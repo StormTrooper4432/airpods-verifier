@@ -61,6 +61,24 @@ model_numbers:
     component: MagSafe Charging Case (Lightning)
     source: apple-identify   # Apple names this one explicitly as the case
 
+# Other AirPods Pro generations. These are recorded for IDENTIFICATION ONLY -
+# this tool verifies Pro 2 and nothing else. Without them, an A-number from
+# another generation is indistinguishable from a fabricated one, and the schema
+# forces the extractor to mislabel the product as a Pro 2.
+#
+# Corpus evidence for why this matters: A3063 appeared on one confirmed
+# counterfeit and one confirmed genuine unit. It is an AirPods Pro 3 number -
+# the posts were a fake Pro 3 and a real one, and the tool could not say so.
+other_generations:
+  - name: AirPods Pro 3
+    introduced: 2025
+    numbers: [A3063, A3064, A3065, A3122]
+    source: apple-identify
+  - name: AirPods Pro (1st generation)
+    introduced: 2019
+    numbers: [A2084, A2083]
+    source: apple-identify
+
 copyright_years:
   Pro 2 USB-C:
     min: 2023

@@ -15,6 +15,7 @@ import pytest
 import main as cli
 from rules_engine import (
     MAXIMUM_COPYRIGHT_YEAR,
+    MIN_COVERAGE_FOR_VERDICT,
     MINIMUM_COPYRIGHT_YEAR,
     MODEL_NUMBERS,
     RULES,
@@ -179,8 +180,33 @@ class TestModelNumberRule:
         # 4 false positives in the first labelled run.
         report = evaluate(make_extraction(extracted_model_number="A9999"))
         assert status_of(report, "Model Number Compatibility") is EvidenceStatus.UNKNOWN
-        assert "not yet cover" in detail_of(report, "Model Number Compatibility")
+        assert "no AirPods Pro generation" in detail_of(report, "Model Number Compatibility")
         assert report.summary_verdict is not Verdict.HIGH_RISK_SUSPECTED
+
+    @pytest.mark.parametrize(
+        "number, generation",
+        [
+            ("A3063", "AirPods Pro 3"),
+            ("A3064", "AirPods Pro 3"),
+            ("A3065", "AirPods Pro 3"),
+            ("A3122", "AirPods Pro 3"),
+            ("A2084", "AirPods Pro (1st generation)"),
+            ("A2083", "AirPods Pro (1st generation)"),
+        ],
+    )
+    def test_other_generations_are_named_not_accused(self, number, generation):
+        # A3063 is a real Pro 3 number. It appeared in the corpus on one genuine
+        # unit and one counterfeit; naming the product is the only honest answer.
+        report = evaluate(make_extraction(extracted_model_number=number))
+        detail = detail_of(report, "Model Number Compatibility")
+        assert status_of(report, "Model Number Compatibility") is EvidenceStatus.UNKNOWN
+        assert generation in detail
+        assert report.summary_verdict is not Verdict.HIGH_RISK_SUSPECTED
+
+    def test_out_of_scope_items_do_not_get_an_authenticity_finding(self):
+        # A counterfeit Pro 3 and a genuine one look identical to a Pro 2 tool.
+        report = evaluate(make_extraction(extracted_model_number="A3063"))
+        assert report.summary_verdict is Verdict.INCONCLUSIVE
 
     def test_malformed_identifier_still_fails(self):
         # Not an A-number at all: no Apple product carries this.
@@ -477,7 +503,9 @@ class TestVerdictAggregation:
 class TestOutputContract:
     def test_report_matches_the_documented_risk_output_schema(self):
         report = evaluate(make_extraction()).to_dict()
-        assert set(report) == {"summary_verdict", "confidence_score", "evidence_ledger"}
+        assert set(report) == {
+            "summary_verdict", "confidence_score", "evidence_ledger", "next_steps"
+        }
         assert report["summary_verdict"] in {v.value for v in Verdict}
         assert 0.0 <= report["confidence_score"] <= 1.0
         for item in report["evidence_ledger"]:
@@ -631,3 +659,50 @@ class TestAccentLossFilter:
         assert "MagSate" in detail
         # The accent-loss word must not be cited as evidence.
         assert "Audifonos" not in detail
+
+
+class TestPanelAwareNextSteps:
+    """Panel data turns an unhelpful UNKNOWN into a specific photograph to take."""
+
+    def _report(self, panels, **overrides):
+        return evaluate(
+            make_extraction(
+                visible_panels=panels,
+                extracted_model_number=None,
+                extracted_serial_number=None,
+                copyright_year=None,
+                has_paper_pull_tabs=False,
+                **overrides,
+            )
+        )
+
+    def test_missing_panels_produce_a_specific_request(self):
+        steps = self._report(["case_exterior", "earbud"]).next_steps
+        assert steps
+        assert any("back of the box" in step for step in steps)
+
+    def test_requests_name_the_checks_they_unblock(self):
+        steps = self._report(["case_exterior"]).next_steps
+        assert any("resolves:" in step for step in steps)
+
+    def test_the_most_informative_panel_wins_a_tie(self):
+        # Underside label and earbud both answer model number + serial; the
+        # label carries them in one printed block, so it is asked for first.
+        steps = self._report(["box_front", "box_back"]).next_steps
+        assert "underside of the box" in steps[0]
+
+    def test_a_photographed_but_unreadable_panel_asks_for_a_reshoot(self):
+        steps = self._report(["box_bottom_label"]).next_steps
+        assert any("re-shoot" in step for step in steps)
+
+    def test_no_open_checks_means_no_busywork(self):
+        report = evaluate(make_extraction(visible_panels=["box_bottom_label", "box_back"]))
+        assert report.summary_verdict is Verdict.GENUINE
+        assert report.next_steps == []
+
+    def test_coverage_is_not_rescoped_to_the_panels_provided(self):
+        # Photographing only the case must never reach a GENUINE verdict just
+        # because the box checks became "not applicable".
+        report = self._report(["case_exterior"])
+        assert report.summary_verdict is Verdict.INCONCLUSIVE
+        assert report.confidence_score < MIN_COVERAGE_FOR_VERDICT

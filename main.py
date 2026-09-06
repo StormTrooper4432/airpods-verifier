@@ -160,20 +160,19 @@ def render_report(report: VerificationReport, *, color: bool) -> str:
     lines.append(f"  Confidence: {report.confidence_score:.2f}")
     lines.append("=" * _RULE_WIDTH)
 
+    if report.next_steps:
+        lines.append("")
+        lines.append(f"{_BOLD if color else ''}WHAT TO ASK FOR NEXT{_RESET if color else ''}")
+        for index, step in enumerate(report.next_steps, start=1):
+            lines.append(_wrap(f"{index}. {step}", indent="     ", width=_RULE_WIDTH))
+
     if report.summary_verdict is Verdict.GENUINE:
+        lines.append("")
         lines.append(
             _wrap(
                 "This check covers packaging and printed identifiers only. It cannot detect a "
                 "counterfeit carrying a serial cloned from a genuine unit, so also confirm the "
                 "serial at checkcoverage.apple.com before paying.",
-                indent="  ",
-            )
-        )
-    elif report.summary_verdict is Verdict.INCONCLUSIVE:
-        lines.append(
-            _wrap(
-                "Re-shoot the unreadable items above in even light, filling the frame with the "
-                "fine print, and run the check again.",
                 indent="  ",
             )
         )

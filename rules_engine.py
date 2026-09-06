@@ -74,6 +74,14 @@ MINIMUM_COPYRIGHT_YEAR: dict[str, int] = {
 #: reprints boxes over a product's life, so this is an observed ceiling.
 MAXIMUM_COPYRIGHT_YEAR: int = max(bounds["max"] for bounds in COPYRIGHT_YEARS.values())
 
+#: A-number -> generation name, for generations this tool identifies but does
+#: not verify. Naming the product beats reporting "unknown number".
+OTHER_GENERATIONS: dict[str, dict] = {
+    number: generation
+    for generation in KNOWLEDGE.get("other_generations", [])
+    for number in generation["numbers"]
+}
+
 SHRINKWRAP_RULES: dict = KNOWLEDGE["packaging"]["shrinkwrap"]
 
 #: Accent-stripped forms of words that legitimately appear on Pro 2 packaging.
@@ -166,6 +174,10 @@ class Rule:
     source: str
     #: Observation-only rules never contribute a FAIL and carry no weight.
     informational: bool = False
+    #: Panels that can answer this rule. Empty means "any image might".
+    #: Used to tell "you did not photograph this" apart from "I looked and it
+    #: was not legible" - two UNKNOWNs that need completely different advice.
+    answerable_from: tuple[str, ...] = ()
 
 
 # --------------------------------------------------------------------------- #
@@ -228,13 +240,23 @@ def _rule_model_number(extraction: VisionExtraction, variant: str) -> RuleOutcom
         # covers Pro 2 - so an unrecognised one usually means "different
         # product", not "fake". Corpus evidence: A3063 appeared on both a
         # confirmed counterfeit and a confirmed genuine unit.
+        generation = OTHER_GENERATIONS.get(number)
+        if generation is not None:
+            return RuleOutcome(
+                EvidenceStatus.UNKNOWN,
+                f"Extracted model {number} is a genuine Apple model number, but it belongs to "
+                f"{generation['name']} (introduced {generation['introduced']}), not AirPods Pro 2. "
+                f"This tool only verifies AirPods Pro 2, so no authenticity finding can be made "
+                f"about this item - a counterfeit {generation['name']} and a genuine one would "
+                f"both look like this here.",
+            )
+
         if _MODEL_NUMBER_SHAPE.fullmatch(number):
             return RuleOutcome(
                 EvidenceStatus.UNKNOWN,
-                f"Extracted model {number} is a well-formed Apple model number but is not an "
-                f"AirPods Pro 2 part. Pro 2 uses A2931/A2699/A2700 (Lightning) and "
-                f"A3047/A3048/A3049/A2968 (USB-C). This is most likely a different AirPods "
-                f"generation, which this tool does not yet cover - confirm which product it is "
+                f"Extracted model {number} is a well-formed Apple model number but matches no "
+                f"AirPods Pro generation known to this tool. It may be another Apple product, a "
+                f"generation not yet in the knowledge base, or a misread - confirm the number "
                 f"before relying on any result here.",
             )
         return RuleOutcome(
@@ -495,6 +517,46 @@ def _rule_visible_panels(extraction: VisionExtraction, variant: str) -> RuleOutc
     return RuleOutcome(EvidenceStatus.UNKNOWN, detail)
 
 
+#: Preference order when two panels would unblock the same number of checks.
+#: The box underside label carries the part number, model numbers and serial in
+#: one printed block, so it is the single most informative photograph anyone can
+#: take; hardware serials are a fallback when the box is gone.
+PANEL_PRIORITY: tuple[str, ...] = (
+    "box_bottom_label",
+    "box_back",
+    "case_lid_underside",
+    "earbud",
+    "box_side",
+    "box_front",
+    "box_top",
+    "case_exterior",
+)
+
+
+#: panel -> how to ask a seller (or yourself) for that photograph.
+PANEL_REQUESTS: dict[str, str] = {
+    "box_bottom_label": (
+        "Photograph the sticker on the underside of the box - it carries the part number, the "
+        "model numbers and the serial."
+    ),
+    "box_back": (
+        "Photograph the back of the box - it carries the copyright line and the regulatory marks."
+    ),
+    "case_lid_underside": (
+        "Open the case and photograph the underside of the lid - the serial is printed there, and "
+        "it should match the serial on the box."
+    ),
+    "earbud": (
+        "Photograph the stem of each earbud - each carries its own serial, different from the "
+        "case and from each other."
+    ),
+    "box_front": "Photograph the front of the box.",
+    "box_side": "Photograph the sides of the box, including any seals or pull tabs.",
+    "box_top": "Photograph the top of the box, including the seams.",
+    "case_exterior": "Photograph the outside of the case, including the hinge and the back button.",
+}
+
+
 # --------------------------------------------------------------------------- #
 # Rule registry
 # --------------------------------------------------------------------------- #
@@ -508,6 +570,7 @@ RULES: tuple[Rule, ...] = (
         disqualifying=True,
         evaluate=_rule_model_number,
         source="Apple, 'Identify your AirPods' (support.apple.com)",
+        answerable_from=("box_bottom_label", "case_lid_underside", "earbud"),
     ),
     Rule(
         tier=2,
@@ -516,6 +579,7 @@ RULES: tuple[Rule, ...] = (
         disqualifying=True,
         evaluate=_rule_packaging_seal,
         source="r/AreMyAirpodsAuthentic community guide, Step 1 (ruled authoritative by owner)",
+        answerable_from=("box_front", "box_back", "box_side", "box_top"),
     ),
     Rule(
         tier=2,
@@ -524,6 +588,7 @@ RULES: tuple[Rule, ...] = (
         disqualifying=True,
         evaluate=_rule_copyright_year,
         source="Apple 'Identify your AirPods' (introduction years); owner (2025 ceiling)",
+        answerable_from=("box_back", "box_bottom_label"),
     ),
     Rule(
         tier=2,
@@ -532,6 +597,7 @@ RULES: tuple[Rule, ...] = (
         disqualifying=False,
         evaluate=_rule_serial_format,
         source="UNSOURCED - length constraint is unverified; do not promote to Tier 1",
+        answerable_from=("box_bottom_label", "case_lid_underside", "earbud"),
     ),
     Rule(
         tier=2,
@@ -540,6 +606,7 @@ RULES: tuple[Rule, ...] = (
         disqualifying=False,
         evaluate=_rule_typography,
         source="Community guide (printed misspellings); corpus measurement (kerning excluded)",
+        answerable_from=("box_back", "box_front", "box_bottom_label"),
     ),
     Rule(
         tier=2,
@@ -563,6 +630,10 @@ _TOTAL_WEIGHT = sum(rule.weight for rule in RULES if not rule.informational)
 def evaluate(extraction: VisionExtraction) -> VerificationReport:
     """Run every rule and fold the outcomes into a verdict + Evidence Ledger."""
     variant = resolve_variant(extraction)
+
+    shown = set(extraction.visible_panels)
+    unanswerable: list[Rule] = []
+    unreadable: list[Rule] = []
 
     ledger: list[EvidenceItem] = []
     evaluated_weight = 0.0
@@ -589,6 +660,13 @@ def evaluate(extraction: VisionExtraction) -> VerificationReport:
         if outcome.status is EvidenceStatus.UNKNOWN:
             if rule.tier == 1:
                 tier1_unresolved = True
+            # Two very different UNKNOWNs: the panel that answers this rule was
+            # never photographed, or it was and the value still could not be
+            # read. Only the first is fixed by taking another photo.
+            if rule.answerable_from and not (shown & set(rule.answerable_from)):
+                unanswerable.append(rule)
+            elif shown:
+                unreadable.append(rule)
             continue
 
         evaluated_weight += rule.weight
@@ -624,7 +702,58 @@ def evaluate(extraction: VisionExtraction) -> VerificationReport:
         summary_verdict=verdict,
         confidence_score=round(min(1.0, max(0.0, confidence)), 2),
         evidence_ledger=ledger,
+        next_steps=_next_steps(unanswerable, unreadable, shown),
     )
+
+
+def _next_steps(
+    unanswerable: list[Rule], unreadable: list[Rule], shown: set[str]
+) -> list[str]:
+    """Turn open checks into the fewest photographs that would resolve them.
+
+    Greedy set cover: repeatedly pick the panel that unblocks the most remaining
+    checks. Listing every panel that *could* answer a rule produces four ways to
+    say "photograph the box", which is noise - a buyer standing in front of a
+    seller needs a short list, in order.
+
+    Coverage is deliberately NOT rescoped to the panels provided. A unit
+    photographed only from the case would otherwise reach high coverage and a
+    GENUINE verdict without anyone having seen the box - missing panels are
+    missing evidence, not irrelevant evidence.
+    """
+    steps: list[str] = []
+    remaining = list(unanswerable)
+
+    while remaining:
+        # Which unshown panel would unblock the most outstanding checks?
+        tally: dict[str, list[str]] = {}
+        for rule in remaining:
+            for panel in rule.answerable_from:
+                if panel not in shown and panel in PANEL_REQUESTS:
+                    tally.setdefault(panel, []).append(rule.parameter)
+        if not tally:
+            break
+
+        def rank(panel: str) -> tuple[int, int]:
+            preference = (
+                len(PANEL_PRIORITY) - PANEL_PRIORITY.index(panel)
+                if panel in PANEL_PRIORITY
+                else 0
+            )
+            return (len(tally[panel]), preference)
+
+        best = max(tally, key=rank)
+        resolved = sorted(set(tally[best]))
+        steps.append(f"{PANEL_REQUESTS[best]} (resolves: {', '.join(resolved)})")
+        remaining = [rule for rule in remaining if best not in rule.answerable_from]
+
+    for rule in unreadable:
+        steps.append(
+            f"{rule.parameter} could not be read from the surfaces you did photograph - "
+            f"re-shoot them in even light, filling the frame with the fine print."
+        )
+
+    return steps
 
 
 def evaluate_dict(payload: dict) -> dict:

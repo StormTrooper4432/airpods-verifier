@@ -213,6 +213,10 @@ class VerificationReport(BaseModel):
     summary_verdict: Verdict
     confidence_score: Annotated[float, Field(ge=0.0, le=1.0)]
     evidence_ledger: list[EvidenceItem]
+    #: Specific photographs that would resolve the open checks, derived from
+    #: which panels were actually shown. An UNKNOWN a buyer can act on is worth
+    #: far more than one they cannot.
+    next_steps: list[str] = Field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         """Plain JSON-safe dict matching the documented Risk Output Schema."""
