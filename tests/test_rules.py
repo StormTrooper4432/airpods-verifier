@@ -230,7 +230,10 @@ class TestPackagingSealRule:
         assert status_of(report, "Packaging Seal Type") is EvidenceStatus.FAIL
         assert report.summary_verdict is Verdict.HIGH_RISK_SUSPECTED
 
-    def test_shoddy_wrap_fails_even_with_a_tab(self):
+    def test_shoddy_wrap_alone_is_not_evidence(self):
+        # Corpus post 6: the model reported wrap AND shoddy wrap on an opened
+        # box with no plastic on it, turning a correct GENUINE into a false
+        # accusation. Subjective quality judgements are recorded, not trusted.
         report = evaluate(
             make_extraction(
                 has_plastic_shrinkwrap=True,
@@ -238,7 +241,28 @@ class TestPackagingSealRule:
                 shrinkwrap_looks_shoddy=True,
             )
         )
+        assert status_of(report, "Packaging Seal Type") is EvidenceStatus.PASS
+        assert "observation only" in detail_of(report, "Packaging Seal Type")
+
+    def test_shoddy_wrap_without_a_tab_still_fails_on_the_tab(self):
+        report = evaluate(
+            make_extraction(
+                has_plastic_shrinkwrap=True,
+                shrinkwrap_has_pull_tab=False,
+                shrinkwrap_looks_shoddy=True,
+            )
+        )
         assert status_of(report, "Packaging Seal Type") is EvidenceStatus.FAIL
+
+    def test_unverifiable_wrap_is_unknown_even_if_called_shoddy(self):
+        report = evaluate(
+            make_extraction(
+                has_plastic_shrinkwrap=True,
+                shrinkwrap_has_pull_tab=None,
+                shrinkwrap_looks_shoddy=True,
+            )
+        )
+        assert status_of(report, "Packaging Seal Type") is EvidenceStatus.UNKNOWN
 
     def test_wrapped_but_sides_not_visible_is_unknown(self):
         report = evaluate(
@@ -580,3 +604,30 @@ class TestCorpusRetry:
         from tools.run_corpus import is_retryable
 
         assert not is_retryable(message)
+
+
+class TestAccentLossFilter:
+    """OCR drops diacritics; the extractor then reports its own reading loss as
+    a printing defect. Corpus post 3 was accused this way on a genuine box."""
+
+    @pytest.mark.parametrize("word", ["Audifonos", "audifonos", "inalambricos", "tamanos"])
+    def test_accent_only_differences_are_not_evidence(self, word):
+        report = evaluate(make_extraction(visible_spelling_errors=[word]))
+        assert status_of(report, "Typography & Print Quality") is EvidenceStatus.UNKNOWN
+        assert report.summary_verdict is not Verdict.HIGH_RISK_SUSPECTED
+
+    @pytest.mark.parametrize(
+        "word", ["MagSate", "Appie", "Bums", "swalliwed", "inalimbricos", "Designd"]
+    )
+    def test_letter_substitutions_still_fail(self, word):
+        # Post 4's real counterfeit errors must survive the filter untouched.
+        report = evaluate(make_extraction(visible_spelling_errors=[word]))
+        assert status_of(report, "Typography & Print Quality") is EvidenceStatus.FAIL
+
+    def test_a_real_error_alongside_accent_loss_still_fails(self):
+        report = evaluate(make_extraction(visible_spelling_errors=["Audifonos", "MagSate"]))
+        detail = detail_of(report, "Typography & Print Quality")
+        assert status_of(report, "Typography & Print Quality") is EvidenceStatus.FAIL
+        assert "MagSate" in detail
+        # The accent-loss word must not be cited as evidence.
+        assert "Audifonos" not in detail

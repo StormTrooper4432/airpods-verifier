@@ -80,6 +80,26 @@ packaging:
     requires_side_pull_tab: true
     quality_matters: true
     source: community-guide (ruled authoritative by owner)
+  # Accented words that genuinely appear on Pro 2 retail packaging, transcribed
+  # from photographs of confirmed-genuine boxes. OCR routinely drops diacritics,
+  # so a reported "misspelling" that matches one of these once accents are
+  # stripped is an artefact of reading, not a defect in printing. Corpus post 3:
+  # a genuine box printed "Audifonos inalambricos" correctly and was accused
+  # because the extractor returned it without accents.
+  expected_accented_words:
+    - audifonos       # audifonos
+    - inalambricos    # inalambricos
+    - tamanos         # tamanos
+    - certificacion   # certificacion
+    - almohadillas
+    - cargadores
+    - estuche
+    - empaque
+    - reciclaje
+    - generacion      # generacion
+    - boitier         # boitier (fr)
+    - source: community-guide + transcription from confirmed-genuine box photos
+
   paper_pull_tabs:
     description: Paper pull-tabs with green arrows on the box seams.
     source: owner

@@ -22,6 +22,7 @@ the product's release), so rules carry an explicit ``disqualifying`` flag.
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Iterable
@@ -74,6 +75,32 @@ MINIMUM_COPYRIGHT_YEAR: dict[str, int] = {
 MAXIMUM_COPYRIGHT_YEAR: int = max(bounds["max"] for bounds in COPYRIGHT_YEARS.values())
 
 SHRINKWRAP_RULES: dict = KNOWLEDGE["packaging"]["shrinkwrap"]
+
+#: Accent-stripped forms of words that legitimately appear on Pro 2 packaging.
+EXPECTED_ACCENTED_WORDS: frozenset[str] = frozenset(
+    entry.lower()
+    for entry in KNOWLEDGE["packaging"].get("expected_accented_words", [])
+    if isinstance(entry, str)
+)
+
+
+def strip_accents(text: str) -> str:
+    return "".join(
+        ch for ch in unicodedata.normalize("NFD", text) if not unicodedata.combining(ch)
+    )
+
+
+def is_accent_loss(word: str) -> bool:
+    """True if this "misspelling" is just a word that lost its diacritics.
+
+    OCR drops accents routinely, and the extractor then reports its own reading
+    loss as a printing defect. Corpus post 3 was accused this way on a genuine
+    box that printed "Audifonos inalambricos" correctly. Real counterfeit
+    misspellings are letter substitutions - post 4's "MagSate", "Appie",
+    "Bums", "swalliwed" - which survive this filter untouched.
+    """
+    normalised = strip_accents(word).lower().strip(" .,;:!?()")
+    return any(normalised == expected for expected in EXPECTED_ACCENTED_WORDS)
 
 #: Used when the variant is still unknown at copyright-check time: the most
 #: permissive bound, so an unidentified box is never failed on a technicality.
@@ -260,31 +287,38 @@ def _rule_packaging_seal(extraction: VisionExtraction, variant: str) -> RuleOutc
     is common online and wrong, and coding it would accuse genuine sealed units.
     """
     if extraction.has_plastic_shrinkwrap:
+        # "Looks shoddy" is a subjective quality judgement, and those have now
+        # produced a false positive twice: kerning on posts 3 and 7, and this
+        # field on post 6 - where the model reported wrap AND shoddy wrap on an
+        # opened box with no plastic on it at all. It is recorded as a note and
+        # never fails on its own. Only the objective, checkable condition -
+        # wrapped with no side pull tab - is treated as evidence.
+        shoddy_note = (
+            " The wrap was also described as loose or poorly finished, which is recorded as an "
+            "observation only."
+            if extraction.shrinkwrap_looks_shoddy
+            else ""
+        )
+
         if extraction.shrinkwrap_has_pull_tab is False:
             return RuleOutcome(
                 EvidenceStatus.FAIL,
                 "The box is shrink-wrapped with no pull tab at the side. Genuine wrapped retail "
                 "units carry a tear-strip pull tab; wrap without one indicates the box was "
-                "re-sealed after the fact.",
-            )
-        if extraction.shrinkwrap_looks_shoddy:
-            return RuleOutcome(
-                EvidenceStatus.FAIL,
-                "The shrink wrap is loose, wrinkled, yellowed, or heavily seamed. Apple's factory "
-                "wrap is tight with minimal seams.",
+                "re-sealed after the fact." + shoddy_note,
             )
         if extraction.shrinkwrap_has_pull_tab:
             return RuleOutcome(
                 EvidenceStatus.PASS,
-                "The box is shrink-wrapped with a side pull tab and the wrap looks tight and "
-                "cleanly seamed, which is consistent with factory-sealed retail stock. Note that "
-                "most genuine Pro 2 units are not wrapped at all - either state is normal.",
+                "The box is shrink-wrapped and a side pull tab is present, consistent with "
+                "factory-sealed retail stock. Most genuine Pro 2 units are not wrapped at all - "
+                "either state is normal." + shoddy_note,
             )
         return RuleOutcome(
             EvidenceStatus.UNKNOWN,
-            "The box is shrink-wrapped, but the sides are not visible so the presence of a pull "
-            "tab could not be checked. Wrapping alone is not evidence either way; photograph the "
-            "box edges to resolve this.",
+            "The box was reported as shrink-wrapped, but no side pull tab could be seen either "
+            "way. Wrapping alone is not evidence; photograph the box edges to resolve this."
+            + shoddy_note,
         )
 
     if extraction.has_paper_pull_tabs:
@@ -379,13 +413,26 @@ def _rule_typography(extraction: VisionExtraction, variant: str) -> RuleOutcome:
         else ""
     )
 
-    if extraction.visible_spelling_errors:
-        listed = ", ".join(f"'{word}'" for word in extraction.visible_spelling_errors)
+    reported = list(extraction.visible_spelling_errors)
+    accent_only = [word for word in reported if is_accent_loss(word)]
+    real_errors = [word for word in reported if not is_accent_loss(word)]
+
+    if real_errors:
+        listed = ", ".join(f"'{word}'" for word in real_errors)
         return RuleOutcome(
             EvidenceStatus.FAIL,
             f"Misspelled text is printed on the packaging ({listed}). Apple's retail packaging is "
             f"proofed and offset-printed, so printed misspellings indicate a reproduction."
             + kerning_note,
+        )
+
+    if accent_only:
+        dropped = ", ".join(f"'{word}'" for word in accent_only)
+        return RuleOutcome(
+            EvidenceStatus.UNKNOWN,
+            f"The only reported spelling issues ({dropped}) are words that appear on genuine "
+            f"packaging and differ solely by missing accents. OCR routinely drops diacritics, so "
+            f"this is treated as a reading artefact rather than a printing defect." + kerning_note,
         )
 
     if extraction.font_kerning_irregularities:

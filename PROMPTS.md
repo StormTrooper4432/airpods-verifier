@@ -39,7 +39,7 @@ Constraints:
 - `visible_panels`: which surfaces the images actually show, from: box_front, box_back, box_bottom_label, box_side, box_top, case_exterior, case_lid_underside, earbud, accessories, other. `box_bottom_label` is the sticker carrying the part number, model numbers, UPC and serial. Include a panel only when you can clearly identify it; an empty list is a valid answer.
 - `has_paper_pull_tabs`: true when the matte paper tabs with green arrows are visible on the top and bottom seams.
 - `font_kerning_irregularities`: true only for a defect you can actually see — uneven letter spacing, wrong font weight, or misaligned baselines. Photo blur, glare, and low resolution are not defects; if the print is simply hard to read, this is false.
-- `visible_spelling_errors`: list each misspelled word exactly as printed. Correctly spelled text in a language other than English is not an error.
+- `visible_spelling_errors`: list each misspelled word exactly as printed. Correctly spelled text in a language other than English is not an error. **Do not report a word solely because it is missing an accent** — if you cannot resolve the diacritic at this resolution, treat the word as correct. Report only letter-level errors you can actually see (a wrong or missing letter, e.g. "MagSate" for "MagSafe"), not characters you were unable to render.
 
 ### Uncertainty
 
