@@ -23,12 +23,13 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Callable, Iterable
 
+import yaml
+
 from schema import (
-    VARIANT_LIGHTNING,
     VARIANT_UNKNOWN,
-    VARIANT_USB_C,
     EvidenceItem,
     EvidenceStatus,
     Verdict,
@@ -37,33 +38,42 @@ from schema import (
 )
 
 # --------------------------------------------------------------------------- #
-# Ground truth (REQUIREMENTS.md §1 and §2)
+# Ground truth (knowledge/airpods_pro_2.yaml)
 # --------------------------------------------------------------------------- #
 
-#: variant -> component -> set of valid Apple A-numbers
-HARDWARE_MATRIX: dict[str, dict[str, frozenset[str]]] = {
-    VARIANT_USB_C: {
-        "Left Earbud": frozenset({"A3047"}),
-        "Right Earbud": frozenset({"A3048"}),
-        "Charging Case": frozenset({"A3049", "A2968"}),
-    },
-    VARIANT_LIGHTNING: {
-        "Left Earbud": frozenset({"A2931"}),
-        "Right Earbud": frozenset({"A2699"}),
-        "Charging Case": frozenset({"A2700"}),
-    },
+KNOWLEDGE_PATH = Path(__file__).with_name("knowledge") / "airpods_pro_2.yaml"
+
+
+def load_knowledge(path: Path | str = KNOWLEDGE_PATH) -> dict:
+    """Read the product knowledge base.
+
+    Data lives in YAML so adding a generation is a data edit; rule logic stays
+    in tested Python. Every factual entry carries a `source` - see the header of
+    the YAML file for why.
+    """
+    with open(path, encoding="utf-8") as handle:
+        return yaml.safe_load(handle)
+
+
+KNOWLEDGE = load_knowledge()
+
+#: number -> {"variant": str, "component": str | None, "source": str}
+MODEL_NUMBERS: dict[str, dict] = {
+    entry["number"]: entry for entry in KNOWLEDGE["model_numbers"]
 }
 
-#: Earliest copyright year that can legitimately appear on each variant's box.
+#: variant -> {"min": int, "max": int, "source": str}
+COPYRIGHT_YEARS: dict[str, dict] = KNOWLEDGE["copyright_years"]
+
 MINIMUM_COPYRIGHT_YEAR: dict[str, int] = {
-    VARIANT_USB_C: 2023,       # released late 2023
-    VARIANT_LIGHTNING: 2022,   # released 2022
+    variant: bounds["min"] for variant, bounds in COPYRIGHT_YEARS.items()
 }
 
-#: Latest copyright year observed on genuine AirPods Pro 2 retail packaging.
-#: Apple reprints boxes over a product's life, so this is an observed ceiling,
-#: not a release date. A 2026 line on a Pro 2 box is out of range.
-MAXIMUM_COPYRIGHT_YEAR = 2025
+#: Latest copyright year observed on genuine Pro 2 retail packaging. Apple
+#: reprints boxes over a product's life, so this is an observed ceiling.
+MAXIMUM_COPYRIGHT_YEAR: int = max(bounds["max"] for bounds in COPYRIGHT_YEARS.values())
+
+SHRINKWRAP_RULES: dict = KNOWLEDGE["packaging"]["shrinkwrap"]
 
 #: Used when the variant is still unknown at copyright-check time: the most
 #: permissive bound, so an unidentified box is never failed on a technicality.
@@ -71,11 +81,13 @@ _PERMISSIVE_MINIMUM_YEAR = min(MINIMUM_COPYRIGHT_YEAR.values())
 
 #: Apple serial numbers are uppercase alphanumeric. Legacy units use 12
 #: characters; devices from the randomised-serial era use 10.
+#: NOTE: this length constraint has no external source - see RULE_SOURCES.
 _VALID_SERIAL_LENGTHS = (10, 12)
+_SERIAL_CHARSET_RE = re.compile(r"^[A-Z0-9]+$")
 
 #: Shape of an Apple model number, independent of which product it belongs to.
 _MODEL_NUMBER_SHAPE = re.compile(r"A\d{4}")
-_SERIAL_CHARSET_RE = re.compile(r"^[A-Z0-9]+$")
+
 
 # --------------------------------------------------------------------------- #
 # Scoring policy
@@ -121,6 +133,12 @@ class Rule:
     #: True when a FAIL is on its own sufficient to call the item high risk.
     disqualifying: bool
     evaluate: Callable[[VisionExtraction, str], RuleOutcome]
+    #: Where this rule's factual claim comes from. Required, and enforced by a
+    #: test: a rule with no provenance is an invented specification, which is
+    #: how a counterfeit detector ends up containing counterfeit information.
+    source: str
+    #: Observation-only rules never contribute a FAIL and carry no weight.
+    informational: bool = False
 
 
 # --------------------------------------------------------------------------- #
@@ -131,15 +149,14 @@ class Rule:
 def lookup_model_number(model_number: str) -> list[tuple[str, str]]:
     """Return every ``(variant, component)`` pair a given A-number belongs to.
 
-    An empty list means the number is not an AirPods Pro 2 part at all.
+    An empty list means the number is not a known Pro 2 part. ``component`` is
+    a human-readable label; where the source does not say which component a
+    number belongs to, it reads "part" rather than a guessed left/right.
     """
-    hits: list[tuple[str, str]] = []
-    needle = model_number.strip().upper()
-    for variant, components in HARDWARE_MATRIX.items():
-        for component, numbers in components.items():
-            if needle in numbers:
-                hits.append((variant, component))
-    return hits
+    entry = MODEL_NUMBERS.get(model_number.strip().upper())
+    if entry is None:
+        return []
+    return [(entry["variant"], entry.get("component") or "part")]
 
 
 def resolve_variant(extraction: VisionExtraction) -> str:
@@ -235,29 +252,52 @@ def _rule_model_number(extraction: VisionExtraction, variant: str) -> RuleOutcom
 
 
 def _rule_packaging_seal(extraction: VisionExtraction, variant: str) -> RuleOutcome:
+    """Seal check.
+
+    Being shrink-wrapped is NOT evidence of a counterfeit. Genuine sealed Pro 2
+    units do ship wrapped; the discriminator is whether the wrap has a side pull
+    tab and is tight with minimal seams. The blanket "wrapped means fake" claim
+    is common online and wrong, and coding it would accuse genuine sealed units.
+    """
     if extraction.has_plastic_shrinkwrap:
-        note = (
-            " Paper pull-tabs were also reported, which is contradictory -- treat the "
-            "shrink wrap as the decisive signal."
-            if extraction.has_paper_pull_tabs
-            else ""
-        )
+        if extraction.shrinkwrap_has_pull_tab is False:
+            return RuleOutcome(
+                EvidenceStatus.FAIL,
+                "The box is shrink-wrapped with no pull tab at the side. Genuine wrapped retail "
+                "units carry a tear-strip pull tab; wrap without one indicates the box was "
+                "re-sealed after the fact.",
+            )
+        if extraction.shrinkwrap_looks_shoddy:
+            return RuleOutcome(
+                EvidenceStatus.FAIL,
+                "The shrink wrap is loose, wrinkled, yellowed, or heavily seamed. Apple's factory "
+                "wrap is tight with minimal seams.",
+            )
+        if extraction.shrinkwrap_has_pull_tab:
+            return RuleOutcome(
+                EvidenceStatus.PASS,
+                "The box is shrink-wrapped with a side pull tab and the wrap looks tight and "
+                "cleanly seamed, which is consistent with factory-sealed retail stock. Note that "
+                "most genuine Pro 2 units are not wrapped at all - either state is normal.",
+            )
         return RuleOutcome(
-            EvidenceStatus.FAIL,
-            "Full plastic shrink wrap detected. Retail AirPods Pro 2 boxes are sealed with "
-            "paper pull-tabs bearing green arrows on the top and bottom seams and never ship "
-            "in plastic shrink wrap." + note,
+            EvidenceStatus.UNKNOWN,
+            "The box is shrink-wrapped, but the sides are not visible so the presence of a pull "
+            "tab could not be checked. Wrapping alone is not evidence either way; photograph the "
+            "box edges to resolve this.",
         )
+
     if extraction.has_paper_pull_tabs:
         return RuleOutcome(
             EvidenceStatus.PASS,
-            "Paper pull-tab seals with green arrows are present and no plastic shrink wrap "
-            "was detected, matching Apple's retail packaging for this generation.",
+            "Paper pull-tab seals with green arrows are present and the box is not wrapped, "
+            "matching Apple's retail packaging for this generation.",
         )
+
     return RuleOutcome(
         EvidenceStatus.UNKNOWN,
-        "Neither plastic shrink wrap nor paper pull-tabs are visible, which is expected for "
-        "an already-opened box. Seal type could not be assessed from these images.",
+        "Neither plastic wrap nor paper pull-tabs are visible, which is expected for an "
+        "already-opened box. Seal type could not be assessed from these images.",
     )
 
 
@@ -270,15 +310,16 @@ def _rule_copyright_year(extraction: VisionExtraction, variant: str) -> RuleOutc
             "underside of the box.",
         )
 
-    if year > MAXIMUM_COPYRIGHT_YEAR:
+    ceiling = COPYRIGHT_YEARS.get(variant, {}).get("max", MAXIMUM_COPYRIGHT_YEAR)
+    if year > ceiling:
         return RuleOutcome(
             EvidenceStatus.FAIL,
             f"Copyright year {year} is later than any year observed on genuine AirPods Pro 2 "
-            f"packaging (latest is {MAXIMUM_COPYRIGHT_YEAR}). Apple reprints boxes over a "
-            f"product's life, but not beyond it.",
+            f"packaging (latest is {ceiling}). Apple reprints boxes over a product's life, but "
+            f"not beyond it.",
         )
 
-    minimum = MINIMUM_COPYRIGHT_YEAR.get(variant, _PERMISSIVE_MINIMUM_YEAR)
+    minimum = COPYRIGHT_YEARS.get(variant, {}).get('min', _PERMISSIVE_MINIMUM_YEAR)
     if year < minimum:
         if variant == VARIANT_UNKNOWN:
             return RuleOutcome(
@@ -364,6 +405,49 @@ def _rule_typography(extraction: VisionExtraction, variant: str) -> RuleOutcome:
     )
 
 
+def _rule_visible_panels(extraction: VisionExtraction, variant: str) -> RuleOutcome:
+    """Record which surfaces were photographed. Observation only.
+
+    This never fails. Panel identification is not yet accurate enough to drive a
+    finding - the extractor has confidently mislabelled a Pro 3 box as a Pro 2 -
+    and a wrong panel ID feeding a rule would manufacture false positives. Its
+    accuracy is being measured against a labelled corpus first; only then do the
+    panel-dependent rules in the knowledge base get promoted.
+    """
+    panels = extraction.visible_panels
+    if not panels:
+        return RuleOutcome(
+            EvidenceStatus.UNKNOWN,
+            "No product surface could be identified in these images.",
+        )
+
+    labels = {
+        "box_bottom_label": "the box underside label",
+        "box_back": "the box rear panel",
+        "box_front": "the box front",
+        "box_side": "a box side",
+        "box_top": "the box top",
+        "case_exterior": "the case exterior",
+        "case_lid_underside": "the underside of the case lid",
+        "earbud": "an earbud",
+        "accessories": "accessories",
+        "other": "an unidentified surface",
+    }
+    seen = ", ".join(labels.get(panel, panel) for panel in panels)
+    missing = [
+        name
+        for panel, name in (
+            ("box_bottom_label", "the box underside label (model number and serial)"),
+            ("case_lid_underside", "the underside of the case lid (serial)"),
+        )
+        if panel not in panels
+    ]
+    detail = f"Images show: {seen}."
+    if missing:
+        detail += " Not photographed: " + "; ".join(missing) + "."
+    return RuleOutcome(EvidenceStatus.UNKNOWN, detail)
+
+
 # --------------------------------------------------------------------------- #
 # Rule registry
 # --------------------------------------------------------------------------- #
@@ -376,6 +460,7 @@ RULES: tuple[Rule, ...] = (
         weight=5.0,
         disqualifying=True,
         evaluate=_rule_model_number,
+        source="Apple, 'Identify your AirPods' (support.apple.com)",
     ),
     Rule(
         tier=2,
@@ -383,6 +468,7 @@ RULES: tuple[Rule, ...] = (
         weight=3.0,
         disqualifying=True,
         evaluate=_rule_packaging_seal,
+        source="r/AreMyAirpodsAuthentic community guide, Step 1 (ruled authoritative by owner)",
     ),
     Rule(
         tier=2,
@@ -390,6 +476,7 @@ RULES: tuple[Rule, ...] = (
         weight=2.0,
         disqualifying=True,
         evaluate=_rule_copyright_year,
+        source="Apple 'Identify your AirPods' (introduction years); owner (2025 ceiling)",
     ),
     Rule(
         tier=2,
@@ -397,6 +484,7 @@ RULES: tuple[Rule, ...] = (
         weight=1.5,
         disqualifying=False,
         evaluate=_rule_serial_format,
+        source="UNSOURCED - length constraint is unverified; do not promote to Tier 1",
     ),
     Rule(
         tier=2,
@@ -404,10 +492,20 @@ RULES: tuple[Rule, ...] = (
         weight=1.5,
         disqualifying=False,
         evaluate=_rule_typography,
+        source="Community guide (printed misspellings); corpus measurement (kerning excluded)",
+    ),
+    Rule(
+        tier=2,
+        parameter="Photographed Surfaces",
+        weight=0.0,
+        disqualifying=False,
+        evaluate=_rule_visible_panels,
+        source="Observation only - no factual claim made",
+        informational=True,
     ),
 )
 
-_TOTAL_WEIGHT = sum(rule.weight for rule in RULES)
+_TOTAL_WEIGHT = sum(rule.weight for rule in RULES if not rule.informational)
 
 
 # --------------------------------------------------------------------------- #
@@ -433,8 +531,13 @@ def evaluate(extraction: VisionExtraction) -> VerificationReport:
                 parameter=rule.parameter,
                 status=outcome.status,
                 detail=outcome.detail,
+                source=rule.source,
             )
         )
+
+        # Observation-only rules are reported but never scored.
+        if rule.informational:
+            continue
 
         if outcome.status is EvidenceStatus.UNKNOWN:
             if rule.tier == 1:

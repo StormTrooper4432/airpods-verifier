@@ -1,0 +1,135 @@
+# Ground truth for AirPods Pro 2. Data only - rule logic lives in rules_engine.py.
+#
+# EVERY factual entry carries a `source`. Nothing goes in this file because it
+# sounds right; if it has no source it does not belong here. Sources used:
+#
+#   apple-identify   Apple, "Identify your AirPods" (support.apple.com)
+#   owner            Project owner, domain expert in AirPods authentication
+#   community-guide  r/AreMyAirpodsAuthentic, "How To Tell If Your Airpod Pros
+#                    Are Fake - A Comprehensive and Definitive Guide"
+#
+# Precedence when sources disagree: apple-identify > owner > community-guide.
+
+product:
+  name: AirPods Pro 2
+  generation: 2
+
+variants:
+  - id: Pro 2 USB-C
+    introduced: 2023
+    source: apple-identify
+  - id: Pro 2 Lightning
+    introduced: 2022
+    source: apple-identify
+
+# Apple lists the three set numbers together without saying which is the left
+# earbud, the right earbud, or the case. Where the component is genuinely
+# unspecified by the source it is left null rather than guessed - the rule only
+# needs set membership and variant, so inventing the mapping would add
+# unsourced detail to the ledger for no benefit.
+model_numbers:
+  - number: A3047
+    variant: Pro 2 USB-C
+    component: null
+    source: apple-identify
+  - number: A3048
+    variant: Pro 2 USB-C
+    component: null
+    source: apple-identify
+  - number: A3049
+    variant: Pro 2 USB-C
+    component: null
+    source: apple-identify
+  - number: A2968
+    variant: Pro 2 USB-C
+    component: MagSafe Charging Case (USB-C)
+    source: apple-identify   # Apple names this one explicitly as the case
+  - number: A2931
+    variant: Pro 2 Lightning
+    component: null
+    source: apple-identify
+  - number: A2699
+    variant: Pro 2 Lightning
+    component: null
+    source: apple-identify
+  - number: A2698
+    variant: Pro 2 Lightning
+    component: null
+    source: apple-identify
+  - number: A2700
+    variant: Pro 2 Lightning
+    component: MagSafe Charging Case (Lightning)
+    source: apple-identify   # Apple names this one explicitly as the case
+
+copyright_years:
+  Pro 2 USB-C:
+    min: 2023
+    max: 2025
+    source: apple-identify (introduced 2023); owner (observed ceiling 2025)
+  Pro 2 Lightning:
+    min: 2022
+    max: 2025
+    source: apple-identify (introduced 2022); owner (observed ceiling 2025)
+
+packaging:
+  shrinkwrap:
+    # Contradicts the common "wrapped = fake" claim, and contradicts the
+    # project's own earlier REQUIREMENTS.md. The owner ruled in favour of this
+    # version: being wrapped is not itself evidence.
+    genuine_may_be_wrapped: true
+    requires_side_pull_tab: true
+    quality_matters: true
+    source: community-guide (ruled authoritative by owner)
+  paper_pull_tabs:
+    description: Paper pull-tabs with green arrows on the box seams.
+    source: owner
+
+# Panel-indexed expectations. Consumed only as observation for now - panel
+# identification is not yet accurate enough to drive a FAIL. Promote entries to
+# rules once panel-ID accuracy is measured against a labelled corpus.
+panels:
+  box_bottom_label:
+    description: Sticker label on the underside carrying part number, model numbers, UPC and serial.
+    expects: [part_number, model_numbers, upc, serial_number]
+    source: community-guide
+  box_back:
+    description: Rear panel with multilingual product description and regulatory marks.
+    expects: [copyright_line, regulatory_marks]
+    source: community-guide
+  case_lid_underside:
+    description: Serial number is printed on the underside of the case lid.
+    expects: [serial_number]
+    source: apple-identify
+  earbud:
+    description: Each earbud carries its own serial, longer than and different from the case serial.
+    expects: [serial_number]
+    source: community-guide
+
+# Documented but NOT yet implemented as rules. Recorded so the knowledge is
+# captured with provenance, and so it is obvious what is known-but-unused.
+pending_rules:
+  - id: serial_cross_match
+    statement: >-
+      Box serial must match the case-lid serial. Each earbud carries its own
+      serial, longer than and different from the case serial. An earbud serial
+      equal to the case or box serial means counterfeit.
+    blocked_on: Extraction of multiple serials tagged by panel.
+    source: community-guide
+  - id: missing_accents
+    statement: >-
+      Accented characters rendered without their accents (e.g. "inalambricos"
+      for "inalambricos") indicate a reproduction.
+    blocked_on: Extractor must distinguish a missing accent from OCR loss.
+    source: community-guide
+  - id: part_number_region
+    statement: >-
+      The part number suffix encodes region (e.g. AM/A, ZA/A) and should agree
+      with the regulatory marks printed on the box.
+    blocked_on: Part number and region marks are not extracted yet.
+    source: community-guide
+  - id: sticker_geometry
+    statement: >-
+      The bottom sticker sits about 1mm above the box bottom edge, with its
+      first line bolded and labels aligned.
+    blocked_on: Requires geometric measurement, not text extraction.
+    source: community-guide

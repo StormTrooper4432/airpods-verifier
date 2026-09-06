@@ -6,5 +6,10 @@
   "has_plastic_shrinkwrap": false,
   "has_paper_pull_tabs": true,
   "font_kerning_irregularities": false,
-  "visible_spelling_errors": []
+  "visible_spelling_errors": [],
+  "shrinkwrap_has_pull_tab": null,
+  "shrinkwrap_looks_shoddy": null,
+  "visible_panels": [
+    "box_bottom_label"
+  ]
 }

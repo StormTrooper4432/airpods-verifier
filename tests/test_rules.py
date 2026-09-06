@@ -14,9 +14,10 @@ import pytest
 
 import main as cli
 from rules_engine import (
-    HARDWARE_MATRIX,
     MAXIMUM_COPYRIGHT_YEAR,
     MINIMUM_COPYRIGHT_YEAR,
+    MODEL_NUMBERS,
+    RULES,
     evaluate,
     evaluate_dict,
     lookup_model_number,
@@ -42,6 +43,9 @@ GENUINE_USB_C = {
     "copyright_year": 2023,
     "has_plastic_shrinkwrap": False,
     "has_paper_pull_tabs": True,
+    "shrinkwrap_has_pull_tab": None,
+    "shrinkwrap_looks_shoddy": None,
+    "visible_panels": ["box_bottom_label"],
     "font_kerning_irregularities": False,
     "visible_spelling_errors": [],
 }
@@ -136,26 +140,29 @@ class TestSchemaNormalisation:
 
 
 class TestModelNumberRule:
-    @pytest.mark.parametrize(
-        "variant, component, number",
-        [
-            (variant, component, number)
-            for variant, components in HARDWARE_MATRIX.items()
-            for component, numbers in components.items()
-            for number in numbers
-        ],
-    )
-    def test_every_matrix_entry_passes_against_its_own_variant(self, variant, component, number):
+    @pytest.mark.parametrize("number", sorted(MODEL_NUMBERS))
+    def test_every_known_number_passes_against_its_own_variant(self, number):
+        variant = MODEL_NUMBERS[number]["variant"]
         report = evaluate(
             make_extraction(claimed_model_variant=variant, extracted_model_number=number)
         )
         assert status_of(report, "Model Number Compatibility") is EvidenceStatus.PASS
-        assert component in detail_of(report, "Model Number Compatibility")
+
+    def test_a2698_is_recognised(self):
+        # Present on genuine Lightning boxes; absent from the original spec doc.
+        assert MODEL_NUMBERS["A2698"]["variant"] == VARIANT_LIGHTNING
 
     def test_lookup_returns_variant_and_component(self):
-        assert lookup_model_number("A2968") == [(VARIANT_USB_C, "Charging Case")]
-        assert lookup_model_number("a2700") == [(VARIANT_LIGHTNING, "Charging Case")]
+        assert lookup_model_number("A2968") == [(VARIANT_USB_C, "MagSafe Charging Case (USB-C)")]
+        assert lookup_model_number("a2700") == [
+            (VARIANT_LIGHTNING, "MagSafe Charging Case (Lightning)")
+        ]
         assert lookup_model_number("A9999") == []
+
+    def test_unspecified_components_are_not_invented(self):
+        # Apple lists the three set numbers without saying which is left/right.
+        # Guessing would put unsourced detail in the ledger.
+        assert lookup_model_number("A3047") == [(VARIANT_USB_C, "part")]
 
     def test_cross_variant_model_number_fails(self):
         # A Lightning case number on a USB-C box: a real counterfeit tell.
@@ -207,17 +214,37 @@ class TestModelNumberRule:
 
 
 class TestPackagingSealRule:
-    def test_shrinkwrap_alone_condemns_an_otherwise_perfect_unit(self):
-        report = evaluate(make_extraction(has_plastic_shrinkwrap=True, has_paper_pull_tabs=False))
+    def test_wrapping_alone_is_not_evidence(self):
+        # The common "wrapped means fake" claim is wrong: genuine sealed units
+        # do ship wrapped. Coding the blanket rule would accuse real stock.
+        report = evaluate(
+            make_extraction(has_plastic_shrinkwrap=True, shrinkwrap_has_pull_tab=True)
+        )
+        assert status_of(report, "Packaging Seal Type") is EvidenceStatus.PASS
+        assert report.summary_verdict is not Verdict.HIGH_RISK_SUSPECTED
+
+    def test_wrap_without_a_side_pull_tab_fails(self):
+        report = evaluate(
+            make_extraction(has_plastic_shrinkwrap=True, shrinkwrap_has_pull_tab=False)
+        )
         assert status_of(report, "Packaging Seal Type") is EvidenceStatus.FAIL
-        # Every other rule passes, so this proves the single disqualifier drives
-        # the verdict on its own.
         assert report.summary_verdict is Verdict.HIGH_RISK_SUSPECTED
 
-    def test_shrinkwrap_wins_over_a_contradictory_pull_tab_report(self):
-        report = evaluate(make_extraction(has_plastic_shrinkwrap=True, has_paper_pull_tabs=True))
+    def test_shoddy_wrap_fails_even_with_a_tab(self):
+        report = evaluate(
+            make_extraction(
+                has_plastic_shrinkwrap=True,
+                shrinkwrap_has_pull_tab=True,
+                shrinkwrap_looks_shoddy=True,
+            )
+        )
         assert status_of(report, "Packaging Seal Type") is EvidenceStatus.FAIL
-        assert "contradictory" in detail_of(report, "Packaging Seal Type")
+
+    def test_wrapped_but_sides_not_visible_is_unknown(self):
+        report = evaluate(
+            make_extraction(has_plastic_shrinkwrap=True, shrinkwrap_has_pull_tab=None)
+        )
+        assert status_of(report, "Packaging Seal Type") is EvidenceStatus.UNKNOWN
 
     def test_paper_pull_tabs_pass(self):
         report = evaluate(make_extraction())
@@ -430,14 +457,30 @@ class TestOutputContract:
         assert report["summary_verdict"] in {v.value for v in Verdict}
         assert 0.0 <= report["confidence_score"] <= 1.0
         for item in report["evidence_ledger"]:
-            assert set(item) == {"tier", "parameter", "status", "detail"}
+            assert set(item) == {"tier", "parameter", "status", "detail", "source"}
+            assert item["source"].strip(), "every rule must declare provenance"
             assert item["tier"] in (1, 2)
             assert item["status"] in {s.value for s in EvidenceStatus}
             assert item["detail"].strip()
 
-    def test_every_rule_produces_exactly_one_ledger_line(self):
-        from rules_engine import RULES
+    def test_every_rule_declares_a_source(self):
+        # A rule with no provenance is an invented specification.
+        for rule in RULES:
+            assert rule.source.strip(), f"{rule.parameter} has no source"
 
+    def test_unsourced_rules_are_flagged_and_cannot_disqualify(self):
+        # The serial-length rule is not externally sourced. Until it is, it must
+        # never be able to drive a HIGH_RISK verdict on its own.
+        for rule in RULES:
+            if rule.source.startswith("UNSOURCED"):
+                assert not rule.disqualifying, f"{rule.parameter} is unsourced but disqualifying"
+
+    def test_informational_rules_carry_no_weight(self):
+        for rule in RULES:
+            if rule.informational:
+                assert rule.weight == 0.0
+
+    def test_every_rule_produces_exactly_one_ledger_line(self):
         report = evaluate(make_extraction())
         parameters = [item.parameter for item in report.evidence_ledger]
         assert parameters == [rule.parameter for rule in RULES]

@@ -35,6 +35,23 @@ VARIANT_UNKNOWN = "Unknown"
 #: shape for the strict structured-outputs schema validator.
 ClaimedVariant = Literal["Pro 2 USB-C", "Pro 2 Lightning", "Unknown"]
 
+#: Surfaces a photograph can show. Panel identification is recorded as an
+#: observation only - it does not drive any rule until its accuracy has been
+#: measured against a labelled corpus. A confidently wrong panel ID feeding a
+#: rule would manufacture exactly the false positives the corpus removed.
+PanelName = Literal[
+    "box_front",
+    "box_back",
+    "box_bottom_label",
+    "box_side",
+    "box_top",
+    "case_exterior",
+    "case_lid_underside",
+    "earbud",
+    "accessories",
+    "other",
+]
+
 #: Strings the vision model tends to emit when a field is simply not legible.
 _NULLISH = {"", "null", "none", "n/a", "na", "unknown", "not visible", "unreadable"}
 
@@ -88,6 +105,26 @@ class VisionExtraction(BaseModel):
     )
     has_paper_pull_tabs: bool = Field(
         description="True if paper pull-tabs with green arrows are visible on the box seams."
+    )
+    shrinkwrap_has_pull_tab: bool | None = Field(
+        description=(
+            "Only meaningful when has_plastic_shrinkwrap is true: whether the plastic wrap has "
+            "a pull tab / tear strip at the side. Null when the box is not wrapped, or when the "
+            "sides are not visible."
+        )
+    )
+    shrinkwrap_looks_shoddy: bool | None = Field(
+        description=(
+            "Only meaningful when has_plastic_shrinkwrap is true: whether the wrap is loose, "
+            "wrinkled, yellowed, or has bulky seams rather than being tight with minimal seams. "
+            "Null when the box is not wrapped."
+        )
+    )
+    visible_panels: list[PanelName] = Field(
+        description=(
+            "Which surfaces of the product the images actually show. Empty list if none can be "
+            "identified. Report only what is clearly identifiable."
+        )
     )
     font_kerning_irregularities: bool = Field(
         description="True if letter spacing, weight, or alignment deviates from Apple's print standards."
@@ -167,6 +204,9 @@ class EvidenceItem(BaseModel):
     parameter: str
     status: EvidenceStatus
     detail: str
+    #: Provenance of the rule's factual claim. Shown to the buyer so any line in
+    #: the ledger can be independently checked.
+    source: str
 
 
 class VerificationReport(BaseModel):

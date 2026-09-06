@@ -6,5 +6,13 @@
   "has_plastic_shrinkwrap": true,
   "has_paper_pull_tabs": false,
   "font_kerning_irregularities": true,
-  "visible_spelling_errors": ["Designd by Apple in California"]
+  "visible_spelling_errors": [
+    "Designd by Apple in California"
+  ],
+  "shrinkwrap_has_pull_tab": false,
+  "shrinkwrap_looks_shoddy": true,
+  "visible_panels": [
+    "box_front",
+    "box_bottom_label"
+  ]
 }

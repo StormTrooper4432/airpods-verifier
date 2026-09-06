@@ -26,6 +26,9 @@ VALID_EXTRACTION = {
     "copyright_year": 2023,
     "has_plastic_shrinkwrap": False,
     "has_paper_pull_tabs": True,
+    "shrinkwrap_has_pull_tab": None,
+    "shrinkwrap_looks_shoddy": None,
+    "visible_panels": ["box_bottom_label"],
     "font_kerning_irregularities": False,
     "visible_spelling_errors": [],
 }
