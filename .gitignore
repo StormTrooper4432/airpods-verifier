@@ -16,3 +16,7 @@ venv/
 *.heic
 !tests/sample_data/*.png
 extraction*.json
+
+# Scraped corpus: other people's photos. Evaluate against them, don't republish.
+corpus/
+results/

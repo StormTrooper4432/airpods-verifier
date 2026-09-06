@@ -33,7 +33,7 @@ jobs:
           pip install pyflakes
 
       - name: Lint
-        run: python -m pyflakes *.py tests/*.py
+        run: python -m pyflakes *.py tests/*.py tools/*.py
 
       # No credentials are set: the rules engine is pure Python and both vision
       # providers are driven by stub clients, so the suite must pass offline.
