@@ -34,6 +34,28 @@ class ProviderError(RuntimeError):
     """A provider could not turn images into a valid extraction."""
 
 
+#: Failures worth retrying or downgrading past. Free-tier capacity is shared, so
+#: overload 500s are routine. Anything not listed here (bad key, missing file,
+#: schema violation) is permanent - retrying it just burns backoff cycles.
+_TRANSIENT_MARKERS = (
+    "rate limit",
+    "server error",
+    "high demand",
+    "temporarily",
+    "timeout",
+    "timed out",
+    "overloaded",
+    "unavailable",
+    "resource has been exhausted",
+)
+
+
+def is_transient_failure(message: str) -> bool:
+    """True when retrying, or trying a different model, could plausibly help."""
+    lowered = message.lower()
+    return any(marker in lowered for marker in _TRANSIENT_MARKERS)
+
+
 @dataclass(frozen=True)
 class PreparedImage:
     """One photograph, already downscaled and base64-encoded by the caller."""
@@ -119,6 +141,9 @@ class AnthropicVisionProvider:
 
     name = "anthropic"
     default_model = "claude-opus-5"
+    #: Tried in order when a model is overloaded. Each step is cheaper and a
+    #: little less capable; all three read fine print acceptably.
+    fallback_chain = ("claude-opus-5", "claude-sonnet-5", "claude-haiku-4-5")
 
     def __init__(self, client=None):
         self._client = client
@@ -286,6 +311,11 @@ class GeminiVisionProvider:
 
     name = "gemini"
     default_model = "gemini-3.8-flash"
+    #: Deliberately all full Flash models, no Flash-Lite. Lite is cheaper still
+    #: but measurably weaker at small print, which is the entire job here - a
+    #: silent downgrade to it would cost accuracy without anyone noticing.
+    #: Reach it explicitly with --model gemini-3.5-flash-lite if you want it.
+    fallback_chain = ("gemini-3.8-flash", "gemini-3.5-flash", "gemini-2.5-flash")
 
     def __init__(self, client=None):
         self._client = client

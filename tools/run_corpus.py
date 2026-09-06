@@ -30,6 +30,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from providers import is_transient_failure  # noqa: E402
 from rules_engine import evaluate  # noqa: E402
 from schema import Verdict  # noqa: E402
 from vision_extractor import VisionExtractionError, extract  # noqa: E402
@@ -40,24 +41,9 @@ IMAGE_SUFFIXES = (".jpg", ".jpeg", ".png", ".webp")
 DEFAULT_DELAY_S = 4.0
 MAX_RETRIES = 4
 
-#: Failures that are worth retrying. Free-tier capacity is shared, so "high
-#: demand" 500s are routine - and a dropped post silently biases the accuracy
-#: number, which is worse than a slow run.
-_RETRYABLE_MARKERS = (
-    "rate limit",
-    "server error",
-    "high demand",
-    "temporarily",
-    "timeout",
-    "timed out",
-    "overloaded",
-    "unavailable",
-)
-
-
-def is_retryable(message: str) -> bool:
-    lowered = message.lower()
-    return any(marker in lowered for marker in _RETRYABLE_MARKERS)
+#: Kept as a module-level alias so the retry policy has one definition shared
+#: with the model-fallback path in vision_extractor.
+is_retryable = is_transient_failure
 
 
 def post_folders(root: Path) -> list[Path]:

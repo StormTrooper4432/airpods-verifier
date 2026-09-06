@@ -98,6 +98,11 @@ def build_parser() -> argparse.ArgumentParser:
         choices=["low", "medium", "high", "xhigh", "max"],
         help="Extraction effort. Lower is cheaper; 'medium' is the default.",
     )
+    parser.add_argument(
+        "--no-fallback",
+        action="store_true",
+        help="Fail instead of downgrading to a lesser model when the primary is overloaded.",
+    )
     parser.add_argument("--json", action="store_true", help="Emit the report as raw JSON.")
     parser.add_argument("--no-color", action="store_true", help="Disable ANSI colour.")
     return parser
@@ -208,6 +213,8 @@ def main(argv: list[str] | None = None) -> int:
                 kwargs["model"] = args.model
             if args.effort:
                 kwargs["effort"] = args.effort
+            if args.no_fallback:
+                kwargs["fallback"] = False
 
             result = vision_extractor.extract(args.images, **kwargs)
             extraction = result.extraction

@@ -27,6 +27,7 @@ import base64
 import io
 import os
 import re
+import sys
 from pathlib import Path
 
 from providers import (
@@ -35,6 +36,7 @@ from providers import (
     ProviderError,
     ProviderResult,
     get_provider,
+    is_transient_failure,
 )
 
 try:  # Optional: local downscaling / format normalisation.
@@ -188,6 +190,20 @@ def build_instruction(image_count: int) -> str:
 # --------------------------------------------------------------------------- #
 
 
+def resolve_model_chain(vision_provider, model: str | None, fallback: bool) -> list[str]:
+    """Models to try, in order.
+
+    An explicitly requested model pins the run: silently answering a
+    ``--model`` request with a different model would corrupt any benchmark
+    comparing two models on the same photographs.
+    """
+    if model is not None:
+        return [model]
+    if not fallback:
+        return [vision_provider.default_model]
+    return list(getattr(vision_provider, "fallback_chain", ()) or [vision_provider.default_model])
+
+
 def extract(
     image_paths: list[Path | str],
     *,
@@ -196,8 +212,15 @@ def extract(
     effort: str = DEFAULT_EFFORT,
     client=None,
     prompts_path: Path | str = PROMPTS_PATH,
+    fallback: bool = True,
 ) -> ProviderResult:
-    """Send photographs to a vision provider and return validated observations."""
+    """Send photographs to a vision provider and return validated observations.
+
+    When a model is overloaded, walks down the provider's fallback chain rather
+    than retrying the same busy model. Whichever model actually answered is
+    reported on the result, so a mixed-model corpus stays visible instead of
+    quietly averaging two models into one accuracy number.
+    """
     try:
         vision_provider = get_provider(provider, client=client)
     except ProviderError as exc:
@@ -205,17 +228,37 @@ def extract(
 
     system_prompt = load_system_prompt(prompts_path)
     images = prepare_images(image_paths)
+    instruction = build_instruction(len(images))
+    chain = resolve_model_chain(vision_provider, model, fallback)
 
-    try:
-        return vision_provider.extract(
-            system_prompt=system_prompt,
-            images=images,
-            instruction=build_instruction(len(images)),
-            model=model or vision_provider.default_model,
-            effort=effort,
-        )
-    except ProviderError as exc:
-        raise VisionExtractionError(str(exc)) from exc
+    last_error: ProviderError | None = None
+    for index, candidate in enumerate(chain):
+        try:
+            return vision_provider.extract(
+                system_prompt=system_prompt,
+                images=images,
+                instruction=instruction,
+                model=candidate,
+                effort=effort,
+            )
+        except ProviderError as exc:
+            last_error = exc
+            is_last = index == len(chain) - 1
+            # Only step down for transient trouble. A bad API key or a malformed
+            # image fails identically on every model in the chain.
+            if is_last or not is_transient_failure(str(exc)):
+                raise VisionExtractionError(str(exc)) from exc
+            print(
+                f"  {candidate} unavailable ({_first_line(exc)}); falling back to {chain[index + 1]}",
+                file=sys.stderr,
+            )
+
+    raise VisionExtractionError(str(last_error))  # pragma: no cover - chain is never empty
+
+
+def _first_line(exc: Exception, limit: int = 80) -> str:
+    text = str(exc).split("\n")[0]
+    return text[:limit] + ("..." if len(text) > limit else "")
 
 
 __all__ = [
@@ -230,4 +273,5 @@ __all__ = [
     "extract",
     "load_system_prompt",
     "prepare_images",
+    "resolve_model_chain",
 ]
