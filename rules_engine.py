@@ -21,7 +21,6 @@ the product's release), so rules carry an explicit ``disqualifying`` flag.
 
 from __future__ import annotations
 
-import datetime as _dt
 import re
 from dataclasses import dataclass
 from typing import Callable, Iterable
@@ -61,6 +60,11 @@ MINIMUM_COPYRIGHT_YEAR: dict[str, int] = {
     VARIANT_LIGHTNING: 2022,   # released 2022
 }
 
+#: Latest copyright year observed on genuine AirPods Pro 2 retail packaging.
+#: Apple reprints boxes over a product's life, so this is an observed ceiling,
+#: not a release date. A 2026 line on a Pro 2 box is out of range.
+MAXIMUM_COPYRIGHT_YEAR = 2025
+
 #: Used when the variant is still unknown at copyright-check time: the most
 #: permissive bound, so an unidentified box is never failed on a technicality.
 _PERMISSIVE_MINIMUM_YEAR = min(MINIMUM_COPYRIGHT_YEAR.values())
@@ -68,6 +72,9 @@ _PERMISSIVE_MINIMUM_YEAR = min(MINIMUM_COPYRIGHT_YEAR.values())
 #: Apple serial numbers are uppercase alphanumeric. Legacy units use 12
 #: characters; devices from the randomised-serial era use 10.
 _VALID_SERIAL_LENGTHS = (10, 12)
+
+#: Shape of an Apple model number, independent of which product it belongs to.
+_MODEL_NUMBER_SHAPE = re.compile(r"A\d{4}")
 _SERIAL_CHARSET_RE = re.compile(r"^[A-Z0-9]+$")
 
 # --------------------------------------------------------------------------- #
@@ -172,12 +179,25 @@ def _rule_model_number(extraction: VisionExtraction, variant: str) -> RuleOutcom
 
     hits = lookup_model_number(number)
     if not hits:
+        # An A-number this tool does not know is not evidence of a counterfeit.
+        # Apple uses A-numbers across every generation, and this matrix only
+        # covers Pro 2 - so an unrecognised one usually means "different
+        # product", not "fake". Corpus evidence: A3063 appeared on both a
+        # confirmed counterfeit and a confirmed genuine unit.
+        if _MODEL_NUMBER_SHAPE.fullmatch(number):
+            return RuleOutcome(
+                EvidenceStatus.UNKNOWN,
+                f"Extracted model {number} is a well-formed Apple model number but is not an "
+                f"AirPods Pro 2 part. Pro 2 uses A2931/A2699/A2700 (Lightning) and "
+                f"A3047/A3048/A3049/A2968 (USB-C). This is most likely a different AirPods "
+                f"generation, which this tool does not yet cover - confirm which product it is "
+                f"before relying on any result here.",
+            )
         return RuleOutcome(
             EvidenceStatus.FAIL,
-            f"Extracted model {number} does not appear anywhere in the AirPods Pro 2 "
-            f"hardware matrix (neither the Lightning nor the USB-C variant). Genuine "
-            f"Pro 2 parts are limited to A2931/A2699/A2700 (Lightning) and "
-            f"A3047/A3048/A3049/A2968 (USB-C).",
+            f"Extracted model '{number}' is not a valid Apple model number at all. Genuine "
+            f"Apple hardware carries an A-number in the form A#### - a malformed identifier "
+            f"indicates fabricated packaging.",
         )
 
     matching = [hit for hit in hits if hit[0] == variant]
@@ -250,12 +270,12 @@ def _rule_copyright_year(extraction: VisionExtraction, variant: str) -> RuleOutc
             "underside of the box.",
         )
 
-    current_year = _dt.date.today().year
-    if year > current_year + 1:
+    if year > MAXIMUM_COPYRIGHT_YEAR:
         return RuleOutcome(
             EvidenceStatus.FAIL,
-            f"Copyright year {year} is in the future (current year {current_year}). No genuine "
-            f"retail packaging carries a forward-dated copyright.",
+            f"Copyright year {year} is later than any year observed on genuine AirPods Pro 2 "
+            f"packaging (latest is {MAXIMUM_COPYRIGHT_YEAR}). Apple reprints boxes over a "
+            f"product's life, but not beyond it.",
         )
 
     minimum = MINIMUM_COPYRIGHT_YEAR.get(variant, _PERMISSIVE_MINIMUM_YEAR)
@@ -311,22 +331,36 @@ def _rule_serial_format(extraction: VisionExtraction, variant: str) -> RuleOutco
 
 
 def _rule_typography(extraction: VisionExtraction, variant: str) -> RuleOutcome:
-    problems: list[str] = []
+    kerning_note = (
+        " A kerning or font-weight irregularity was also reported, but that observation is not "
+        "treated as evidence on its own - see below."
+        if extraction.font_kerning_irregularities
+        else ""
+    )
+
     if extraction.visible_spelling_errors:
         listed = ", ".join(f"'{word}'" for word in extraction.visible_spelling_errors)
-        problems.append(f"misspelled printed text ({listed})")
-    if extraction.font_kerning_irregularities:
-        problems.append("irregular letter spacing or font weight versus Apple's print standard")
-
-    if problems:
         return RuleOutcome(
             EvidenceStatus.FAIL,
-            "Print forensics flagged " + " and ".join(problems) + ". Apple's packaging is "
-            "offset-printed from a fixed template, so typography defects indicate a reproduction.",
+            f"Misspelled text is printed on the packaging ({listed}). Apple's retail packaging is "
+            f"proofed and offset-printed, so printed misspellings indicate a reproduction."
+            + kerning_note,
         )
+
+    if extraction.font_kerning_irregularities:
+        # Measured 0-for-2 on a labelled corpus: kerning fired standalone only on
+        # genuine units. Photo blur, compression and angle all mimic it, so it is
+        # recorded as an observation and never as a finding.
+        return RuleOutcome(
+            EvidenceStatus.UNKNOWN,
+            "A kerning or font-weight irregularity was reported, but no misspelled text was found. "
+            "Photo blur, compression, and viewing angle reproduce this appearance on genuine "
+            "packaging, so it is recorded as an observation rather than treated as evidence.",
+        )
+
     return RuleOutcome(
         EvidenceStatus.PASS,
-        "No spelling errors or kerning irregularities were observed in the printed text.",
+        "No misspelled text was found in the printed packaging copy.",
     )
 
 

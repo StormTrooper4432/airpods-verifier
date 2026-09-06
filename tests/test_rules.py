@@ -7,7 +7,6 @@ the pipeline that decides whether someone loses $200 is exhaustively testable.
 
 from __future__ import annotations
 
-import datetime as dt
 import json
 from pathlib import Path
 
@@ -16,6 +15,7 @@ import pytest
 import main as cli
 from rules_engine import (
     HARDWARE_MATRIX,
+    MAXIMUM_COPYRIGHT_YEAR,
     MINIMUM_COPYRIGHT_YEAR,
     evaluate,
     evaluate_dict,
@@ -165,8 +165,19 @@ class TestModelNumberRule:
         assert status_of(report, "Model Number Compatibility") is EvidenceStatus.FAIL
         assert report.summary_verdict is Verdict.HIGH_RISK_SUSPECTED
 
-    def test_number_outside_the_matrix_fails(self):
+    def test_unknown_apple_number_is_out_of_scope_not_a_failure(self):
+        # Corpus evidence: A3063 appeared on a confirmed counterfeit AND a
+        # confirmed genuine unit. An A-number this matrix does not cover means
+        # "different generation", not "fake" - accusing on it produced 2 of the
+        # 4 false positives in the first labelled run.
         report = evaluate(make_extraction(extracted_model_number="A9999"))
+        assert status_of(report, "Model Number Compatibility") is EvidenceStatus.UNKNOWN
+        assert "not yet cover" in detail_of(report, "Model Number Compatibility")
+        assert report.summary_verdict is not Verdict.HIGH_RISK_SUSPECTED
+
+    def test_malformed_identifier_still_fails(self):
+        # Not an A-number at all: no Apple product carries this.
+        report = evaluate(make_extraction(extracted_model_number="B1234"))
         assert status_of(report, "Model Number Compatibility") is EvidenceStatus.FAIL
 
     def test_missing_number_is_unknown_not_a_failure(self):
@@ -274,11 +285,17 @@ class TestCopyrightYearRule:
         )
         assert status_of(report, "Copyright Year Constraint") is EvidenceStatus.FAIL
 
-    def test_forward_dated_copyright_fails(self):
-        future = dt.date.today().year + 5
-        report = evaluate(make_extraction(copyright_year=future))
+    def test_year_beyond_the_observed_ceiling_fails(self):
+        report = evaluate(make_extraction(copyright_year=MAXIMUM_COPYRIGHT_YEAR + 1))
         assert status_of(report, "Copyright Year Constraint") is EvidenceStatus.FAIL
-        assert "future" in detail_of(report, "Copyright Year Constraint")
+
+    def test_the_ceiling_year_itself_passes(self):
+        # 2025 appears on genuine Pro 2 packaging; the bound must not be tighter.
+        report = evaluate(make_extraction(copyright_year=MAXIMUM_COPYRIGHT_YEAR))
+        assert status_of(report, "Copyright Year Constraint") is EvidenceStatus.PASS
+
+    def test_ceiling_matches_the_expert_sourced_range(self):
+        assert MAXIMUM_COPYRIGHT_YEAR == 2025
 
     def test_missing_year_is_unknown(self):
         report = evaluate(make_extraction(copyright_year=None))
@@ -322,9 +339,19 @@ class TestTypographyRule:
         assert status_of(report, "Typography & Print Quality") is EvidenceStatus.FAIL
         assert "Designd" in detail and "Califorina" in detail
 
-    def test_kerning_alone_fails(self):
+    def test_kerning_alone_is_not_evidence(self):
+        # Measured 0-for-2 on the labelled corpus: fired standalone only on
+        # genuine units. Blur, compression and angle mimic it.
         report = evaluate(make_extraction(font_kerning_irregularities=True))
+        assert status_of(report, "Typography & Print Quality") is EvidenceStatus.UNKNOWN
+        assert report.summary_verdict is not Verdict.HIGH_RISK_SUSPECTED
+
+    def test_kerning_is_still_noted_alongside_a_real_misspelling(self):
+        report = evaluate(
+            make_extraction(font_kerning_irregularities=True, visible_spelling_errors=["Appie"])
+        )
         assert status_of(report, "Typography & Print Quality") is EvidenceStatus.FAIL
+        assert "kerning" in detail_of(report, "Typography & Print Quality")
 
 
 # --------------------------------------------------------------------------- #
@@ -344,14 +371,14 @@ class TestVerdictAggregation:
         two = evaluate(make_extraction(has_plastic_shrinkwrap=True, copyright_year=2019))
         three = evaluate(
             make_extraction(
-                has_plastic_shrinkwrap=True, copyright_year=2019, extracted_model_number="A9999"
+                has_plastic_shrinkwrap=True, copyright_year=2019, extracted_model_number="B1234"
             )
         )
         assert one.confidence_score < two.confidence_score < three.confidence_score
         assert three.confidence_score <= 0.99
 
     def test_soft_signals_alone_flag_risk_with_lower_confidence(self):
-        soft = evaluate(make_extraction(font_kerning_irregularities=True))
+        soft = evaluate(make_extraction(extracted_serial_number="TOO-SHORT"))
         hard = evaluate(make_extraction(has_plastic_shrinkwrap=True))
         assert soft.summary_verdict is Verdict.HIGH_RISK_SUSPECTED
         assert soft.confidence_score < hard.confidence_score
