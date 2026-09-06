@@ -99,6 +99,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Extraction effort. Lower is cheaper; 'medium' is the default.",
     )
     parser.add_argument(
+        "--allow-lite",
+        action="store_true",
+        help="Extend the fallback chain to Flash-Lite models. Cheaper capacity, weaker at fine print.",
+    )
+    parser.add_argument(
         "--no-fallback",
         action="store_true",
         help="Fail instead of downgrading to a lesser model when the primary is overloaded.",
@@ -215,6 +220,8 @@ def main(argv: list[str] | None = None) -> int:
                 kwargs["effort"] = args.effort
             if args.no_fallback:
                 kwargs["fallback"] = False
+            if args.allow_lite:
+                kwargs["allow_lite"] = True
 
             result = vision_extractor.extract(args.images, **kwargs)
             extraction = result.extraction

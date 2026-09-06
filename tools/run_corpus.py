@@ -58,7 +58,7 @@ def images_in(folder: Path, cap: int) -> list[Path]:
     return sorted(f for f in folder.iterdir() if f.suffix.lower() in IMAGE_SUFFIXES)[:cap]
 
 
-def process(folder: Path, *, provider, model, effort, cap) -> dict:
+def process(folder: Path, *, provider, model, effort, cap, allow_lite=False) -> dict:
     images = images_in(folder, cap)
     metadata = {}
     post_json = folder / "post.json"
@@ -78,7 +78,9 @@ def process(folder: Path, *, provider, model, effort, cap) -> dict:
     delay = DEFAULT_DELAY_S
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            result = extract(images, provider=provider, model=model, effort=effort)
+            result = extract(
+                images, provider=provider, model=model, effort=effort, allow_lite=allow_lite
+            )
             break
         except VisionExtractionError as exc:
             message = str(exc)
@@ -213,6 +215,12 @@ def main() -> int:
     parser.add_argument("--provider")
     parser.add_argument("--model")
     parser.add_argument("--effort", default="medium")
+    parser.add_argument(
+        "--allow-lite",
+        action="store_true",
+        help="Extend the chain to Flash-Lite. Avoid for measurement runs: a weaker model "
+             "silently handling some posts corrupts the accuracy figure.",
+    )
     parser.add_argument("--max-images", type=int, default=4, help="Images per post (token cost).")
     parser.add_argument("--delay", type=float, default=DEFAULT_DELAY_S, help="Seconds between posts.")
     parser.add_argument("--limit", type=int, help="Only process the first N folders.")
@@ -243,7 +251,8 @@ def main() -> int:
 
         print(f"[{index}/{len(folders)}] {folder.name}", flush=True)
         record = process(
-            folder, provider=args.provider, model=args.model, effort=args.effort, cap=args.max_images
+            folder, provider=args.provider, model=args.model, effort=args.effort,
+            cap=args.max_images, allow_lite=args.allow_lite,
         )
         # Only cache successes. Caching an error would make a re-run replay the
         # failure forever, which is how a transient outage becomes permanent

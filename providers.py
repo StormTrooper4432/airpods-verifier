@@ -18,6 +18,7 @@ Both SDKs are imported lazily, so neither is a hard dependency: installing only
 from __future__ import annotations
 
 import os
+import time
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -54,6 +55,44 @@ def is_transient_failure(message: str) -> bool:
     """True when retrying, or trying a different model, could plausibly help."""
     lowered = message.lower()
     return any(marker in lowered for marker in _TRANSIENT_MARKERS)
+
+
+_RATE_LIMIT_MARKERS = ("rate limit", "quota", "resource has been exhausted")
+
+
+def is_rate_limited(message: str) -> bool:
+    lowered = message.lower()
+    return any(marker in lowered for marker in _RATE_LIMIT_MARKERS)
+
+
+#: How long to stop attempting a model after it reports a rate limit. Free-tier
+#: per-minute windows are short, so this is about skipping doomed calls rather
+#: than waiting out a daily cap.
+MODEL_COOLDOWN_SECONDS = 90.0
+
+#: model -> unix timestamp when it is worth trying again.
+_cooldown_until: dict[str, float] = {}
+
+
+def mark_rate_limited(model: str, *, now: float | None = None) -> None:
+    _cooldown_until[model] = (now if now is not None else time.time()) + MODEL_COOLDOWN_SECONDS
+
+
+def is_cooling_down(model: str, *, now: float | None = None) -> bool:
+    """True if this model recently reported a rate limit.
+
+    Without this, every post in a corpus run re-attempts each exhausted model
+    and eats a full round-trip per model per post - the dominant cost of a run
+    once the free tier is saturated.
+    """
+    deadline = _cooldown_until.get(model)
+    if deadline is None:
+        return False
+    return (now if now is not None else time.time()) < deadline
+
+
+def reset_cooldowns() -> None:
+    _cooldown_until.clear()
 
 
 @dataclass(frozen=True)
@@ -280,19 +319,35 @@ def estimate_anthropic_cost(
 # Google Gemini (AI Studio)
 # --------------------------------------------------------------------------- #
 
-#: Models Google lists as available on the AI Studio free tier. Flash-Lite is
-#: cheaper still but weaker at reading fine print, which is the whole job here.
+#: Models confirmed to serve this API on the AI Studio free tier, by live probe
+#: rather than from the documentation's free-tier list. That list included
+#: gemini-2.5-flash, gemini-2.5-pro and gemini-2.5-flash-lite, all of which
+#: return 404 "no longer available to new users" - which is why this set is
+#: maintained by probing (tools/check_models.py), not by reading.
 GEMINI_FREE_TIER_MODELS = frozenset(
     {
         "gemini-3.8-flash",
         "gemini-3.7-flash",
         "gemini-3.6-flash",
         "gemini-3.5-flash",
+        "gemini-3-flash-preview",
         "gemini-3.5-flash-lite",
         "gemini-3.1-flash-lite",
+        "gemini-flash-lite-latest",
+    }
+)
+
+#: Confirmed retired for new accounts. Kept so a future edit cannot silently
+#: reintroduce one - a dead model at the end of a chain turns a recoverable
+#: rate limit into a hard failure, which is exactly how a corpus run lost 8 of
+#: 10 posts.
+GEMINI_RETIRED_MODELS = frozenset(
+    {
         "gemini-2.5-flash",
-        "gemini-2.5-flash-lite",
         "gemini-2.5-pro",
+        "gemini-2.5-flash-lite",
+        "gemini-2.0-flash",
+        "gemini-2.0-flash-lite",
     }
 )
 
@@ -326,6 +381,23 @@ class GeminiVisionProvider:
         "gemini-3.7-flash",
         "gemini-3.6-flash",
         "gemini-3.5-flash",
+        "gemini-3-flash-preview",
+    )
+
+    #: Opt-in only (--allow-lite). Flash-Lite models are measurably weaker at
+    #: small print, which is the entire job here, so they are capacity of last
+    #: resort. For a measurement run against labelled data they are worse than
+    #: useless: a weaker model silently handling some posts corrupts the
+    #: accuracy figure the run exists to produce. For a live user who just needs
+    #: an answer, a Lite result beats an error page.
+    #:
+    #: Every entry below was probed live. gemini-2.5-flash, gemini-2.5-pro,
+    #: gemini-2.5-flash-lite, gemini-2.0-flash and gemini-2.0-flash-lite are all
+    #: retired for new accounts (404) and deliberately absent.
+    extended_fallback_chain = fallback_chain + (
+        "gemini-3.5-flash-lite",
+        "gemini-3.1-flash-lite",
+        "gemini-flash-lite-latest",
     )
 
     def __init__(self, client=None):

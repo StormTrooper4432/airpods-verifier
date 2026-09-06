@@ -460,5 +460,68 @@ class TestChainResolution:
         assert not any("lite" in m for m in pv.get_provider("gemini").fallback_chain)
 
     def test_gemini_chain_is_entirely_free_tier(self):
-        chain = pv.get_provider("gemini").fallback_chain
-        assert set(chain) <= pv.GEMINI_FREE_TIER_MODELS
+        provider = pv.get_provider("gemini")
+        assert set(provider.fallback_chain) <= pv.GEMINI_FREE_TIER_MODELS
+        assert set(provider.extended_fallback_chain) <= pv.GEMINI_FREE_TIER_MODELS
+
+    def test_no_chain_contains_a_retired_model(self):
+        provider = pv.get_provider("gemini")
+        assert not pv.GEMINI_RETIRED_MODELS & set(provider.extended_fallback_chain)
+        assert not pv.GEMINI_RETIRED_MODELS & pv.GEMINI_FREE_TIER_MODELS
+
+
+class TestRateLimitCooldown:
+    """Without cooldown memory, every post in a batch re-attempts each
+    exhausted model and eats a full round-trip per model per post."""
+
+    @pytest.fixture(autouse=True)
+    def _clear(self):
+        pv.reset_cooldowns()
+        yield
+        pv.reset_cooldowns()
+
+    def test_rate_limited_models_move_to_the_back_of_the_chain(self, photo, scripted):
+        provider = scripted({"model-a": "Gemini rate limit reached"})
+        ve.extract([photo])  # trips the cooldown on model-a
+        assert pv.is_cooling_down("model-a")
+
+        provider.attempted.clear()
+        provider.failures = {}
+        ve.extract([photo])
+        # model-a is skipped, not retried first.
+        assert provider.attempted[0] == "model-b"
+
+    def test_cooldown_expires(self):
+        pv.mark_rate_limited("model-x", now=0.0)
+        assert pv.is_cooling_down("model-x", now=1.0)
+        assert not pv.is_cooling_down("model-x", now=pv.MODEL_COOLDOWN_SECONDS + 1.0)
+
+    def test_all_cooling_down_still_tries_something(self, photo, scripted):
+        scripted({})
+        for m in _ScriptedProvider.fallback_chain:
+            pv.mark_rate_limited(m)
+        # Never return an empty chain - a doomed attempt beats no attempt.
+        assert ve.extract([photo]).model in _ScriptedProvider.fallback_chain
+
+    def test_non_rate_limit_failures_do_not_trip_cooldown(self, photo, scripted):
+        scripted({"model-a": "server error (500)"})
+        ve.extract([photo])
+        assert not pv.is_cooling_down("model-a")
+
+
+class TestExtendedChain:
+    def test_lite_models_are_opt_in_only(self):
+        provider = pv.get_provider("gemini")
+        assert not any("lite" in m for m in provider.fallback_chain)
+        assert any("lite" in m for m in provider.extended_fallback_chain)
+
+    def test_extended_chain_keeps_quality_models_first(self):
+        provider = pv.get_provider("gemini")
+        extended = provider.extended_fallback_chain
+        assert extended[: len(provider.fallback_chain)] == provider.fallback_chain
+
+    def test_retired_models_are_absent(self):
+        # All probed live and returning 404 "no longer available to new users".
+        assert not pv.GEMINI_RETIRED_MODELS & set(
+            pv.get_provider("gemini").extended_fallback_chain
+        )

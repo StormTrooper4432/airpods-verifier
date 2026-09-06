@@ -36,7 +36,10 @@ from providers import (
     ProviderError,
     ProviderResult,
     get_provider,
+    is_cooling_down,
+    is_rate_limited,
     is_transient_failure,
+    mark_rate_limited,
 )
 
 try:  # Optional: local downscaling / format normalisation.
@@ -190,18 +193,32 @@ def build_instruction(image_count: int) -> str:
 # --------------------------------------------------------------------------- #
 
 
-def resolve_model_chain(vision_provider, model: str | None, fallback: bool) -> list[str]:
+def resolve_model_chain(
+    vision_provider, model: str | None, fallback: bool, allow_lite: bool = False
+) -> list[str]:
     """Models to try, in order.
 
     An explicitly requested model pins the run: silently answering a
     ``--model`` request with a different model would corrupt any benchmark
     comparing two models on the same photographs.
+
+    Models cooling down from a recent rate limit are moved to the back rather
+    than dropped - if every model is cooling down we still have to try one.
     """
     if model is not None:
         return [model]
     if not fallback:
         return [vision_provider.default_model]
-    return list(getattr(vision_provider, "fallback_chain", ()) or [vision_provider.default_model])
+
+    attribute = "extended_fallback_chain" if allow_lite else "fallback_chain"
+    chain = list(
+        getattr(vision_provider, attribute, None)
+        or getattr(vision_provider, "fallback_chain", ())
+        or [vision_provider.default_model]
+    )
+    ready = [m for m in chain if not is_cooling_down(m)]
+    cooling = [m for m in chain if is_cooling_down(m)]
+    return ready + cooling
 
 
 def extract(
@@ -213,6 +230,7 @@ def extract(
     client=None,
     prompts_path: Path | str = PROMPTS_PATH,
     fallback: bool = True,
+    allow_lite: bool = False,
 ) -> ProviderResult:
     """Send photographs to a vision provider and return validated observations.
 
@@ -229,7 +247,7 @@ def extract(
     system_prompt = load_system_prompt(prompts_path)
     images = prepare_images(image_paths)
     instruction = build_instruction(len(images))
-    chain = resolve_model_chain(vision_provider, model, fallback)
+    chain = resolve_model_chain(vision_provider, model, fallback, allow_lite)
 
     last_error: ProviderError | None = None
     for index, candidate in enumerate(chain):
@@ -243,6 +261,9 @@ def extract(
             )
         except ProviderError as exc:
             last_error = exc
+            if is_rate_limited(str(exc)):
+                # Remember this so later posts in a batch skip it outright.
+                mark_rate_limited(candidate)
             is_last = index == len(chain) - 1
             # Only step down for transient trouble. A bad API key or a malformed
             # image fails identically on every model in the chain.
