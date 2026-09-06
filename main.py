@@ -1,0 +1,223 @@
+"""CLI entry point: photographs (or a saved extraction) -> Evidence Ledger.
+
+    python main.py box_front.jpg box_underside.jpg case.jpg
+    python main.py --extraction tests/sample_data/genuine_usbc.json   # no API call
+    python main.py box.jpg --json > report.json
+
+Exit codes make the tool usable from a script:
+    0  GENUINE
+    1  HIGH_RISK_SUSPECTED
+    2  INCONCLUSIVE
+    3  the pipeline could not run (bad input, API failure)
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+import textwrap
+from pathlib import Path
+
+from rules_engine import evaluate
+from schema import EvidenceStatus, Verdict, VerificationReport, VisionExtraction
+
+EXIT_CODES = {
+    Verdict.GENUINE: 0,
+    Verdict.HIGH_RISK_SUSPECTED: 1,
+    Verdict.INCONCLUSIVE: 2,
+}
+EXIT_PIPELINE_ERROR = 3
+
+_STATUS_MARKS = {
+    EvidenceStatus.PASS: "PASS",
+    EvidenceStatus.FAIL: "FAIL",
+    EvidenceStatus.UNKNOWN: "----",
+}
+
+_VERDICT_HEADLINES = {
+    Verdict.GENUINE: "GENUINE - consistent with a genuine unit",
+    Verdict.HIGH_RISK_SUSPECTED: "HIGH RISK - do not buy without further checks",
+    Verdict.INCONCLUSIVE: "INCONCLUSIVE - not enough readable evidence",
+}
+
+_ANSI = {
+    EvidenceStatus.PASS: "\033[32m",
+    EvidenceStatus.FAIL: "\033[31m",
+    EvidenceStatus.UNKNOWN: "\033[90m",
+}
+_RESET = "\033[0m"
+_BOLD = "\033[1m"
+
+_RULE_WIDTH = 78
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="airpods-verifier",
+        description="Authenticate AirPods Pro 2 packaging and hardware from photographs.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=__doc__,
+    )
+    parser.add_argument(
+        "images",
+        nargs="*",
+        type=Path,
+        help="Photographs of the box and hardware. Include the box underside fine print.",
+    )
+    parser.add_argument(
+        "--extraction",
+        type=Path,
+        metavar="FILE",
+        help="Skip the vision call and run the rules engine on a saved extraction JSON file.",
+    )
+    parser.add_argument(
+        "--save-extraction",
+        type=Path,
+        metavar="FILE",
+        help="Write the vision extraction to a file so it can be re-scored without another API call.",
+    )
+    parser.add_argument(
+        "--variant",
+        choices=["Pro 2 USB-C", "Pro 2 Lightning"],
+        help="Override the variant the seller claims, instead of relying on the photographs.",
+    )
+    parser.add_argument("--model", help="Model ID for the extraction stage.")
+    parser.add_argument(
+        "--effort",
+        choices=["low", "medium", "high", "xhigh", "max"],
+        help="Extraction effort. Lower is cheaper; 'medium' is the default.",
+    )
+    parser.add_argument("--json", action="store_true", help="Emit the report as raw JSON.")
+    parser.add_argument("--no-color", action="store_true", help="Disable ANSI colour.")
+    return parser
+
+
+def load_extraction_file(path: Path) -> VisionExtraction:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    return VisionExtraction.model_validate(payload)
+
+
+def _colorize(text: str, status: EvidenceStatus, enabled: bool) -> str:
+    return f"{_ANSI[status]}{text}{_RESET}" if enabled else text
+
+
+def _wrap(text: str, indent: str, width: int = _RULE_WIDTH) -> str:
+    return textwrap.fill(
+        text, width=width, initial_indent=indent, subsequent_indent=indent
+    )
+
+
+def render_report(report: VerificationReport, *, color: bool) -> str:
+    lines: list[str] = ["", "=" * _RULE_WIDTH, "  EVIDENCE LEDGER", "=" * _RULE_WIDTH]
+
+    current_tier: int | None = None
+    for item in report.evidence_ledger:
+        if item.tier != current_tier:
+            current_tier = item.tier
+            label = (
+                "TIER 1 - HARDWARE IDENTITY MATRIX"
+                if item.tier == 1
+                else "TIER 2 - PACKAGING & VISUAL SIGNATURES"
+            )
+            lines.append("")
+            lines.append(f"{_BOLD if color else ''}{label}{_RESET if color else ''}")
+
+        mark = _colorize(f"[{_STATUS_MARKS[item.status]}]", item.status, color)
+        lines.append(f"  {mark} {item.parameter}")
+        lines.append(_wrap(item.detail, indent="         "))
+
+    headline = _VERDICT_HEADLINES[report.summary_verdict]
+    status_for_color = {
+        Verdict.GENUINE: EvidenceStatus.PASS,
+        Verdict.HIGH_RISK_SUSPECTED: EvidenceStatus.FAIL,
+        Verdict.INCONCLUSIVE: EvidenceStatus.UNKNOWN,
+    }[report.summary_verdict]
+
+    lines.append("")
+    lines.append("=" * _RULE_WIDTH)
+    lines.append(f"  VERDICT: {_colorize(headline, status_for_color, color)}")
+    lines.append(f"  Confidence: {report.confidence_score:.2f}")
+    lines.append("=" * _RULE_WIDTH)
+
+    if report.summary_verdict is Verdict.GENUINE:
+        lines.append(
+            _wrap(
+                "This check covers packaging and printed identifiers only. It cannot detect a "
+                "counterfeit carrying a serial cloned from a genuine unit, so also confirm the "
+                "serial at checkcoverage.apple.com before paying.",
+                indent="  ",
+            )
+        )
+    elif report.summary_verdict is Verdict.INCONCLUSIVE:
+        lines.append(
+            _wrap(
+                "Re-shoot the unreadable items above in even light, filling the frame with the "
+                "fine print, and run the check again.",
+                indent="  ",
+            )
+        )
+    lines.append("")
+    return "\n".join(lines)
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+
+    if bool(args.images) == bool(args.extraction):
+        parser.error("Provide either one or more image paths, or --extraction FILE (not both).")
+
+    try:
+        if args.extraction:
+            extraction = load_extraction_file(args.extraction)
+            result = None
+        else:
+            # Imported lazily so --extraction runs (and the tests import main)
+            # without needing the anthropic SDK configured.
+            import vision_extractor
+
+            kwargs = {}
+            if args.model:
+                kwargs["model"] = args.model
+            if args.effort:
+                kwargs["effort"] = args.effort
+
+            result = vision_extractor.extract(args.images, **kwargs)
+            extraction = result.extraction
+
+            if args.save_extraction:
+                args.save_extraction.write_text(
+                    json.dumps(extraction.model_dump(mode="json"), indent=2), encoding="utf-8"
+                )
+    except Exception as exc:  # surfaced to the user, not a stack trace
+        print(f"error: {exc}", file=sys.stderr)
+        return EXIT_PIPELINE_ERROR
+
+    if args.variant:
+        extraction = extraction.model_copy(update={"claimed_model_variant": args.variant})
+
+    report = evaluate(extraction)
+
+    if args.json:
+        print(json.dumps(report.to_dict(), indent=2))
+    else:
+        color = not args.no_color and sys.stdout.isatty()
+        print(render_report(report, color=color))
+        if result is not None:
+            cost = (
+                f"~${result.estimated_cost_usd:.4f}"
+                if result.estimated_cost_usd is not None
+                else "n/a"
+            )
+            print(
+                f"  {result.model} | {result.input_tokens} in / {result.output_tokens} out"
+                f" | cached {result.cache_read_tokens} | est. cost {cost}\n",
+                file=sys.stderr,
+            )
+
+    return EXIT_CODES[report.summary_verdict]
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

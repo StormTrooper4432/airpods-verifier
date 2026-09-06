@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+
+# Environment
+.venv/
+venv/
+.env
+
+# Local artifacts
+*.jpg
+*.jpeg
+*.png
+*.heic
+!tests/sample_data/*.png
+extraction*.json
