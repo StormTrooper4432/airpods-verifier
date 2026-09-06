@@ -475,3 +475,38 @@ class TestSampleData:
     def test_cli_reports_a_missing_file_without_a_traceback(self, capsys):
         assert cli.main(["--extraction", "does_not_exist.json"]) == 3
         assert "error:" in capsys.readouterr().err
+
+
+class TestCorpusRetry:
+    """A dropped post silently biases the accuracy number, so transient
+    failures must retry rather than being recorded as a result."""
+
+    @pytest.mark.parametrize(
+        "message",
+        [
+            "Gemini had a server error (500); retry shortly",
+            "Gemini rate limit reached. Free tiers cap requests",
+            "gemini-3.8-flash is currently experiencing high demand",
+            "The model is overloaded, please try again",
+            "Service temporarily unavailable",
+            "Request timed out",
+        ],
+    )
+    def test_transient_failures_are_retried(self, message):
+        from tools.run_corpus import is_retryable
+
+        assert is_retryable(message)
+
+    @pytest.mark.parametrize(
+        "message",
+        [
+            "No Gemini credentials found. Create a free key at aistudio.google.com",
+            "Image not found: corpus/post_1/photo.jpg",
+            "Gemini returned output that did not match the extraction schema",
+            "Model 'gemini-9-flash' is not available on Gemini",
+        ],
+    )
+    def test_permanent_failures_are_not_retried(self, message):
+        from tools.run_corpus import is_retryable
+
+        assert not is_retryable(message)

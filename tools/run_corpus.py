@@ -40,6 +40,25 @@ IMAGE_SUFFIXES = (".jpg", ".jpeg", ".png", ".webp")
 DEFAULT_DELAY_S = 4.0
 MAX_RETRIES = 4
 
+#: Failures that are worth retrying. Free-tier capacity is shared, so "high
+#: demand" 500s are routine - and a dropped post silently biases the accuracy
+#: number, which is worse than a slow run.
+_RETRYABLE_MARKERS = (
+    "rate limit",
+    "server error",
+    "high demand",
+    "temporarily",
+    "timeout",
+    "timed out",
+    "overloaded",
+    "unavailable",
+)
+
+
+def is_retryable(message: str) -> bool:
+    lowered = message.lower()
+    return any(marker in lowered for marker in _RETRYABLE_MARKERS)
+
 
 def post_folders(root: Path) -> list[Path]:
     return sorted(
@@ -77,9 +96,9 @@ def process(folder: Path, *, provider, model, effort, cap) -> dict:
             break
         except VisionExtractionError as exc:
             message = str(exc)
-            if "rate limit" in message.lower() and attempt < MAX_RETRIES:
+            if is_retryable(message) and attempt < MAX_RETRIES:
                 wait = delay * (2**attempt)
-                print(f"      rate limited; waiting {wait:.0f}s (attempt {attempt}/{MAX_RETRIES})")
+                print(f"      transient failure; waiting {wait:.0f}s (attempt {attempt}/{MAX_RETRIES})")
                 time.sleep(wait)
                 continue
             record["error"] = message
