@@ -2,7 +2,11 @@
 
     python main.py box_front.jpg box_underside.jpg case.jpg
     python main.py --extraction tests/sample_data/genuine_usbc.json   # no API call
+    python main.py box.jpg --provider anthropic                       # compare models
     python main.py box.jpg --json > report.json
+
+Vision provider defaults to Gemini (free on the Google AI Studio tier). Set
+GEMINI_API_KEY, or ANTHROPIC_API_KEY when using --provider anthropic.
 
 Exit codes make the tool usable from a script:
     0  GENUINE
@@ -19,6 +23,7 @@ import sys
 import textwrap
 from pathlib import Path
 
+from providers import PROVIDERS
 from rules_engine import evaluate
 from schema import EvidenceStatus, Verdict, VerificationReport, VisionExtraction
 
@@ -81,6 +86,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--variant",
         choices=["Pro 2 USB-C", "Pro 2 Lightning"],
         help="Override the variant the seller claims, instead of relying on the photographs.",
+    )
+    parser.add_argument(
+        "--provider",
+        choices=sorted(PROVIDERS),
+        help="Vision backend for the extraction stage (default: gemini, free tier).",
     )
     parser.add_argument("--model", help="Model ID for the extraction stage.")
     parser.add_argument(
@@ -161,6 +171,20 @@ def render_report(report: VerificationReport, *, color: bool) -> str:
     return "\n".join(lines)
 
 
+def _render_usage(result) -> str:
+    """One-line provenance footer: which model read the photos, and what it cost."""
+    if result.free_tier:
+        cost = "free tier"
+    elif result.estimated_cost_usd is not None:
+        cost = f"est. ~${result.estimated_cost_usd:.4f}"
+    else:
+        cost = "cost unknown (model not in pricing table)"
+    return (
+        f"{result.provider}/{result.model} | {result.input_tokens} in / "
+        f"{result.output_tokens} out | cached {result.cached_tokens} | {cost}"
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -178,6 +202,8 @@ def main(argv: list[str] | None = None) -> int:
             import vision_extractor
 
             kwargs = {}
+            if args.provider:
+                kwargs["provider"] = args.provider
             if args.model:
                 kwargs["model"] = args.model
             if args.effort:
@@ -205,16 +231,7 @@ def main(argv: list[str] | None = None) -> int:
         color = not args.no_color and sys.stdout.isatty()
         print(render_report(report, color=color))
         if result is not None:
-            cost = (
-                f"~${result.estimated_cost_usd:.4f}"
-                if result.estimated_cost_usd is not None
-                else "n/a"
-            )
-            print(
-                f"  {result.model} | {result.input_tokens} in / {result.output_tokens} out"
-                f" | cached {result.cache_read_tokens} | est. cost {cost}\n",
-                file=sys.stderr,
-            )
+            print(f"  {_render_usage(result)}\n", file=sys.stderr)
 
     return EXIT_CODES[report.summary_verdict]
 

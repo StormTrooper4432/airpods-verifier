@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyflakes
+
+      - name: Lint
+        run: python -m pyflakes *.py tests/*.py
+
+      # No credentials are set: the rules engine is pure Python and both vision
+      # providers are driven by stub clients, so the suite must pass offline.
+      # If a test ever needs a real API key, it belongs behind a marker.
+      - name: Test
+        run: python -m pytest -q
+
+  schema-contract:
+    # The extraction schema is what stops the LLM returning a verdict. If it
+    # ever loses additionalProperties:false, the guarantee is gone silently.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Assert the extraction boundary still holds
+        run: |
+          python - <<'PY'
+          from schema import VisionExtraction
+          schema = VisionExtraction.model_json_schema()
+          assert schema["additionalProperties"] is False, "LLM could return extra fields"
+          assert set(schema["required"]) == set(schema["properties"]), "nullable != optional"
+          print("Extraction boundary intact:", len(schema["properties"]), "required fields")
+          PY

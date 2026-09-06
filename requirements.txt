@@ -1,4 +1,5 @@
-anthropic>=1.4.0
 pydantic>=2.0
-pytest>=8.0
-pillow>=10.0   # optional: local image downscaling + HEIC/phone-format normalisation
+google-genai>=2.0      # default vision provider (AI Studio free tier)
+anthropic>=1.4.0       # optional: --provider anthropic
+pillow>=10.0           # optional: local downscaling + HEIC/phone-format normalisation
+pytest>=8.0            # tests only
