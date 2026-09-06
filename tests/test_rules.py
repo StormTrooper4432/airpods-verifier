@@ -706,3 +706,37 @@ class TestPanelAwareNextSteps:
         report = self._report(["case_exterior"])
         assert report.summary_verdict is Verdict.INCONCLUSIVE
         assert report.confidence_score < MIN_COVERAGE_FOR_VERDICT
+
+
+class TestGenerationIdentification:
+    """The corpus keeps surfacing non-Pro-2 products. Naming them is the only
+    honest answer a Pro 2 verifier can give, and it is what stops an unknown
+    A-number being mistaken for a fabricated one."""
+
+    @pytest.mark.parametrize(
+        "number, generation",
+        [
+            ("A3055", "AirPods 4 with Active Noise Cancellation"),  # corpus post 5
+            ("A3063", "AirPods Pro 3"),                             # corpus posts 4 and 8
+            ("A3053", "AirPods 4"),
+            ("A2565", "AirPods (3rd generation)"),
+            ("A2032", "AirPods (2nd generation)"),
+            ("A1523", "AirPods (1st generation)"),
+            ("A2096", "AirPods Max"),
+        ],
+    )
+    def test_the_product_is_named(self, number, generation):
+        report = evaluate(make_extraction(extracted_model_number=number))
+        assert generation in detail_of(report, "Model Number Compatibility")
+        assert status_of(report, "Model Number Compatibility") is EvidenceStatus.UNKNOWN
+
+    def test_no_number_belongs_to_two_products(self):
+        from rules_engine import MODEL_NUMBERS, OTHER_GENERATIONS
+
+        assert not set(MODEL_NUMBERS) & set(OTHER_GENERATIONS)
+
+    def test_every_generation_entry_is_sourced(self):
+        from rules_engine import KNOWLEDGE
+
+        for generation in KNOWLEDGE["other_generations"]:
+            assert generation.get("source"), f"{generation['name']} has no source"

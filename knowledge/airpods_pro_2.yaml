@@ -78,6 +78,30 @@ other_generations:
     introduced: 2019
     numbers: [A2084, A2083]
     source: apple-identify
+  - name: AirPods 4 with Active Noise Cancellation
+    introduced: 2024
+    numbers: [A3056, A3055, A3057, A3059]
+    source: apple-identify
+  - name: AirPods 4
+    introduced: 2024
+    numbers: [A3053, A3050, A3054, A3058]
+    source: apple-identify
+  - name: AirPods (3rd generation)
+    introduced: 2021
+    numbers: [A2565, A2564, A2897, A2566]
+    source: apple-identify
+  - name: AirPods (2nd generation)
+    introduced: 2019
+    numbers: [A2032, A2031, A1938]
+    source: apple-identify
+  - name: AirPods (1st generation)
+    introduced: 2016
+    numbers: [A1523, A1722, A1602]
+    source: apple-identify
+  - name: AirPods Max
+    introduced: 2020
+    numbers: [A2096, A3184, A3454]
+    source: apple-identify
 
 copyright_years:
   Pro 2 USB-C:
