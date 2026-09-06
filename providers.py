@@ -315,7 +315,18 @@ class GeminiVisionProvider:
     #: but measurably weaker at small print, which is the entire job here - a
     #: silent downgrade to it would cost accuracy without anyone noticing.
     #: Reach it explicitly with --model gemini-3.5-flash-lite if you want it.
-    fallback_chain = ("gemini-3.8-flash", "gemini-3.5-flash", "gemini-2.5-flash")
+    #:
+    #: Free-tier quota is metered PER MODEL, so each distinct model in this
+    #: chain is extra daily capacity, not just extra redundancy. Verified live
+    #: against the API with tools/check_models.py - gemini-2.5-flash was in the
+    #: docs' free-tier list but returns 404 "no longer available to new users",
+    #: so never add a model here without probing it first.
+    fallback_chain = (
+        "gemini-3.8-flash",
+        "gemini-3.7-flash",
+        "gemini-3.6-flash",
+        "gemini-3.5-flash",
+    )
 
     def __init__(self, client=None):
         self._client = client

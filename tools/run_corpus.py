@@ -241,18 +241,22 @@ def main() -> int:
             print(f"[{index}/{len(folders)}] {folder.name}  (cached)")
             continue
 
-        print(f"[{index}/{len(folders)}] {folder.name}")
+        print(f"[{index}/{len(folders)}] {folder.name}", flush=True)
         record = process(
             folder, provider=args.provider, model=args.model, effort=args.effort, cap=args.max_images
         )
-        cached.write_text(json.dumps(record, indent=2), encoding="utf-8")
+        # Only cache successes. Caching an error would make a re-run replay the
+        # failure forever, which is how a transient outage becomes permanent
+        # missing data in the corpus.
+        if "error" not in record:
+            cached.write_text(json.dumps(record, indent=2), encoding="utf-8")
         records.append(record)
         spend += record.get("estimated_cost_usd") or 0.0
 
         if "error" in record:
-            print(f"      ERROR: {record['error'][:120]}")
+            print(f"      ERROR: {record['error'][:120]}", flush=True)
         else:
-            print(f"      {record['verdict']} @ {record['confidence']}  ({failed_checks(record)})")
+            print(f"      {record['verdict']} @ {record['confidence']}  ({failed_checks(record)})", flush=True)
         time.sleep(args.delay)
 
     if records:
