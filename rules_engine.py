@@ -30,7 +30,7 @@ from typing import Callable, Iterable
 
 import yaml
 
-from font_forensics import FONT_SCATTER_THRESHOLD, MINIMUM_GLYPH_HEIGHT_PX
+from font_forensics import FONT_SCATTER_THRESHOLD, MEASURABLE_GLYPH_HEIGHT_PX
 from schema import (
     VARIANT_UNKNOWN,
     EvidenceItem,
@@ -750,17 +750,26 @@ def _rule_label_typography(
     is indistinguishable from Arial. But typefaces differ from each other
     non-uniformly, so a wrong font makes per-glyph deviations DISAGREE while
     genuine print makes them agree at any scale.
+
+    Resolution decides whether any of that is worth saying. Measured across
+    four typefaces degraded the way a photograph degrades them, separation is
+    real from about 45px of glyph height and INVERTED at 23px, where a
+    substitute scores better than San Francisco. A whole-box-underside photo
+    puts this print at 28-35px. So the rule's first job is to say whether the
+    photograph resolves letterform at all, and to ask for the one that would.
     """
-    if local is None or local.font_scatter_percent is None:
-        if local is not None and local.font_below_resolution_floor:
-            height = local.median_glyph_height_px or 0
+    if local is not None and not local.font_letterforms_resolved:
+        height = local.median_glyph_height_px or 0
+        if height > 0:
             return RuleOutcome(
                 EvidenceStatus.UNKNOWN,
-                f"The label's print is too small in these images to check the letterforms "
-                f"(about {height:.0f} pixels tall; roughly {MINIMUM_GLYPH_HEIGHT_PX} is needed). "
-                f"Photograph the underside label straight on, filling the frame, and the "
-                f"typography can be checked against Apple's own typeface.",
+                f"The label's letterforms are {height:.0f} pixels tall in these images, and "
+                f"separating Apple's typeface from a substitute needs about "
+                f"{MEASURABLE_GLYPH_HEIGHT_PX}. Below that the measurement is not merely weak: "
+                f"a substitute typeface can score better than the real one. Fill the frame with "
+                f"the printed label, straight on, and this check becomes worth running.",
             )
+    if local is None or local.font_scatter_percent is None:
         return RuleOutcome(
             EvidenceStatus.UNKNOWN,
             "The label's letterforms were not measured. This check needs a close, straight-on "
@@ -768,6 +777,21 @@ def _rule_label_typography(
         )
 
     scatter = local.font_scatter_percent
+    shape = local.font_shape_distance
+    if shape is not None:
+        # Above the gate the shape descriptor is the better statistic: it
+        # separated San Francisco from Helvetica, Arial and Verdana by 1.8x to
+        # 3.8x where the bounding-box ratio was erratic. Still reported rather
+        # than voted, because no counterfeit label has yet been photographed
+        # above the gate - there is nothing to calibrate a threshold against.
+        return RuleOutcome(
+            EvidenceStatus.UNKNOWN,
+            f"The label's letterforms sit {shape:.3f} from San Francisco across "
+            f"{local.font_glyphs_measured} glyphs, measured at "
+            f"{local.median_glyph_height_px:.0f} pixels - high enough to resolve letterform. "
+            f"Reported, not scored: no counterfeit label has been photographed this close, so "
+            f"there is no measured figure to compare it against yet.",
+        )
     if scatter >= FONT_SCATTER_THRESHOLD:
         # UNKNOWN, not FAIL. The measurement is real but uncalibrated: genuine
         # labels reach 3.0% at the resolution phone photos actually produce, so

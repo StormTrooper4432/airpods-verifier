@@ -347,6 +347,15 @@ class LocalAnalysis(BaseModel):
     font_line_text: str | None = None
     #: Set when a label was found but its print is too small to measure.
     font_below_resolution_floor: bool = False
+    #: Median per-glyph distance from San Francisco over the full shape
+    #: descriptor, not just the bounding box. None when nothing could be
+    #: described. Meaningless below the resolution gate - see
+    #: font_forensics.MEASURABLE_GLYPH_HEIGHT_PX.
+    font_shape_distance: float | None = None
+    #: Whether the photograph resolves letterform at all. Below the gate a
+    #: substitute typeface can score BETTER than San Francisco, so a distance
+    #: measured there is worse than no measurement.
+    font_letterforms_resolved: bool = False
 
 
 class EvidenceStatus(str, Enum):

@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import pathlib
 
+from pathlib import Path
+
 import pytest
 from PIL import Image, ImageFilter
 
@@ -544,3 +546,100 @@ class TestMultiLinePooling:
     def test_the_glyph_floor_sits_above_where_it_starts_working(self):
         # Six glyphs let Arial through; twelve caught every substitute.
         assert 12 < ff.MINIMUM_GLYPHS_TO_SCORE <= 25
+
+
+class TestShapeDescriptorAndResolutionGate:
+    """The gate is a measurement, not a preference. These re-derive it.
+
+    The rule this replaced was calibrated on synthetic renders and produced a
+    false positive on first contact with a photograph. So the number that
+    matters - the glyph height at which a typeface substitution is still
+    visible - is derived here rather than asserted, and the test fails if the
+    constant drifts away from what the pixels support.
+    """
+
+    TEXT = "Model A3047 A3048 Designed by Apple in California Product of Vietnam"
+    SUBSTITUTES = {
+        "Helvetica": "/System/Library/Fonts/Helvetica.ttc",
+        "Arial": "/System/Library/Fonts/Supplemental/Arial.ttf",
+        "Verdana": "/System/Library/Fonts/Supplemental/Verdana.ttf",
+    }
+
+    @staticmethod
+    def _photographed(path: str, render_px: int, text: str):
+        """Degrade a clean render the way a phone camera degrades print."""
+        import io
+        import random
+
+        from PIL import Image, ImageDraw, ImageFilter, ImageFont
+
+        big = render_px * 4
+        font = ImageFont.truetype(path, big)
+        width = int(font.getlength(text)) + big
+        canvas = Image.new("L", (width, big * 3), 246)
+        ImageDraw.Draw(canvas).text((big // 2, big // 2), text, font=font, fill=28)
+        canvas = canvas.filter(ImageFilter.GaussianBlur(big * 0.012))
+        canvas = canvas.resize((width // 4, big * 3 // 4), Image.LANCZOS)
+        random.seed(7)
+        canvas.putdata(
+            [max(0, min(255, v + random.gauss(0, 3.5))) for v in list(canvas.getdata())]
+        )
+        buffer = io.BytesIO()
+        canvas.save(buffer, "JPEG", quality=82)
+        buffer.seek(0)
+        return Image.open(buffer).convert("L")
+
+    def _score(self, path: str, render_px: int):
+        image = self._photographed(path, render_px, self.TEXT)
+        return ff.analyse_label_lines(image, [self.TEXT])
+
+    @pytest.mark.skipif(not ff.sf_available(), reason="San Francisco not installed")
+    def test_above_the_gate_a_substitute_typeface_separates(self):
+        genuine = self._score(ff.SF_FONT_PATH, 200)
+        assert genuine is not None and genuine.shape_distance is not None
+        assert genuine.median_glyph_height_px >= ff.MEASURABLE_GLYPH_HEIGHT_PX
+
+        for name, path in self.SUBSTITUTES.items():
+            if not Path(path).exists():
+                continue
+            other = self._score(path, 200)
+            assert other is not None and other.shape_distance is not None
+            assert other.shape_distance > genuine.shape_distance * 1.5, (
+                f"{name} is within 1.5x of San Francisco above the resolution "
+                f"gate: {other.shape_distance:.4f} vs {genuine.shape_distance:.4f}"
+            )
+
+    @pytest.mark.skipif(not ff.sf_available(), reason="San Francisco not installed")
+    def test_below_the_gate_the_measurement_can_invert(self):
+        """Why the gate exists, stated as a test rather than as a comment.
+
+        At the resolution a whole-box photograph produces, at least one
+        substitute scores BETTER than San Francisco. A reading taken there is
+        not weak evidence, it is misleading evidence, which is why the rule
+        refuses to report a figure below the gate at all.
+        """
+        genuine = self._score(ff.SF_FONT_PATH, 40)
+        assert genuine is not None
+        assert genuine.median_glyph_height_px < ff.MEASURABLE_GLYPH_HEIGHT_PX
+
+        scores = []
+        for path in self.SUBSTITUTES.values():
+            if not Path(path).exists():
+                continue
+            other = self._score(path, 40)
+            if other is not None and other.shape_distance is not None:
+                scores.append(other.shape_distance)
+        if genuine.shape_distance is not None and scores:
+            assert min(scores) < genuine.shape_distance, (
+                "below the gate a substitute no longer scores better than San "
+                "Francisco - re-derive MEASURABLE_GLYPH_HEIGHT_PX, the gate may "
+                "now be set higher than the evidence requires"
+            )
+
+    @pytest.mark.skipif(not ff.sf_available(), reason="San Francisco not installed")
+    def test_the_gate_sits_below_the_first_usable_separation(self):
+        """The constant must not drift above the resolution it was derived from."""
+        assert 30 < ff.MEASURABLE_GLYPH_HEIGHT_PX <= 60
+
+    def test_a_shape_needs_enough_glyphs_before_it_reports(self):
+        assert ff.shape_distance([]) is None

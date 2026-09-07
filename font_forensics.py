@@ -41,7 +41,7 @@ Glyphs are therefore selected by measured signal-to-noise, not by intuition.
 from __future__ import annotations
 
 import string
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import lru_cache
 from pathlib import Path
 
@@ -395,6 +395,25 @@ class FontScore:
     scatter_percent: float
     letters_measured: int
     median_glyph_height_px: float
+    #: Median per-glyph shape distance from San Francisco over the full
+    #: descriptor, not just the bounding box. None when no glyph could be
+    #: described. See ``shape_distance``.
+    shape_distance: float | None = None
+
+    @property
+    def is_measurable(self) -> bool:
+        """Whether the photograph resolves letterform at all.
+
+        Separate from ``is_scoreable``, which asks whether enough glyphs were
+        paired. This asks whether the pixels carry the information in the first
+        place - and below 100px they do not, whatever the glyph count.
+        """
+        return self.median_glyph_height_px >= MEASURABLE_GLYPH_HEIGHT_PX
+
+    @property
+    def resolution_shortfall_px(self) -> float:
+        """How much closer the photograph needs to be. 0 when already enough."""
+        return max(0.0, MEASURABLE_GLYPH_HEIGHT_PX - self.median_glyph_height_px)
 
     @property
     def is_scoreable(self) -> bool:
@@ -431,6 +450,30 @@ class FontScore:
         property above: an unmeasurable line is neither."""
         return self.is_scoreable and self.scatter_percent >= FONT_SCATTER_THRESHOLD
 
+
+#: The measured glyph height at which a typeface substitution survives a phone
+#: camera. Derived by rendering one label line in San Francisco, Helvetica,
+#: Arial and Verdana, degrading each the way a photograph does - optical blur,
+#: resampling, sensor noise, JPEG - and scoring all four against San Francisco
+#: through this module's own path. Heights are what `median_glyph_height_px`
+#: reports, so the gate is expressed in the units the code measures:
+#:
+#:   glyph px   SF shape   nearest substitute   separation
+#:         23     0.1890               0.1382        0.73x   INVERTED
+#:         30     0.0869               0.1101        1.27x   noise
+#:         41     0.0684               0.1284        1.88x   usable
+#:         54     0.0399               0.1514        3.79x   usable
+#:         75     0.0650               0.1163        1.79x   usable
+#:        106     0.0385               0.1043        2.71x   usable
+#:        137     0.0335               0.1123        3.35x   usable
+#:
+#: At 23px a substitute scores BETTER than San Francisco. That inversion is the
+#: mechanism behind this rule's false positives, and no descriptor fixes it:
+#: the pixels do not carry the letterform. Photographs of a whole box underside
+#: put the fine print at 28-35px - measured on the owner's genuine Pro 2 label
+#: (28px) and a counterfeit label (35px) - which is inside the dead band. The
+#: cut sits at 45px, above the first usable row with margin.
+MEASURABLE_GLYPH_HEIGHT_PX = 45
 
 #: Below this, per-glyph deviations agree and the line is consistent with San
 #: Francisco. Genuine photographed labels measured 0.90%; SF rendered
@@ -837,6 +880,56 @@ def _split_into_words(
     return groups
 
 
+def _pair_components(
+    boxes: list[tuple[int, int, int, int]],
+    expected_text: str,
+    image: "Image.Image",
+) -> list[tuple[str, tuple[int, int, int, int]]]:
+    """Align components with the characters they should be, word by word.
+
+    Requiring the whole line to match exactly made real print unusable: glyphs
+    touch, glyphs break, punctuation segments unpredictably, and any one of
+    those discarded the entire line. Word-level alignment loses only the word
+    that went wrong.
+    """
+    ordered = _merge_stacked(sorted(boxes, key=lambda box: box[0]))
+    if not ordered:
+        return []
+
+    groups = _split_into_words(ordered)
+    expected_words = [
+        "".join(c for c in word if c not in _SHORT_MARKS) for word in expected_text.split()
+    ]
+    expected_words = [word for word in expected_words if word]
+
+    pairs: list[tuple[str, tuple[int, int, int, int]]] = []
+    if len(groups) == len(expected_words):
+        for group, word in zip(groups, expected_words):
+            if len(group) == len(word):
+                pairs.extend(zip(word, group))
+    else:
+        remaining = list(groups)
+        for word in expected_words:
+            for index, group in enumerate(remaining):
+                if len(group) == len(word):
+                    pairs.extend(zip(word, group))
+                    remaining = remaining[index + 1:]
+                    break
+    if not pairs:
+        return []
+
+    heights = [float(box[3] - box[1]) for box in ordered]
+    ceiling = _median(heights) * MERGED_GLYPH_HEIGHT_RATIO
+    _, image_height = image.size
+    return [
+        (character, box)
+        for character, box in pairs
+        if character in USABLE_GLYPHS
+        and (box[3] - box[1]) <= ceiling          # merged with a neighbouring mark
+        and box[1] > 0 and box[3] < image_height  # clipped by the crop edge
+    ]
+
+
 def measure_components(
     image: Image.Image, boxes: list[tuple[int, int, int, int]], expected_text: str
 ) -> list[GlyphComparison]:
@@ -849,67 +942,167 @@ def measure_components(
     the filters themselves differed. One segmentation, one component list, one
     count.
     """
-    ordered = sorted(boxes, key=lambda box: box[0])
-    if not ordered:
-        return []
-
-    # Merge vertically stacked pieces before pairing. Raw components count a
-    # dotted "i" or "j" twice, so "Designed by Apple in California" - which has
-    # four dotted i's - produced 31 components for 27 characters and paired
-    # nothing. Layout analysis must NOT merge (it needs every mark to find
-    # rows), but pairing must.
-    ordered = _merge_stacked(ordered)
-
-    # Pair word by word rather than demanding the whole line match exactly.
-    # Requiring global equality made real print unusable: glyphs touch, glyphs
-    # break, punctuation segments unpredictably, and a two-column label puts
-    # unrelated words on one detected row - any one of which discarded the
-    # entire line. Word-level alignment loses only the word that went wrong.
-    groups = _split_into_words(ordered)
-    expected_words = [
-        "".join(c for c in word if c not in _SHORT_MARKS)
-        for word in expected_text.split()
-    ]
-    expected_words = [word for word in expected_words if word]
-
-    pairs: list[tuple[str, tuple[int, int, int, int]]] = []
-    if len(groups) == len(expected_words):
-        # Word counts agree: pair the words that also agree on length.
-        for group, word in zip(groups, expected_words):
-            if len(group) == len(word):
-                pairs.extend(zip(word, group))
-    else:
-        # Word counts disagree, so position is unreliable. Fall back to matching
-        # each expected word against a group of the same length, in order,
-        # consuming groups as they are used.
-        remaining = list(groups)
-        for word in expected_words:
-            for index, group in enumerate(remaining):
-                if len(group) == len(word):
-                    pairs.extend(zip(word, group))
-                    remaining = remaining[index + 1:]
-                    break
-
-    if not pairs:
-        return []
-
-    heights = [float(box[3] - box[1]) for box in ordered]
-    line_height = _median(heights)
-    ceiling = line_height * MERGED_GLYPH_HEIGHT_RATIO
-    _, image_height = image.size
-
     results: list[GlyphComparison] = []
-    for character, box in pairs:
-        if character not in USABLE_GLYPHS:
-            continue
-        if (box[3] - box[1]) > ceiling:          # merged with a neighbouring mark
-            continue
-        if box[1] <= 0 or box[3] >= image_height:  # clipped by the crop edge
-            continue
+    for character, box in _pair_components(boxes, expected_text, image):
         comparison = compare_glyph(character, image.crop(box))
         if comparison is not None:
             results.append(comparison)
     return results
+
+
+# --------------------------------------------------------------------------- #
+# Shape descriptor
+# --------------------------------------------------------------------------- #
+#
+# The aspect ratio above reduces a glyph to its bounding box, which is exactly
+# the thing a crop edge, a blur radius and a resampling step all change: moving
+# one crop edge on a genuine label moved its score from 2.25% to 5.52%. This
+# describes where the ink actually sits instead, which survives those and
+# separates San Francisco from Helvetica, Arial, Verdana and Geneva by 1.7-2.0x
+# on clean renders.
+
+#: Bands used for the ink profiles. Six is enough to place a crossbar and
+#: coarse enough to survive blur at the resolutions that matter.
+SHAPE_BINS = 6
+
+SHAPE_FEATURES = (
+    ["aspect", "density", "stroke", "centroid_x", "centroid_y"]
+    + [f"row{i}" for i in range(SHAPE_BINS)]
+    + [f"col{i}" for i in range(SHAPE_BINS)]
+)
+
+#: Features live on different scales; these bring them to comparable size so no
+#: single one dominates the distance.
+_SHAPE_WEIGHTS = [4.0, 6.0, 8.0, 6.0, 6.0] + [10.0] * (2 * SHAPE_BINS)
+
+
+@dataclass(frozen=True)
+class GlyphShape:
+    """Where a glyph's ink sits, independent of how big it was photographed."""
+
+    character: str
+    height: int
+    aspect: float
+    density: float
+    stroke: float
+    row_profile: tuple[float, ...]
+    col_profile: tuple[float, ...]
+    centroid_x: float
+    centroid_y: float
+
+    def vector(self) -> list[float]:
+        return [
+            self.aspect, self.density, self.stroke, self.centroid_x, self.centroid_y,
+            *self.row_profile, *self.col_profile,
+        ]
+
+
+def describe_glyph(image: "Image.Image", character: str, threshold: int) -> "GlyphShape | None":
+    """Measure one glyph's ink distribution. None when there is too little ink."""
+    grey = image.convert("L")
+    width, height = grey.size
+    if width < 3 or height < 6:
+        return None
+    pixels = list(grey.getdata())
+    rows = [
+        [1 if pixels[y * width + x] < threshold else 0 for x in range(width)]
+        for y in range(height)
+    ]
+    ink = sum(sum(row) for row in rows)
+    if ink < 8:
+        return None
+
+    runs: list[int] = []
+    for row in rows:
+        run = 0
+        for value in row:
+            if value:
+                run += 1
+            elif run:
+                runs.append(run)
+                run = 0
+        if run:
+            runs.append(run)
+
+    row_profile = []
+    for band in range(SHAPE_BINS):
+        low, high = int(band * height / SHAPE_BINS), int((band + 1) * height / SHAPE_BINS)
+        row_profile.append(sum(sum(rows[y]) for y in range(low, max(high, low + 1))) / ink)
+    col_profile = []
+    for band in range(SHAPE_BINS):
+        low, high = int(band * width / SHAPE_BINS), int((band + 1) * width / SHAPE_BINS)
+        col_profile.append(
+            sum(rows[y][x] for y in range(height) for x in range(low, max(high, low + 1))) / ink
+        )
+
+    sum_x = sum(x for y in range(height) for x in range(width) if rows[y][x])
+    sum_y = sum(y for y in range(height) for x in range(width) if rows[y][x])
+
+    return GlyphShape(
+        character=character,
+        height=height,
+        aspect=width / height,
+        density=ink / (width * height),
+        stroke=(_median([float(r) for r in runs]) / height) if runs else 0.0,
+        row_profile=tuple(row_profile),
+        col_profile=tuple(col_profile),
+        centroid_x=(sum_x / ink) / width,
+        centroid_y=(sum_y / ink) / height,
+    )
+
+
+def reference_shape(character: str, height: int, blur: float = 0.6) -> "GlyphShape | None":
+    """San Francisco's own shape for this character, rendered at this height."""
+    for size in range(max(height, 8), height * 4):
+        glyph = render_glyph(character, size=size, blur=0.0)
+        box = glyph.point(lambda pixel: 255 if pixel < 128 else 0).getbbox()
+        if box and (box[3] - box[1]) >= height:
+            crop = glyph.crop(box)
+            scale = height / (box[3] - box[1])
+            crop = crop.resize((max(1, round(crop.width * scale)), height), Image.LANCZOS)
+            if blur:
+                crop = crop.filter(ImageFilter.GaussianBlur(blur))
+            return describe_glyph(crop, character, 128)
+    return None
+
+
+def shape_distance(pairs: list[tuple["GlyphShape", "GlyphShape"]]) -> float | None:
+    """Median per-glyph distance from San Francisco, with the label's own bias out.
+
+    Blur, exposure and resolution push every glyph on one label the same way.
+    Subtracting the label's median shift per feature leaves the part that is
+    actually about letterform rather than about the photograph.
+    """
+    if len(pairs) < MINIMUM_GLYPHS_TO_SCORE:
+        return None
+    count = len(SHAPE_FEATURES)
+    rows = [
+        [measured.vector()[i] - reference.vector()[i] for i in range(count)]
+        for measured, reference in pairs
+    ]
+    bias = [_median([row[i] for row in rows]) for i in range(count)]
+    distances = [
+        sum(abs(row[i] - bias[i]) * _SHAPE_WEIGHTS[i] for i in range(count)) / count
+        for row in rows
+    ]
+    return _median(distances)
+
+
+def measure_shapes(
+    image: "Image.Image", boxes: list[tuple[int, int, int, int]], expected_text: str
+) -> list[tuple["GlyphShape", "GlyphShape"]]:
+    """Pair already-segmented components with text and describe both sides."""
+    pairs: list[tuple[GlyphShape, GlyphShape]] = []
+    for character, box in _pair_components(boxes, expected_text, image):
+        crop = image.crop(box)
+        measured = describe_glyph(crop, character, otsu_threshold(crop))
+        if measured is None:
+            continue
+        reference = reference_shape(character, measured.height)
+        if reference is None:
+            continue
+        pairs.append((measured, reference))
+    return pairs
 
 
 def analyse_label_lines(
@@ -935,6 +1128,7 @@ def analyse_label_lines(
     components = raw_components(mask, threshold=128, min_ink_pixels=15)
 
     pooled: list[GlyphComparison] = []
+    shapes: list[tuple[GlyphShape, GlyphShape]] = []
     heights: list[float] = []
     # Each expected text claims a DISTINCT detected line. Choosing independently
     # let two texts of similar length pick the same line while others went
@@ -956,9 +1150,22 @@ def analyse_label_lines(
         if not comparisons:
             continue
         pooled.extend(comparisons)
-        heights.extend(float(box[3] - box[1]) for box in inside)
+        shapes.extend(measure_shapes(image, inside, text))
+        # Height of the glyphs actually MEASURED, not of every component in the
+        # line. Commas, full stops and the dots off an "i" are a third the
+        # height of a letter, and including them dragged the reported glyph
+        # height down by a third - which is the number the resolution gate
+        # depends on.
+        heights.extend(
+            float(box[3] - box[1]) for _, box in _pair_components(inside, text, image)
+        )
 
-    return score_font_match(pooled, heights) if pooled else None
+    if not pooled:
+        return None
+    score = score_font_match(pooled, heights)
+    if score is None:
+        return None
+    return replace(score, shape_distance=shape_distance(shapes))
 
 
 def sf_available() -> bool:

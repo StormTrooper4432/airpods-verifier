@@ -373,6 +373,8 @@ def analyse_locally(
         "median_glyph_height_px": score.median_glyph_height_px,
         "font_line_text": extraction.label_line_texts[0] if extraction.label_line_texts else None,
         "font_below_resolution_floor": score.median_glyph_height_px < MINIMUM_GLYPH_HEIGHT_PX,
+        "font_shape_distance": score.shape_distance,
+        "font_letterforms_resolved": score.is_measurable,
     })
 
 

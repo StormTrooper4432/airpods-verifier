@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 
 import main as cli
+from font_forensics import MEASURABLE_GLYPH_HEIGHT_PX
 from rules_engine import (
     MAXIMUM_COPYRIGHT_YEAR,
     MIN_COVERAGE_FOR_VERDICT,
@@ -70,13 +71,21 @@ GENUINE_USB_C = {
 #: labels measured 0.90% scatter; the threshold is 2.0%.
 GOOD_FONT = LocalAnalysis(
     font_scatter_percent=0.9, font_glyphs_measured=9, font_letters_measured=4,
-    median_glyph_height_px=80.0,
+    median_glyph_height_px=80.0, font_letterforms_resolved=True,
 )
 
 #: The same label set in something other than San Francisco.
 WRONG_FONT = LocalAnalysis(
     font_scatter_percent=4.4, font_glyphs_measured=9, font_letters_measured=4,
-    median_glyph_height_px=80.0,
+    median_glyph_height_px=80.0, font_letterforms_resolved=True,
+)
+
+#: Photographed close enough that letterform is actually resolved, so the shape
+#: descriptor - not the bounding-box ratio - is the statistic that applies.
+RESOLVED_FONT = LocalAnalysis(
+    font_scatter_percent=1.1, font_glyphs_measured=22, font_letters_measured=14,
+    median_glyph_height_px=96.0, font_letterforms_resolved=True,
+    font_shape_distance=0.041,
 )
 
 #: A label located but photographed too small to measure.
@@ -906,11 +915,40 @@ class TestLabelTypographyRule:
         assert "information only" in detail_of(report, "Label Typography")
 
     def test_print_below_the_resolution_floor_is_unknown_with_advice(self):
+        # Below the gate the rule must not merely decline: it must say how far
+        # short the photograph is and what would fix it, because that is the
+        # only thing the buyer can act on.
         report = evaluate(make_extraction(), TOO_SMALL_FONT)
         detail = detail_of(report, "Label Typography")
         assert status_of(report, "Label Typography") is EvidenceStatus.UNKNOWN
-        assert "too small" in detail and "pixels tall" in detail
+        assert "7 pixels tall" in detail
+        assert str(MEASURABLE_GLYPH_HEIGHT_PX) in detail
+        assert "Fill the frame" in detail
         assert report.summary_verdict is not Verdict.HIGH_RISK_SUSPECTED
+
+    def test_below_the_gate_the_warning_names_the_inversion(self):
+        # The reason for the gate is not that the measurement is weak. It is
+        # that at 23px a substitute typeface scores BETTER than San Francisco,
+        # so a reading taken there is worse than no reading. Anyone tempted to
+        # lower the gate should meet that sentence first.
+        detail = detail_of(evaluate(make_extraction(), TOO_SMALL_FONT), "Label Typography")
+        assert "better than the real one" in detail
+
+    def test_a_resolved_label_reports_shape_not_bounding_box(self):
+        report = evaluate(make_extraction(), RESOLVED_FONT)
+        detail = detail_of(report, "Label Typography")
+        assert status_of(report, "Label Typography") is EvidenceStatus.UNKNOWN
+        assert "0.041" in detail
+        assert "96 pixels" in detail
+        # Still not scored: no counterfeit has been photographed above the gate,
+        # so there is no measured figure to compare against.
+        assert "Reported, not scored" in detail
+        assert report.summary_verdict is not Verdict.HIGH_RISK_SUSPECTED
+
+    def test_a_resolved_label_still_carries_no_weight(self):
+        without = evaluate(make_extraction())
+        resolved = evaluate(make_extraction(), RESOLVED_FONT)
+        assert without.confidence_score == resolved.confidence_score
 
     def test_no_measurement_at_all_is_unknown(self):
         report = evaluate(make_extraction())
