@@ -5,6 +5,13 @@ primary_target: "web/src/pages/index.astro"
 related_targets: []
 ---
 
+---
+version: 1
+slug: "web-src-pages-index-astro"
+primary_target: "web/src/pages/index.astro"
+related_targets: []
+---
+
 ## Scope
 
 The verification surface itself: a buyer brings photographs of an AirPods Pro 2 box and case and receives an Evidence Ledger. Visitor mode: **Operate** — the visitor completes an examination. A first-time visitor still has to understand within seconds what this is and why Apple's own serial lookup does not settle it, but that understanding is carried by the sheet doing its job, not by a marketing hero above it.
@@ -43,7 +50,14 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 
 The box net. Findings are marked at the panel they were read from, and the panels nobody photographed sit unexposed on the sheet — so the gap in the evidence is the same object as the instruction for closing it.
 
+## Decided during the build
+
+- **It prints.** A certificate that cannot be printed is not one. `@media print` drops the guilloche, the actions, the legend and the marketing sections, and keeps the record two-column.
+- **Serials are masked wherever the sheet prints them**, at the `examine()` boundary rather than per rule, so a rule added later cannot word its way around it. The buyer reads the serial off the box for Apple's lookup.
+- **`RUN THE EXAMINATION` sits below the fold deliberately.** The first viewport's action is `ADD PHOTO` on the unexposed panels; RUN does nothing until a photograph exists, and hoisting a dead control above a live one would have cost either the plot or the thesis.
+- **The examination does not navigate when scripting is on.** The next step is almost always "add one more photograph", and a navigation empties every file input.
+
 ## Unresolved
 
-- Whether the sheet prints (a real `@media print` certificate) or stays screen-only — decide during the sections phase.
-- Hosting and the API key path for a public deployment; the surface is built against the existing Python pipeline's JSON contract, not a chosen backend.
+- Hosting and the API key path for a public deployment. The server needs `GEMINI_API_KEY` and the Python checkout beside it (or `VERIFIER_ROOT` pointing at one); both failure modes now surface as named notices rather than generic errors.
+- Rate limiting is real: free-tier examinations measured 8s to 89s across a session, and one hit the 120s timeout. A public deployment needs a queue or a paid key before it meets more than one visitor at a time.
