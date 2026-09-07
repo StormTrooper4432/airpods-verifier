@@ -23,8 +23,10 @@ _IMPORT_TO_PACKAGE = {
     "google": "google-genai",
 }
 
-#: Modules that are part of this project, not dependencies.
-_LOCAL_MODULES = {"schema", "rules_engine", "providers", "vision_extractor", "main", "tools"}
+#: Modules that are part of this project, not dependencies. Derived from the
+#: files on disk so a new module cannot silently look like an undeclared
+#: third-party package.
+_LOCAL_MODULES = {p.stem for p in ROOT.glob("*.py")} | {"tools", "tests"}
 
 
 def source_files() -> list[Path]:

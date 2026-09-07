@@ -788,3 +788,41 @@ class TestIndicatorCatalogue:
         for indicator in catalogue["indicators"]:
             assert indicator["status"] in valid, indicator["id"]
             assert indicator["verdict_when_present"] in {"real", "fake"}
+
+
+class TestImageQuality:
+    def test_a_blurred_image_scores_lower_than_a_sharp_one(self, tmp_path):
+        from PIL import Image, ImageDraw, ImageFilter
+
+        from image_quality import measure_sharpness
+
+        sharp = Image.new("RGB", (600, 400), "white")
+        draw = ImageDraw.Draw(sharp)
+        for y in range(20, 380, 24):
+            draw.line([(20, y), (580, y)], fill="black", width=2)
+        sharp_path = tmp_path / "sharp.png"
+        sharp.save(sharp_path)
+
+        blurred_path = tmp_path / "blurred.png"
+        sharp.filter(ImageFilter.GaussianBlur(4)).save(blurred_path)
+
+        assert measure_sharpness(sharp_path).score > measure_sharpness(blurred_path).score
+
+    def test_sharpest_picks_the_best_image_in_a_set(self, tmp_path):
+        from PIL import Image, ImageDraw, ImageFilter
+
+        from image_quality import measure_sharpness, sharpest
+
+        base = Image.new("RGB", (400, 300), "white")
+        ImageDraw.Draw(base).rectangle([50, 50, 350, 250], outline="black", width=3)
+        paths = []
+        for name, image in [("a.png", base.filter(ImageFilter.GaussianBlur(5))), ("b.png", base)]:
+            p = tmp_path / name
+            image.save(p)
+            paths.append(p)
+        assert sharpest(paths).score == measure_sharpness(paths[1]).score
+
+    def test_empty_set_returns_none(self):
+        from image_quality import sharpest
+
+        assert sharpest([]) is None
