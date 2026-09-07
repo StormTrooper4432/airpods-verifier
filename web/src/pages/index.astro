@@ -4,7 +4,6 @@ import BoxNet from '../components/BoxNet.astro';
 import Ledger from '../components/Ledger.astro';
 import Grade from '../components/Grade.astro';
 import Mark from '../components/Mark.astro';
-import specimenData from '../data/specimens.json';
 import {
   blankLedger,
   plotPanel,
@@ -14,11 +13,8 @@ import {
   TOTAL_WEIGHT,
   type Finding,
   type PanelId,
-  type Specimen,
 } from '../data/sheet';
 import { examine, shotsFrom, ExamineError } from '../lib/examine';
-
-const specimens = specimenData as unknown as Specimen[];
 
 let result: Awaited<ReturnType<typeof examine>> | null = null;
 let failure: { problem: string; recovery: string } | null = null;
@@ -62,7 +58,7 @@ const examinedAt = result
  * A record number, so the sheet is a citable document rather than a view.
  * Derived from the findings themselves, so re-examining the same photographs
  * to the same result reproduces it. It is a local reference and nothing more:
- * no registry issues it, and the colophon says so.
+ * no registry issues it, and /about says so.
  */
 function recordNumber(report: NonNullable<typeof result>['report'], at: string): string {
   const basis =
@@ -89,14 +85,6 @@ function recordNumber(report: NonNullable<typeof result>['report'], at: string):
 const record = result && examinedAt ? recordNumber(result.report, examinedAt) : null;
 
 const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
-
-const specimenFindings = (s: Specimen): Finding[] =>
-  s.report.evidence_ledger.map((item, i) => ({
-    n: i + 1,
-    parameter: item.parameter,
-    status: item.status,
-    panel: plotPanel(RULE_BY_PARAMETER[item.parameter], s.panels),
-  }));
 ---
 
 <Sheet
@@ -162,10 +150,14 @@ const specimenFindings = (s: Specimen): Finding[] =>
       </ul>
 
       <div class="actions">
-        <button type="submit" class="run">Run the examination</button>
-        <p class="fine actions-note" role="status">
-          Reading a set of photographs takes about a minute. The record fills in when the
-          engine returns.
+        <div class="actions-row">
+          <button type="submit" class="run">Run the examination</button>
+          <a class="restart" href="/" id="restart" hidden={!result}>Start a new record</a>
+        </div>
+        <p class="fine actions-note">
+          Reading a set of photographs usually takes 10 to 90 seconds. The wait is the
+          vision model&rsquo;s queue on Google&rsquo;s free tier, not the size of your
+          photographs.
         </p>
         <p class="fine actions-note" id="upload-disclosure">
           Photographs are read by Google&rsquo;s Gemini free tier. Google may use free-tier
@@ -186,6 +178,25 @@ const specimenFindings = (s: Specimen): Finding[] =>
 
     <section class="col-findings" id="findings-col" aria-labelledby="findings-h" aria-live="polite">
       <h2 id="findings-h" class="sr-only">Findings</h2>
+
+      <div class="examining" id="examining" hidden>
+        <p class="examining-word">Examining</p>
+        <div class="examining-rail" role="progressbar"
+             aria-label="Examination in progress. The length is not known in advance.">
+          <span></span><span></span><span></span><span></span>
+          <span></span><span></span><span></span><span></span>
+        </div>
+        <p class="examining-stage" id="examining-stage" aria-live="polite">
+          Downscaling each photograph and encoding it
+        </p>
+        <p class="fine examining-clock">
+          <span id="examining-elapsed">0:00</span> elapsed
+          <span class="sep" aria-hidden="true">/</span>
+          the length is not known in advance, so no percentage is shown
+        </p>
+      </div>
+
+      <div id="graded-slot">
       <Grade
         verdict={result?.report.summary_verdict ?? null}
         score={result?.report.confidence_score ?? null}
@@ -194,6 +205,7 @@ const specimenFindings = (s: Specimen): Finding[] =>
       />
       <h3 class="section-h rows-h">Findings</h3>
       <Ledger items={items} striking={Boolean(result)} />
+      </div>
     </section>
   </form>
 
@@ -222,154 +234,6 @@ const specimenFindings = (s: Specimen): Finding[] =>
     )}
   </section>
 
-  <section class="specimens" aria-labelledby="specimens-h">
-    <h2 id="specimens-h" class="section-h">Filed records</h2>
-    <p class="section-note fine">
-      Three real examinations from the labelled corpus, printed exactly as the engine
-      returned them. Serials are redacted: they belong to the people who posted the
-      photographs.
-    </p>
-
-    {specimens.map((s) => (
-      <article class="specimen">
-        <div class="specimen-head">
-          <h3>{s.title}</h3>
-          <p class="specimen-stand">{s.standfirst}</p>
-          <p class="fine specimen-meta">
-            <span class="caps">{s.variant}</span>
-            <span class="sep" aria-hidden="true">/</span>
-            {s.panels.length} of {PANELS.length} surfaces photographed
-          </p>
-        </div>
-        <div class="specimen-plot">
-          <BoxNet shown={s.panels as PanelId[]} findings={specimenFindings(s)} />
-        </div>
-        <div class="specimen-findings">
-          <Grade
-            verdict={s.report.summary_verdict}
-            score={s.report.confidence_score}
-            items={s.report.evidence_ledger}
-          />
-          <Ledger items={s.report.evidence_ledger} condensed={true} resolvedOnly={true} />
-        </div>
-      </article>
-    ))}
-  </section>
-
-  <section class="method" aria-labelledby="method-h">
-    <h2 id="method-h" class="section-h">How the record is made</h2>
-
-    <div class="method-grid">
-      <div>
-        <h3>The model reads. It never grades.</h3>
-        <p>
-          A vision model transcribes each photograph into a fixed schema &mdash; model number,
-          copyright year, the literal serial line, which surfaces are visible. The schema
-          forbids extra fields and has no verdict field in it, so the model is structurally
-          unable to return one. Every grade on this sheet comes from Python evaluating
-          constraints.
-        </p>
-      </div>
-      <div>
-        <h3>Every check carries a citation.</h3>
-        <p>
-          A rule without provenance is an invented specification &mdash; a polished counterfeit
-          detector containing counterfeit information. Each of the {RULES.length} checks names
-          its source in fine print beneath the finding, and the test suite fails if a rule
-          ships without one.
-        </p>
-      </div>
-      <div>
-        <h3>Measured, not asserted.</h3>
-        <p>
-          Twenty listings were labelled blind by a domain expert and then scored:
-          twelve agreements, <b>no counterfeit passed</b>, and <b>no genuine unit was
-          accused</b>. Three checks that looked convincing in synthetic tests &mdash; kerning
-          irregularity, packaging wrap quality, typeface comparison &mdash; produced a false
-          positive on first contact with real photographs and were demoted.
-        </p>
-      </div>
-    </div>
-
-    <div class="scroll-x">
-    <table class="register">
-      <caption class="fine">The register of checks, in the order the ledger prints them.</caption>
-      <thead>
-        <tr>
-          <th scope="col" class="caps">#</th>
-          <th scope="col" class="caps">Check</th>
-          <th scope="col" class="caps num">Tier</th>
-          <th scope="col" class="caps num">Weight</th>
-          <th scope="col" class="caps">Effect</th>
-          <th scope="col" class="caps">Source</th>
-        </tr>
-      </thead>
-      <tbody>
-        {RULES.map((rule, i) => (
-          <tr class={rule.informational ? 'is-informational' : undefined}>
-            <td class="num">{String(i + 1).padStart(2, '0')}</td>
-            <th scope="row">{rule.parameter}</th>
-            <td class="num">{rule.tier}</td>
-            <td class="num">{rule.weight.toFixed(1)}</td>
-            <td>
-              {rule.informational
-                ? 'Reports only'
-                : rule.disqualifying
-                  ? 'Disqualifying'
-                  : 'Contributes'}
-            </td>
-            <td class="src">{rule.source}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-    </div>
-  </section>
-
-  <section class="limits" aria-labelledby="limits-h">
-    <h2 id="limits-h" class="section-h">What this record cannot do</h2>
-    <ul class="limit-list">
-      <li>
-        <b>It does not contact Apple.</b> Counterfeits clone valid serials, so{' '}
-        <span class="mono-ish">checkcoverage.apple.com</span> returns a clean result for them.
-        Check it as well &mdash; it catches a serial that was never issued &mdash; but a pass
-        there is not evidence.
-      </li>
-      <li>
-        <b>It covers AirPods Pro 2 only.</b> Twenty-eight other Apple model numbers are
-        recognised well enough to say &ldquo;this is a different product, and I decline to
-        grade it&rdquo;. That refusal is the feature; the alternative is a Pro 2 packaging
-        rule accusing a genuine AirPods 4.
-      </li>
-      <li>
-        <b>Typeface comparison does not vote.</b> It ships at weight 0. Four genuine labels
-        scattered 2.4&ndash;4.7% against San Francisco and the one counterfeit measured 6.8%:
-        the variation inside the genuine group is wider than the gap to the fake, so the
-        check reports and stays out of the grade until it is calibrated.
-      </li>
-      <li>
-        <b>Inconclusive is not a pass.</b> Coverage is never rescoped to the surfaces you
-        happened to send, because that would clear a unit whose box nobody photographed.
-      </li>
-      <li>
-        <b>Your photographs leave this machine.</b> They are sent to Google&rsquo;s Gemini
-        free tier, whose terms allow the content to be used to improve Google&rsquo;s
-        products. The box label carries a serial number.
-      </li>
-    </ul>
-  </section>
-
-  <footer class="colophon">
-    <p class="fine">
-      Evidence ledger produced by a deterministic rules engine over a schema-constrained
-      vision extraction. Grades, weights and sources on this page are read from the same
-      rule table the command line uses. Record numbers are derived from the findings so a
-      repeat examination reproduces them; no registry issues one, and neither Apple nor
-      any other body stands behind this sheet. Serial numbers are masked wherever the
-      record prints them &mdash; the box is in your hand, and Apple&rsquo;s coverage lookup
-      wants the number off the box, not off this page.
-    </p>
-  </footer>
 </Sheet>
 
 <script>
@@ -412,6 +276,55 @@ const specimenFindings = (s: Specimen): Finding[] =>
       if (next && here) here.innerHTML = next.innerHTML;
     };
 
+    /**
+     * What the pipeline is actually doing, in order. There is no percentage
+     * here and there will not be one: the engine cannot know how long the
+     * vision model's queue is, and a bar that fills at a guessed rate is the
+     * same false precision this whole sheet exists to refuse. The elapsed
+     * clock is the only number, and it is true.
+     */
+    const STAGES: [number, string][] = [
+      [0, 'Downscaling each photograph and encoding it'],
+      [3, 'Measuring sharpness locally \u2014 no model sees this step'],
+      [6, 'Sending the photographs to the vision model'],
+      [10, 'The model transcribes into a fixed schema. It has no verdict field'],
+      [16, 'Reading model numbers, the copyright year and the serial line'],
+      [24, 'Recording which surfaces the photographs actually show'],
+      [34, 'Waiting on the free tier. This is the slow part, and it is not yours'],
+      [60, 'Still waiting. Free-tier capacity is shared; runs have taken 90 seconds'],
+      [120, 'Still waiting. Your photographs stay attached whatever happens next'],
+    ];
+
+    const panel = document.getElementById('examining');
+    const stageEl = document.getElementById('examining-stage');
+    const elapsedEl = document.getElementById('examining-elapsed');
+    const graded = document.getElementById('graded-slot');
+
+    let ticker: ReturnType<typeof setInterval> | undefined;
+
+    const startProgress = () => {
+      const began = Date.now();
+      if (panel) panel.hidden = false;
+      if (graded) graded.hidden = true;
+      const tick = () => {
+        const seconds = Math.floor((Date.now() - began) / 1000);
+        if (elapsedEl) {
+          elapsedEl.textContent =
+            `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+        }
+        const stage = STAGES.filter(([at]) => at <= seconds).pop();
+        if (stage && stageEl && stageEl.textContent !== stage[1]) stageEl.textContent = stage[1];
+      };
+      tick();
+      ticker = setInterval(tick, 1000);
+    };
+
+    const stopProgress = () => {
+      if (ticker) clearInterval(ticker);
+      if (panel) panel.hidden = true;
+      if (graded) graded.hidden = false;
+    };
+
     form.addEventListener('submit', async (event) => {
       const run = form.querySelector<HTMLButtonElement>('.run');
       if (!run) return;
@@ -419,8 +332,8 @@ const specimenFindings = (s: Specimen): Finding[] =>
 
       const label = run.textContent;
       run.disabled = true;
-      run.textContent = 'Examining\u2026 about a minute';
-      document.querySelector('.grade')?.classList.add('is-examining');
+      run.textContent = 'Examining\u2026';
+      startProgress();
 
       try {
         const response = await fetch(form.action || location.pathname, {
@@ -445,6 +358,7 @@ const specimenFindings = (s: Specimen): Finding[] =>
         /* The overlay is never replaced, so the plot is told here that its job
            has changed from collecting photographs to reading findings. */
         document.querySelector('.plot')?.classList.add('is-graded');
+        document.getElementById('restart')?.removeAttribute('hidden');
         document.getElementById('findings-col')?.scrollIntoView({
           behavior: 'smooth',
           block: 'start',
@@ -458,7 +372,7 @@ const specimenFindings = (s: Specimen): Finding[] =>
             '<p class="notice-fix">Check the connection and run it again.</p></div>';
         }
       } finally {
-        document.querySelector('.grade')?.classList.remove('is-examining');
+        stopProgress();
         run.disabled = false;
         run.textContent = label;
       }
@@ -574,6 +488,45 @@ const specimenFindings = (s: Specimen): Finding[] =>
     gap: calc(var(--u) * 2);
     justify-items: start;
   }
+  .actions-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: calc(var(--u) * 2);
+  }
+
+  .restart {
+    font-family: var(--narrow);
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--ink);
+    background: none;
+    border: 2px solid var(--intaglio);
+    padding: calc(var(--u) * 1.75) calc(var(--u) * 3);
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    transition:
+      background 160ms cubic-bezier(0.16, 1, 0.3, 1),
+      color 160ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .restart:hover { background: var(--intaglio); color: var(--paper); }
+  .restart[hidden] { display: none; }
+
+  .to-method {
+    margin: 0;
+    padding-top: calc(var(--u) * 4);
+    border-top: 2px solid var(--ink);
+  }
+  .to-method a {
+    font-family: var(--narrow);
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-weight: 700;
+    font-size: 13px;
+  }
 
   .run {
     font-family: var(--narrow);
@@ -591,14 +544,72 @@ const specimenFindings = (s: Specimen): Finding[] =>
       color 160ms cubic-bezier(0.16, 1, 0.3, 1);
   }
   .run:hover { background: var(--intaglio); border-color: var(--intaglio); }
-  .examination :global(.grade.is-examining .grade-word) {
+  /* Examining -------------------------------------------------------------
+     The record's own field, mid-fill. It takes the grade's place rather than
+     appearing beside it, so the sheet has one state at a time. */
+
+  .examining { margin: 0 0 calc(var(--u) * 4); }
+
+  .examining-word {
+    font-family: var(--narrow);
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: clamp(26px, 3.6vw, 42px);
+    line-height: 0.92;
+    margin: 0;
+    padding-bottom: calc(var(--u) * 1.5);
     color: var(--ink-soft);
-    border-bottom-color: var(--intaglio-hair);
-    animation: pulse-examining 1.6s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+    border-bottom: 3px solid var(--intaglio-hair);
   }
-  @keyframes pulse-examining {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.45; }
+
+  /* Indeterminate by construction: eight fixed cells with a lit run passing
+     along them. It says "working", never "this far along". */
+  .examining-rail {
+    display: flex;
+    gap: 3px;
+    height: calc(var(--u) * 2);
+    margin: calc(var(--u) * 3) 0 calc(var(--u) * 2);
+  }
+  .examining-rail span {
+    flex: 1;
+    border: 1px solid var(--intaglio-hair);
+    background: transparent;
+    animation: rail-sweep 1.9s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+  }
+  .examining-rail span:nth-child(1) { animation-delay: 0ms; }
+  .examining-rail span:nth-child(2) { animation-delay: 110ms; }
+  .examining-rail span:nth-child(3) { animation-delay: 220ms; }
+  .examining-rail span:nth-child(4) { animation-delay: 330ms; }
+  .examining-rail span:nth-child(5) { animation-delay: 440ms; }
+  .examining-rail span:nth-child(6) { animation-delay: 550ms; }
+  .examining-rail span:nth-child(7) { animation-delay: 660ms; }
+  .examining-rail span:nth-child(8) { animation-delay: 770ms; }
+  @keyframes rail-sweep {
+    0%, 55%, 100% { background: transparent; border-color: var(--intaglio-hair); }
+    18% { background: var(--intaglio); border-color: var(--intaglio); }
+  }
+
+  .examining-stage {
+    margin: 0 0 calc(var(--u) * 1);
+    max-width: 54ch;
+    line-height: calc(var(--u) * 3);
+  }
+  .examining-clock { margin: 0; }
+  .examining-clock .sep { padding: 0 0.5em; color: var(--intaglio); }
+  #examining-elapsed {
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  /* With motion reduced the rail holds a steady lit state rather than
+     freezing on whatever frame it happened to stop at. */
+  @media (prefers-reduced-motion: reduce) {
+    .examining-rail span {
+      animation: none;
+      background: var(--intaglio-hair);
+      border-color: var(--intaglio-soft);
+    }
   }
 
   .run:disabled { background: none; color: var(--ink-soft); border-color: var(--intaglio-hair); cursor: progress; }
@@ -630,122 +641,6 @@ const specimenFindings = (s: Specimen): Finding[] =>
   .steps-weight { color: var(--ink-soft); }
   .steps-none { margin: 0; color: var(--ink-soft); }
 
-  /* Filed records --------------------------------------------------------- */
-
-  .specimens { margin-bottom: calc(var(--u) * 12); }
-
-  .specimen {
-    display: grid;
-    grid-template-columns: minmax(0, 20ch) minmax(0, 0.8fr) minmax(0, 1.35fr);
-    gap: calc(var(--u) * 5);
-    align-items: start;
-    /* Split by a void, per the world's own rule: mass and gap divide these,
-       not a rule across the page. */
-    padding: calc(var(--u) * 9) 0 0;
-  }
-  .specimen:first-of-type { padding-top: calc(var(--u) * 4); }
-  .specimen h3 {
-    margin: 0 0 calc(var(--u) * 1.5);
-    font-size: 19px;
-    font-weight: 600;
-    line-height: calc(var(--u) * 3);
-    letter-spacing: -0.012em;
-  }
-  .specimen-stand { margin: 0 0 calc(var(--u) * 2); color: var(--ink-soft); }
-  .specimen-meta { margin: 0; }
-  .specimen-meta .sep { padding: 0 0.5em; color: var(--intaglio); }
-
-  /* The register ---------------------------------------------------------- */
-
-  .method { margin-bottom: calc(var(--u) * 12); }
-
-  .method-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(28ch, 1fr));
-    gap: calc(var(--u) * 5);
-    margin-bottom: calc(var(--u) * 8);
-  }
-  .method-grid h3 {
-    margin: 0 0 calc(var(--u) * 1.5);
-    font-size: 19px;
-    font-weight: 600;
-    letter-spacing: -0.012em;
-    line-height: calc(var(--u) * 3);
-  }
-  .method-grid p { margin: 0; line-height: calc(var(--u) * 3); max-width: 46ch; }
-
-  /* Wide content scrolls inside its own box; the page body never does. */
-  .scroll-x {
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
-  }
-
-  .register {
-    width: 100%;
-    min-width: 34rem;
-    border-collapse: collapse;
-    text-align: left;
-  }
-  .register caption { text-align: left; padding-bottom: calc(var(--u) * 1.5); }
-  .register th,
-  .register td {
-    padding: calc(var(--u) * 1.5) calc(var(--u) * 2) calc(var(--u) * 1.5) 0;
-    border-bottom: 1px solid var(--intaglio-hair);
-    vertical-align: baseline;
-  }
-  .register thead th {
-    font-size: 9.5px;
-    color: var(--intaglio);
-    border-bottom: 2px solid var(--intaglio);
-    padding-bottom: calc(var(--u) * 1);
-  }
-  .register tbody th { font-weight: 600; }
-  .register .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .register thead .num { text-align: right; }
-  .register .src {
-    font-family: var(--narrow);
-    font-size: 12px;
-    color: var(--ink-soft);
-    line-height: calc(var(--u) * 2);
-    min-width: 26ch;
-  }
-  .register .is-informational th,
-  .register .is-informational td { color: var(--ink-soft); }
-
-  /* Limits ---------------------------------------------------------------- */
-
-  .limits { margin-bottom: calc(var(--u) * 10); }
-  .limit-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: grid;
-    gap: calc(var(--u) * 3);
-    max-width: 82ch;
-  }
-  .limit-list li {
-    line-height: calc(var(--u) * 3);
-    padding-left: calc(var(--u) * 3);
-    position: relative;
-  }
-  /* A printed bullet, not an empty checkbox: these are statements, not checks. */
-  .limit-list li::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: calc(var(--u) * 1.5);
-    width: calc(var(--u) * 1.5);
-    height: 2px;
-    background: var(--intaglio);
-  }
-  .mono-ish { font-family: var(--narrow); letter-spacing: 0.02em; }
-
-  .colophon {
-    padding-top: calc(var(--u) * 4);
-    border-top: 2px solid var(--ink);
-  }
-  .colophon p { max-width: 76ch; }
-
   /* Narrower ---------------------------------------------------------------
      The examination is one column on a phone, plot first: at a meet-up the
      buyer is adding photographs, not reading a register. */
@@ -753,7 +648,6 @@ const specimenFindings = (s: Specimen): Finding[] =>
   @media (max-width: 1100px) {
     .examination { grid-template-columns: minmax(0, 1fr); gap: calc(var(--u) * 7); }
     .col-plot { position: static; }
-    .specimen { grid-template-columns: minmax(0, 1fr); gap: calc(var(--u) * 4); }
   }
 
   @media (max-width: 860px) {
@@ -763,9 +657,6 @@ const specimenFindings = (s: Specimen): Finding[] =>
       align-items: start;
     }
     .record { text-align: left; min-width: 0; }
-    .register .src { display: none; }
-    .register { min-width: 26rem; }
-    .register th, .register td { padding-right: calc(var(--u) * 1.5); }
   }
 
   @media (max-width: 560px) {
@@ -780,7 +671,7 @@ const specimenFindings = (s: Specimen): Finding[] =>
   /* Printed --------------------------------------------------------------- */
 
   @media print {
-    .actions, .legend, .specimens, .method, .limits { display: none; }
+    .actions, .legend, .to-method { display: none; }
     .examination { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; }
     .masthead { margin-bottom: 24px; }
   }

@@ -73,7 +73,13 @@ function python(): string {
 
 export const MAX_FILES = 10;
 export const MAX_BYTES = 8 * 1024 * 1024;
-const TIMEOUT_MS = 120_000;
+/**
+ * Measured on the free tier: 8s to 89s for four photographs, 53s for two, and
+ * one run past 120s. The old two-minute ceiling cut off examinations that were
+ * still working, and the number of photographs was never the cause — the wait
+ * is the vision model's queue, not the upload.
+ */
+const TIMEOUT_MS = 300_000;
 
 const EXT: Record<string, string> = {
   'image/jpeg': '.jpg',
@@ -101,8 +107,9 @@ function run(args: string[]): Promise<{ code: number; stdout: string; stderr: st
       child.kill('SIGKILL');
       reject(
         new ExamineError(
-          'The examination took longer than two minutes and was stopped.',
-          'Try again with fewer photographs.',
+          'The vision model did not answer within five minutes.',
+          'This is free-tier congestion, not your photographs. Wait a minute and ' +
+            'run it again; the ones you added are still attached.',
         ),
       );
     }, TIMEOUT_MS);
