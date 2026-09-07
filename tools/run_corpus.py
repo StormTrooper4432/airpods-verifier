@@ -32,7 +32,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from providers import is_transient_failure  # noqa: E402
 from rules_engine import evaluate  # noqa: E402
-from schema import Verdict  # noqa: E402
+from schema import Verdict, VisionExtraction  # noqa: E402
 from vision_extractor import VisionExtractionError, extract  # noqa: E402
 
 IMAGE_SUFFIXES = (".jpg", ".jpeg", ".png", ".webp")
@@ -110,6 +110,20 @@ def process(folder: Path, *, provider, model, effort, cap, allow_lite=False, lit
     return record
 
 
+def rescore(record: dict) -> dict:
+    """Recompute verdict, ledger and next steps from a stored extraction."""
+    extraction = record.get("extraction")
+    if not extraction:
+        return record
+    report = evaluate(VisionExtraction.model_validate(extraction))
+    record = dict(record)
+    record["verdict"] = report.summary_verdict.value
+    record["confidence"] = report.confidence_score
+    record["ledger"] = report.to_dict()["evidence_ledger"]
+    record["next_steps"] = report.next_steps
+    return record
+
+
 def failed_checks(record: dict) -> str:
     return "; ".join(
         item["parameter"] for item in record.get("ledger", []) if item["status"] == "FAIL"
@@ -164,8 +178,38 @@ def write_review(records: list[dict], out: Path) -> None:
     (out / "review.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def refresh_review(results_dir: Path) -> None:
+    """Re-score every stored extraction and rewrite the review sheet in place.
+
+    Keeps the expert_verdict column, which is hand-entered and must survive.
+    """
+    csv_path = results_dir / "review.csv"
+    existing: dict[str, str] = {}
+    if csv_path.is_file():
+        existing = {
+            row["post_id"]: row.get("expert_verdict", "")
+            for row in csv.DictReader(csv_path.open(encoding="utf-8"))
+        }
+
+    records = []
+    for path in sorted(results_dir.glob("*.json"), key=lambda p: (len(p.stem), p.stem)):
+        records.append(rescore(json.loads(path.read_text(encoding="utf-8"))))
+    if not records:
+        return
+    write_review(records, results_dir)
+
+    rows = list(csv.DictReader(csv_path.open(encoding="utf-8")))
+    for row in rows:
+        row["expert_verdict"] = existing.get(row["post_id"], row.get("expert_verdict", ""))
+    with csv_path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+
+
 def score(results_dir: Path) -> int:
     """Compare filled-in expert labels against the pipeline."""
+    refresh_review(results_dir)
     csv_path = results_dir / "review.csv"
     if not csv_path.is_file():
         print(f"error: {csv_path} not found - run the corpus first.", file=sys.stderr)
@@ -224,8 +268,7 @@ def main() -> int:
     parser.add_argument(
         "--allow-lite",
         action="store_true",
-        help="Extend the chain to Flash-Lite. Avoid for measurement runs: a weaker model "
-             "silently handling some posts corrupts the accuracy figure.",
+        help="Extend the chain to full-Flash after Lite. Better fine print, ~20 requests/day.",
     )
     parser.add_argument("--max-images", type=int, default=4, help="Images per post (token cost).")
     parser.add_argument("--delay", type=float, default=DEFAULT_DELAY_S, help="Seconds between posts.")
@@ -251,8 +294,15 @@ def main() -> int:
     for index, folder in enumerate(folders, start=1):
         cached = args.out / f"{folder.name}.json"
         if cached.is_file():
-            records.append(json.loads(cached.read_text(encoding="utf-8")))
-            print(f"[{index}/{len(folders)}] {folder.name}  (cached)")
+            record = json.loads(cached.read_text(encoding="utf-8"))
+            # Re-score against the CURRENT rules. The extraction is the
+            # expensive part and is safe to reuse; the verdict is cheap and goes
+            # stale the moment a rule changes. Trusting the cached verdict made
+            # a scoring run report false accusations that had already been fixed.
+            record = rescore(record)
+            cached.write_text(json.dumps(record, indent=2), encoding="utf-8")
+            records.append(record)
+            print(f"[{index}/{len(folders)}] {folder.name}  (cached, re-scored)")
             continue
 
         print(f"[{index}/{len(folders)}] {folder.name}", flush=True)

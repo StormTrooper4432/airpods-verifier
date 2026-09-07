@@ -106,7 +106,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--allow-lite",
         action="store_true",
-        help="Extend the fallback chain to Flash-Lite models. Cheaper capacity, weaker at fine print.",
+        help="Extend the chain to the full-Flash models after Lite. Better fine print, far less quota.",
     )
     parser.add_argument(
         "--no-fallback",

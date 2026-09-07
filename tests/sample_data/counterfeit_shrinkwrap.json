@@ -14,5 +14,6 @@
   "visible_panels": [
     "box_front",
     "box_bottom_label"
-  ]
+  ],
+  "serial_label_literal": null
 }

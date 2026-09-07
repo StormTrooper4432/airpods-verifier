@@ -41,6 +41,7 @@ GENUINE_USB_C = {
     "claimed_model_variant": VARIANT_USB_C,
     "extracted_model_number": "A3047",
     "extracted_serial_number": "H4XQ7K2LMN9P",
+    "serial_label_literal": "(S) Serial No. H4XQ7K2LMN9P",
     "copyright_year": 2023,
     "has_plastic_shrinkwrap": False,
     "has_paper_pull_tabs": True,
@@ -740,3 +741,50 @@ class TestGenerationIdentification:
 
         for generation in KNOWLEDGE["other_generations"]:
             assert generation.get("source"), f"{generation['name']} has no source"
+
+
+class TestSerialLabelSpacing:
+    """The (S) Serial marker. Binary and printed, unlike the subjective
+    judgements that produced false positives - and it caught a counterfeit the
+    pipeline had passed as GENUINE."""
+
+    def test_missing_space_fails(self):
+        report = evaluate(make_extraction(serial_label_literal="(S)Serial No. PCWXHW027R"))
+        assert status_of(report, "Serial Label Format") is EvidenceStatus.FAIL
+        assert report.summary_verdict is Verdict.HIGH_RISK_SUSPECTED
+
+    def test_present_space_passes(self):
+        report = evaluate(make_extraction(serial_label_literal="(S) Serial No. WXLP2LT40J"))
+        assert status_of(report, "Serial Label Format") is EvidenceStatus.PASS
+
+    def test_unreadable_label_is_unknown_not_a_failure(self):
+        report = evaluate(make_extraction(serial_label_literal=None))
+        assert status_of(report, "Serial Label Format") is EvidenceStatus.UNKNOWN
+
+    def test_a_line_without_the_marker_is_unknown(self):
+        report = evaluate(make_extraction(serial_label_literal="Serial WXLP2LT40J"))
+        assert status_of(report, "Serial Label Format") is EvidenceStatus.UNKNOWN
+
+    @pytest.mark.parametrize(
+        "literal", ["(s)serial no. abc123", "( S )Serial No. ABC", "(S)SERIAL NO. ABC"]
+    )
+    def test_case_and_bracket_padding_do_not_defeat_it(self, literal):
+        report = evaluate(make_extraction(serial_label_literal=literal))
+        assert status_of(report, "Serial Label Format") is EvidenceStatus.FAIL
+
+    def test_it_is_answerable_only_from_the_box_label(self):
+        rule = next(r for r in RULES if r.parameter == "Serial Label Format")
+        assert rule.answerable_from == ("box_bottom_label",)
+        assert rule.source and not rule.source.startswith("UNSOURCED")
+
+
+class TestIndicatorCatalogue:
+    def test_catalogue_is_sourced_and_status_tracked(self):
+        from rules_engine import KNOWLEDGE
+
+        catalogue = KNOWLEDGE["owner_indicator_catalogue"]
+        assert catalogue["source"]
+        valid = {"implemented", "partially_implemented", "pending"}
+        for indicator in catalogue["indicators"]:
+            assert indicator["status"] in valid, indicator["id"]
+            assert indicator["verdict_when_present"] in {"real", "fake"}

@@ -216,7 +216,7 @@ def resolve_model_chain(
 
     if lite_only:
         attribute = "lite_only_chain"
-    elif allow_lite:
+    elif allow_lite:  # historical name: "extend beyond the default chain"
         attribute = "extended_fallback_chain"
     else:
         attribute = "fallback_chain"

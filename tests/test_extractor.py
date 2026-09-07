@@ -23,6 +23,7 @@ VALID_EXTRACTION = {
     "claimed_model_variant": "Pro 2 USB-C",
     "extracted_model_number": "A3047",
     "extracted_serial_number": "H4XQ7K2LMN9P",
+    "serial_label_literal": "(S) Serial No. H4XQ7K2LMN9P",
     "copyright_year": 2023,
     "has_plastic_shrinkwrap": False,
     "has_paper_pull_tabs": True,
@@ -455,9 +456,17 @@ class TestChainResolution:
             assert provider.fallback_chain[0] == provider.default_model
             assert len(provider.fallback_chain) >= 2
 
-    def test_gemini_chain_avoids_flash_lite(self):
-        # Lite is cheaper but weaker at small print, which is the whole job.
-        assert not any("lite" in m for m in pv.get_provider("gemini").fallback_chain)
+    def test_default_chain_is_lite(self):
+        # ~500 requests/day per Lite model against ~20 for Flash. Labelled data
+        # is the binding constraint, so throughput wins over fine-print quality.
+        provider = pv.get_provider("gemini")
+        assert all("lite" in m for m in provider.fallback_chain)
+        assert provider.default_model in provider.fallback_chain
+
+    def test_full_flash_is_reachable_when_quality_matters(self):
+        provider = pv.get_provider("gemini")
+        assert provider.flash_chain
+        assert set(provider.flash_chain) <= set(provider.extended_fallback_chain)
 
     def test_gemini_chain_is_entirely_free_tier(self):
         provider = pv.get_provider("gemini")
@@ -510,10 +519,10 @@ class TestRateLimitCooldown:
 
 
 class TestExtendedChain:
-    def test_lite_models_are_opt_in_only(self):
+    def test_extending_reaches_full_flash(self):
         provider = pv.get_provider("gemini")
-        assert not any("lite" in m for m in provider.fallback_chain)
-        assert any("lite" in m for m in provider.extended_fallback_chain)
+        assert not set(provider.flash_chain) & set(provider.fallback_chain)
+        assert set(provider.flash_chain) <= set(provider.extended_fallback_chain)
 
     def test_extended_chain_keeps_quality_models_first(self):
         provider = pv.get_provider("gemini")
@@ -535,7 +544,7 @@ class TestLiteOnlyChain:
         provider = pv.get_provider("gemini")
         chain = ve.resolve_model_chain(provider, None, fallback=True, lite_only=True)
         assert chain == list(provider.lite_only_chain)
-        assert not set(chain) & set(provider.fallback_chain)
+        assert not set(chain) & set(provider.flash_chain)
 
     def test_lite_only_still_has_internal_fallback(self):
         chain = ve.resolve_model_chain(

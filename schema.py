@@ -97,6 +97,13 @@ class VisionExtraction(BaseModel):
     extracted_serial_number: str | None = Field(
         description="Serial number printed on the box or hardware. Null if not legible."
     )
+    serial_label_literal: str | None = Field(
+        description=(
+            "The serial line from the box label copied EXACTLY as printed, including brackets, "
+            "punctuation and spacing - for example '(S) Serial No. WXLP2LT40J'. Reproduce the "
+            "spacing faithfully; do not tidy it up. Null if the serial line is not legible."
+        )
+    )
     copyright_year: int | None = Field(
         description="Four-digit copyright year printed on the packaging. Null if not legible."
     )

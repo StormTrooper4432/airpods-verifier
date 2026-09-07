@@ -169,6 +169,74 @@ panels:
 
 # Documented but NOT yet implemented as rules. Recorded so the knowledge is
 # captured with provenance, and so it is obvious what is known-but-unused.
+# Indicators catalogued by the project owner across 25 hand-verified listings.
+# These are the reasons a domain expert gave for each verdict, which makes them
+# the best-sourced material in this file. Counts are how often each was cited.
+#
+# IMPORTANT: those 25 listings are a SEPARATE reference set. Their numbering
+# does not correspond to the corpus in tests/sample_data.
+owner_indicator_catalogue:
+  source: owner (25 hand-verified listings)
+  indicators:
+    - id: incorrect_font
+      cited: 10
+      verdict_when_present: fake
+      status: partially_implemented
+      note: >-
+        By far the most-cited tell. Currently only reachable through
+        font_kerning_irregularities, which measured 0-for-2 on the corpus and no
+        longer fails on its own. Needs a sharper signal than "looks off" before
+        it can be trusted - reference glyph comparison rather than a judgement.
+    - id: serial_label_spacing
+      cited: 2
+      verdict_when_present: fake
+      status: implemented
+      note: >-
+        No space between the (S) marker and "Serial" on the box label. Binary and
+        printed, so it is trusted where subjective judgements are not. Caught a
+        counterfeit the pipeline had passed as GENUINE.
+    - id: grammar_errors
+      cited: 6
+      verdict_when_present: fake
+      status: implemented
+      note: Printed misspellings, via visible_spelling_errors.
+    - id: shrink_wrap
+      cited: 2
+      verdict_when_present: fake
+      status: implemented
+      note: Subject to the pull-tab qualification in packaging.shrinkwrap.
+    - id: copyright_2026
+      cited: 2
+      verdict_when_present: fake
+      status: implemented
+      note: >-
+        A 2026 copyright is invalid on any AirPods product except AirPods Max 2.
+        Pro 2 is bounded at 2025 by copyright_years.
+    - id: distinct_model_numbers_per_bud
+      cited: 3
+      verdict_when_present: real
+      status: pending
+    - id: three_model_numbers_on_box_side
+      cited: 2
+      verdict_when_present: real
+      status: pending
+    - id: region_icons_match_part_number
+      cited: 3
+      verdict_when_present: real
+      status: pending
+      note: >-
+        Part-number suffix encodes region (ZP/A Hong Kong, AM/A US, ZA/A
+        Malaysia). The printed regulatory icons must agree with it.
+    - id: aligned_peel_stickers
+      cited: 1
+      verdict_when_present: real
+      status: pending
+    - id: info_on_side_and_back_of_box
+      cited: 2
+      verdict_when_present: real
+      status: pending
+      note: Panel-dependent; needs reliable panel identification first.
+
 pending_rules:
   - id: serial_cross_match
     statement: >-
@@ -189,6 +257,19 @@ pending_rules:
       with the regulatory marks printed on the box.
     blocked_on: Part number and region marks are not extracted yet.
     source: community-guide
+  - id: distinct_serials_per_bud
+    statement: >-
+      Each earbud carries its own model number and serial, distinct from the
+      other bud and from the case. Matching serials across components indicate a
+      counterfeit.
+    blocked_on: Extraction of per-component identifiers tagged by panel.
+    source: owner (25 hand-verified listings)
+  - id: region_icon_consistency
+    statement: >-
+      The part-number region suffix (ZP/A, AM/A, ZA/A, LL/A) must agree with the
+      regulatory icons printed on the box.
+    blocked_on: Part number and regulatory marks are not extracted yet.
+    source: owner (25 hand-verified listings) + community-guide
   - id: sticker_geometry
     statement: >-
       The bottom sticker sits about 1mm above the box bottom edge, with its

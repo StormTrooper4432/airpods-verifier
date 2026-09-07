@@ -365,7 +365,13 @@ class GeminiVisionProvider:
     """Gemini via AI Studio, using response_format for schema-constrained JSON."""
 
     name = "gemini"
-    default_model = "gemini-3.8-flash"
+    #: Lite by default. The free tier allows ~500 requests/day per Lite model
+    #: against ~20 for Flash and ~5 for Pro, so Lite is worth roughly 25x the
+    #: corpus throughput. Labelled data has been the binding constraint on this
+    #: project throughout, and that outweighs Lite's weaker fine-print reading.
+    #: Override with --model or --allow-flash when accuracy matters more than
+    #: volume - e.g. re-extracting a post whose result looks model-limited.
+    default_model = "gemini-3.5-flash-lite"
     #: Deliberately all full Flash models, no Flash-Lite. Lite is cheaper still
     #: but measurably weaker at small print, which is the entire job here - a
     #: silent downgrade to it would cost accuracy without anyone noticing.
@@ -377,6 +383,13 @@ class GeminiVisionProvider:
     #: docs' free-tier list but returns 404 "no longer available to new users",
     #: so never add a model here without probing it first.
     fallback_chain = (
+        "gemini-3.5-flash-lite",
+        "gemini-3.1-flash-lite",
+        "gemini-flash-lite-latest",
+    )
+
+    #: The full-Flash family, for when quality matters more than quota.
+    flash_chain = (
         "gemini-3.8-flash",
         "gemini-3.7-flash",
         "gemini-3.6-flash",
@@ -394,21 +407,13 @@ class GeminiVisionProvider:
     #: Every entry below was probed live. gemini-2.5-flash, gemini-2.5-pro,
     #: gemini-2.5-flash-lite, gemini-2.0-flash and gemini-2.0-flash-lite are all
     #: retired for new accounts (404) and deliberately absent.
-    extended_fallback_chain = fallback_chain + (
-        "gemini-3.5-flash-lite",
-        "gemini-3.1-flash-lite",
-        "gemini-flash-lite-latest",
-    )
+    extended_fallback_chain = fallback_chain + flash_chain
 
     #: Lite models only (--lite-only). When the full-Flash family is out of
     #: daily quota, walking it first costs five failed round-trips per post
     #: before reaching a model that can answer. This skips straight to what
     #: still has capacity.
-    lite_only_chain = (
-        "gemini-3.5-flash-lite",
-        "gemini-3.1-flash-lite",
-        "gemini-flash-lite-latest",
-    )
+    lite_only_chain = fallback_chain
 
     def __init__(self, client=None):
         self._client = client

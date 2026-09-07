@@ -427,6 +427,49 @@ def _rule_serial_format(extraction: VisionExtraction, variant: str) -> RuleOutco
     )
 
 
+#: Genuine label prints "(S) Serial No." with a space after the (S) marker.
+_SERIAL_LABEL_RE = re.compile(r"\(\s*S\s*\)(?P<gap>\s*)serial", re.IGNORECASE)
+
+
+def _rule_serial_label_spacing(extraction: VisionExtraction, variant: str) -> RuleOutcome:
+    """Check the '(S) Serial' marker on the box label.
+
+    Genuine labels print a space between the (S) marker and the word Serial.
+    Counterfeit labels routinely run them together. This is a binary, printed
+    feature - no subjective judgement - which is why it is trusted where
+    "looks shoddy" and kerning are not.
+    """
+    literal = extraction.serial_label_literal
+    if not literal:
+        return RuleOutcome(
+            EvidenceStatus.UNKNOWN,
+            "The serial line on the box label was not legible, so the '(S) Serial' marker could "
+            "not be checked. Photograph the underside label straight on and close up.",
+        )
+
+    match = _SERIAL_LABEL_RE.search(literal)
+    if match is None:
+        return RuleOutcome(
+            EvidenceStatus.UNKNOWN,
+            f"No '(S) Serial' marker was found in the transcribed label text ({literal!r}), so "
+            f"the spacing could not be checked.",
+        )
+
+    if match.group("gap") == "":
+        return RuleOutcome(
+            EvidenceStatus.FAIL,
+            f"The box label prints '(S)Serial' with no space after the (S) marker "
+            f"({literal!r}). Genuine Apple labels place a space there. This is one of the most "
+            f"reliable single tells on the printed label.",
+        )
+
+    return RuleOutcome(
+        EvidenceStatus.PASS,
+        f"The box label prints '(S) Serial' with the expected space after the (S) marker "
+        f"({literal!r}).",
+    )
+
+
 def _rule_typography(extraction: VisionExtraction, variant: str) -> RuleOutcome:
     kerning_note = (
         " A kerning or font-weight irregularity was also reported, but that observation is not "
@@ -598,6 +641,15 @@ RULES: tuple[Rule, ...] = (
         evaluate=_rule_serial_format,
         source="UNSOURCED - length constraint is unverified; do not promote to Tier 1",
         answerable_from=("box_bottom_label", "case_lid_underside", "earbud"),
+    ),
+    Rule(
+        tier=2,
+        parameter="Serial Label Format",
+        weight=2.5,
+        disqualifying=True,
+        evaluate=_rule_serial_label_spacing,
+        source="Project owner (domain expert); corroborated by community-guide label photographs",
+        answerable_from=("box_bottom_label",),
     ),
     Rule(
         tier=2,
