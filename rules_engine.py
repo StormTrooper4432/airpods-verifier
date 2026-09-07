@@ -646,12 +646,16 @@ def _rule_label_typography(
 
     scatter = local.font_scatter_percent
     if scatter >= FONT_SCATTER_THRESHOLD:
+        # UNKNOWN, not FAIL. The measurement is real but uncalibrated: genuine
+        # labels reach 3.0% at the resolution phone photos actually produce, so
+        # this cannot yet distinguish a substitute typeface from a genuine label
+        # shot slightly worse.
         return RuleOutcome(
-            EvidenceStatus.FAIL,
-            f"The label's letterforms do not match San Francisco, the typeface Apple sets its "
-            f"packaging in. Per-glyph shape deviations disagree with each other by {scatter:.1f}% "
-            f"(genuine printing measures under {FONT_SCATTER_THRESHOLD:.1f}%; substitute typefaces "
-            f"measure 3-8%). Measured across {local.font_glyphs_measured} glyphs.",
+            EvidenceStatus.UNKNOWN,
+            f"The label's letterforms deviate from San Francisco by {scatter:.1f}% across "
+            f"{local.font_glyphs_measured} glyphs. Reported for information only: genuine labels "
+            f"have measured up to 3.0% at this resolution, so this figure cannot yet separate a "
+            f"substitute typeface from a genuine label photographed slightly worse.",
         )
     return RuleOutcome(
         EvidenceStatus.PASS,
@@ -715,7 +719,14 @@ RULES: tuple[Rule, ...] = (
     Rule(
         tier=2,
         parameter="Label Typography",
-        weight=3.0,
+        # Weight 0 and informational: this REPORTS a measurement, it does not
+        # vote. Four genuine labels span 0.69%-3.0% scatter, and the only
+        # substitute figures available (3.3%-7.9%) come from synthetic renders
+        # at a different scale, so the populations are not comparable and the
+        # 2.0% threshold would flag genuine boxes. Calibrating it needs
+        # counterfeit labels photographed at the 30-40px resolution real phone
+        # photos actually produce - which the owner does not have.
+        weight=0.0,
         # NOT disqualifying yet. A genuine AirPods Pro 1 label measured 2.25% to
         # 5.52% depending only on where the crop edge fell, well past the 2.0%
         # threshold - so on today's evidence a disqualifying font rule would
@@ -726,10 +737,11 @@ RULES: tuple[Rule, ...] = (
         disqualifying=False,
         evaluate=_rule_label_typography,
         source=(
-            "Measured against San Francisco (Apple's packaging typeface, shipped with macOS); "
-            "thresholds from 2 genuine labels and 4 substitute typefaces"
+            "Measured against San Francisco (Apple's packaging typeface, shipped with macOS). "
+            "NOT CALIBRATED - reported as an observation, never as a finding"
         ),
         answerable_from=("box_bottom_label",),
+        informational=True,
     ),
     Rule(
         tier=2,

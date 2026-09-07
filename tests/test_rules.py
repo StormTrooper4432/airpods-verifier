@@ -868,10 +868,16 @@ class TestLabelTypographyRule:
         report = evaluate(make_extraction(), GOOD_FONT)
         assert status_of(report, "Label Typography") is EvidenceStatus.PASS
 
-    def test_mismatched_letterforms_fail(self):
+    def test_mismatched_letterforms_are_reported_not_charged(self):
+        # UNCALIBRATED. Four genuine labels span 0.69%-3.0% scatter at the
+        # resolution phone photos produce, and the only substitute figures
+        # available come from synthetic renders at a different scale. Until a
+        # counterfeit label is measured at comparable resolution, a high reading
+        # cannot separate a wrong typeface from a genuine label shot badly.
         report = evaluate(make_extraction(), WRONG_FONT)
-        assert status_of(report, "Label Typography") is EvidenceStatus.FAIL
-        assert report.summary_verdict is Verdict.HIGH_RISK_SUSPECTED
+        assert status_of(report, "Label Typography") is EvidenceStatus.UNKNOWN
+        assert report.summary_verdict is not Verdict.HIGH_RISK_SUSPECTED
+        assert "information only" in detail_of(report, "Label Typography")
 
     def test_print_below_the_resolution_floor_is_unknown_with_advice(self):
         report = evaluate(make_extraction(), TOO_SMALL_FONT)
@@ -884,18 +890,16 @@ class TestLabelTypographyRule:
         report = evaluate(make_extraction())
         assert status_of(report, "Label Typography") is EvidenceStatus.UNKNOWN
 
-    def test_an_unmeasured_font_lowers_confidence_without_blocking(self):
-        # Deliberately not a hard blocker. Requiring a macro shot of the print
-        # before anything can be cleared would make the tool unusable, so an
-        # unmeasured font counts against coverage instead - a unit clean on
-        # every other check still clears, but with visibly less confidence.
+    def test_it_carries_no_weight_while_uncalibrated(self):
+        # An observation-only rule must not move the verdict in either
+        # direction, or an uncalibrated measurement is silently voting.
         without = evaluate(make_extraction())
         with_font = evaluate(make_extraction(), GOOD_FONT)
-        assert without.summary_verdict is Verdict.GENUINE
-        assert with_font.summary_verdict is Verdict.GENUINE
-        assert without.confidence_score < with_font.confidence_score
+        wrong = evaluate(make_extraction(), WRONG_FONT)
+        assert without.summary_verdict is with_font.summary_verdict is Verdict.GENUINE
+        assert without.confidence_score == with_font.confidence_score == wrong.confidence_score
 
-    def test_it_tips_a_thinly_evidenced_item_out_of_genuine(self):
+    def test_a_thinly_evidenced_item_is_still_not_cleared(self):
         # The safety trade this rule exists to make. On the labelled corpus it
         # turned a counterfeit that had passed as GENUINE @ 0.62 into
         # INCONCLUSIVE, because that item was already near the coverage floor.
@@ -912,14 +916,10 @@ class TestLabelTypographyRule:
         assert rule.answerable_from == ("box_bottom_label",)
         assert not rule.source.startswith("UNSOURCED")
 
-    def test_it_cannot_convict_on_its_own_yet(self):
-        # A genuine Pro 1 label measured 2.25-5.52% depending only on crop edge.
-        # Until the baseline is wider and crop contamination is detected, a font
-        # mismatch is corroborating evidence, not a verdict.
+    def test_it_is_marked_uncalibrated_and_weightless(self):
         rule = next(r for r in RULES if r.parameter == "Label Typography")
-        assert not rule.disqualifying
-        report = evaluate(make_extraction(), WRONG_FONT)
-        assert report.confidence_score <= 0.75
+        assert rule.informational and rule.weight == 0.0 and not rule.disqualifying
+        assert "NOT CALIBRATED" in rule.source
 
 
 class TestChargingCaseIdentification:

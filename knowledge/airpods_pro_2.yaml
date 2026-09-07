@@ -276,7 +276,17 @@ font_baseline:
     # the score with it. The Label Typography rule is therefore non-
     # disqualifying until the baseline is wider and crop contamination is
     # detected.
-    caveat: two genuine labels only; crop-sensitive; rule cannot convict alone
+    caveat: >-
+      NOT CALIBRATED - the rule is informational, carries zero weight and cannot
+      move a verdict. Four genuine labels measured natively span 0.69% to 3.0%
+      scatter, while the only substitute figures available (3.3%-7.9%) come from
+      SYNTHETIC renders at a much larger scale. Those populations are not
+      comparable, and at 30-40px - the resolution real phone photos produce -
+      genuine readings reach 3.0%, so the 2.0% threshold would flag genuine
+      boxes. Calibration requires counterfeit labels photographed at comparable
+      resolution, which the owner does not have.
+    genuine_population_percent: [0.69, 3.0]
+    substitute_population_percent_synthetic_only: [3.3, 7.9]
     source: measurement (2 genuine boxes, 4 substitute typefaces)
 
   # Resolution floor - the constraint that decides what this feature is FOR.
@@ -293,7 +303,17 @@ font_baseline:
   # tool for posted listing photos. Claiming otherwise would produce confident
   # nonsense on the images real users actually paste.
   resolution_floor:
-    minimum_glyph_height_px: 60
+    minimum_glyph_height_px: 25
+    # CORRECTION. A previous value of 60px rested on my recording the AirPods
+    # Pro 2 line as ~130px glyphs. That figure came from a FAILED pairing whose
+    # height was measured on whatever the crop contained rather than on text;
+    # measured properly the line is 32px. The 60px floor excluded all four
+    # genuine labels.
+    #
+    # Every genuine label the owner photographed sits at 30-40px glyph height.
+    # That is simply what a phone photograph of a retail box produces, so the
+    # floor describes what can be MEASURED, not what can be TRUSTED.
+    genuine_labels_native_px: {airpods_pro_2: 32, airpods_pro_1: 30, airpods_4: 40}
     # PROVISIONAL and under-evidenced. Native measurements: AirPods Pro 2 at
     # ~130px glyphs scored 0.90%; AirPods Pro 1 at ~30px scored 2.0-3.0%, which
     # overlaps the 3.3% where substitute typefaces begin. At 30px there is

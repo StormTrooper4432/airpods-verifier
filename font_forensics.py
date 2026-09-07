@@ -402,32 +402,21 @@ MERGED_GLYPH_HEIGHT_RATIO = 1.4
 #: with almost no margin. Below 18px segmentation fails outright: strokes merge
 #: and neighbouring glyphs join, so there is nothing to measure.
 #:
-#: PROVISIONAL, and known to be under-evidenced. Two genuine labels measured
-#: natively: AirPods Pro 2 at ~130px glyphs scored 0.90%, AirPods Pro 1 at ~30px
-#: scored 2.0-3.0% - overlapping the 3.3% where substitute typefaces begin. At
-#: 30px native capture there is effectively no separation, so the floor sits at
-#: 60px. Nothing has been measured between 30 and 130, and the true floor could
-#: be anywhere in that gap.
+#: What can be MEASURED, not what can be TRUSTED. All four of the owner's
+#: genuine labels sit at 30-40px glyph height - that is simply what a phone
+#: photograph of a retail box produces - so a floor above that would exclude
+#: every real sample.
+#:
+#: A previous value of 60px came from my own error: I recorded the AirPods Pro 2
+#: line as having ~130px glyphs, but that figure came from a FAILED pairing
+#: whose height was measured on whatever the crop happened to contain rather
+#: than on text. Measured properly the line is 32px. The floor built on that
+#: number excluded all four genuine labels.
 #:
 #: METHODOLOGICAL WARNING: downscaling a sharp image is NOT equivalent to a
-#: natively low-resolution capture. Downscaling the 130px label to 32px scored
-#: 0.92%, while a real 30px capture scored 2.0-3.0%. The downscaled version
-#: keeps stroke structure a small sensor never recorded, so the noise curve
-#: below flatters low resolutions and must not be used to set this floor.
-#:
-#: Raised from 25 to 30 after measuring the noise curve on a genuine label
-#: downscaled step by step - the typeface never changes, so every rise is
-#: measurement noise. It is ERRATIC rather than gradual: 32px scored 0.92%, 26px
-#: 0.85%, but 19px scored 2.17%, 16px 0.67%, 13px 0.31%, 10px 2.65%. Below
-#: roughly 26px the result is a coin flip, so a threshold applied there would
-#: accuse genuine boxes at random.
-#:
-#: This is the constraint that decides what the feature is FOR. Across 20 real
-#: listing screenshots, exactly one contained a detectable text line, and its
-#: glyphs were 7px tall - far below the floor. Font forensics works for someone
-#: photographing a box in front of them, and does not work for screening posted
-#: listing photos.
-MINIMUM_GLYPH_HEIGHT_PX = 60
+#: natively low-resolution capture, so the synthetic noise curve recorded in the
+#: knowledge base flatters low resolutions and must not be used to set this.
+MINIMUM_GLYPH_HEIGHT_PX = 25
 
 
 def _median(values: list[float]) -> float:
@@ -522,6 +511,16 @@ def compare_text_line(image: Image.Image, expected_text: str) -> list[GlyphCompa
     # median of 93px. Their aspect ratios are meaningless, and including them
     # swung the font score from 2.25% to 5.52% on a genuine box. They are
     # skipped for MEASUREMENT but kept in the pairing, so alignment survives.
+    # A glyph cut by the crop boundary has a truncated bounding box, so its
+    # aspect ratio is meaningless. Sliding a crop band down a genuine AirPods 4
+    # label by 36 pixels moved the score from 0.69% to 4.15% and the apparent
+    # glyph height from 30px to 66px - all of it clipping, none of it typeface.
+    # Reject the whole line rather than score a truncated one: a crop that
+    # clips is a crop we cannot trust anywhere along it.
+    width, height = image.size
+    if any(box[1] <= 0 or box[3] >= height for box, _ in segments):
+        return []
+
     heights = [box[3] - box[1] for box, _ in segments]
     line_height = _median([float(h) for h in heights]) if heights else 0.0
     ceiling = line_height * MERGED_GLYPH_HEIGHT_RATIO if line_height else float("inf")

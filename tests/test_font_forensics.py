@@ -348,7 +348,7 @@ class TestResolutionFloor:
         # 40px font renders ~29px caps, just under the raised 30px floor, so use
         # a size that clears it. The floor moved up after the noise curve showed
         # results below ~26px are erratic rather than merely imprecise.
-        score = self._score_at(90)
+        score = self._score_at(50)
         assert score is not None and score.is_scoreable
 
     def test_listing_screenshot_resolution_is_refused(self):
@@ -366,11 +366,12 @@ class TestResolutionFloor:
         assert score.too_small_to_score
         assert not score.is_scoreable
 
-    def test_the_floor_matches_what_was_measured(self):
-        # Downscaling a genuine label: 32px -> 0.92%, 26px -> 0.85%, but
-        # 19px -> 2.17% and 10px -> 2.65%. Erratic below ~26px, so the floor
-        # sits above that with margin.
-        assert 50 <= ff.MINIMUM_GLYPH_HEIGHT_PX <= 80
+    def test_the_floor_admits_real_photographs(self):
+        # All four of the owner's genuine labels sit at 30-40px glyph height -
+        # that is what a phone photograph of a retail box produces. A floor
+        # above that excludes every real sample, which is what a previous value
+        # of 60px did after I misread one line as having 130px glyphs.
+        assert ff.MINIMUM_GLYPH_HEIGHT_PX <= 30
 
 
 class TestUpscaleDoesNotFakeResolution:
