@@ -54,35 +54,6 @@ const examinedAt = result
   ? new Date().toISOString().slice(0, 16).replace('T', ' ')
   : null;
 
-/**
- * A record number, so the sheet is a citable document rather than a view.
- * Derived from the findings themselves, so re-examining the same photographs
- * to the same result reproduces it. It is a local reference and nothing more:
- * no registry issues it, and /about says so.
- */
-function recordNumber(report: NonNullable<typeof result>['report'], at: string): string {
-  const basis =
-    report.summary_verdict +
-    report.confidence_score +
-    report.evidence_ledger.map((i) => i.status[0]).join('') +
-    at;
-  let hash = 0x811c9dc5;
-  for (const ch of basis) {
-    hash ^= ch.charCodeAt(0);
-    hash = Math.imul(hash, 0x01000193) >>> 0;
-  }
-  // Crockford-ish: no 0/O or 1/I, so a number read off a screen is unambiguous.
-  const alphabet = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
-  let out = '';
-  let n = hash;
-  for (let i = 0; i < 6; i += 1) {
-    out += alphabet[n % 32];
-    n = Math.floor(n / 32);
-  }
-  return `AP2-${out.slice(0, 3)}-${out.slice(3)}`;
-}
-
-const record = result && examinedAt ? recordNumber(result.report, examinedAt) : null;
 
 const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 ---
@@ -104,8 +75,9 @@ const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
       </p>
     </div>
 
+    <div class="masthead-aside">
+    <a class="to-method-top" href="/about">How this record is made &rarr;</a>
     <dl class="record" id="record-fields">
-      <div><dt class="caps">Record no.</dt><dd>{record ?? '——'}</dd></div>
       <div><dt class="caps">Examined</dt><dd>{examinedAt ?? '——'}</dd></div>
       <div><dt class="caps">Variant</dt><dd>{result?.variant ?? '——'}</dd></div>
       <div>
@@ -118,6 +90,7 @@ const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
           <span class="unit">weight</span></dd>
       </div>
     </dl>
+    </div>
   </header>
 
   <form
@@ -435,17 +408,34 @@ const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
     line-height: calc(var(--u) * 3.5);
   }
 
+  .masthead-aside {
+    display: grid;
+    gap: calc(var(--u) * 3);
+    justify-items: end;
+  }
+  .to-method-top {
+    font-family: var(--narrow);
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-weight: 700;
+    font-size: 12px;
+    color: var(--intaglio);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 4px;
+    white-space: nowrap;
+  }
+  .to-method-top:hover { color: var(--ink); }
+
   .record {
     display: grid;
-    /* One grid, shared edges: five fields over two rows of three, the sixth
-       cell left empty. Auto columns sized each row to its own content read as
-       a near-miss at alignment, which on the one block that has to look like a
-       ruled form is worse than no alignment at all. */
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    /* One grid, shared edges. Auto columns sized each row to its own content
+       read as a near-miss at alignment, which on the one block that has to
+       look like a ruled form is worse than no alignment at all. */
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: calc(var(--u) * 2) calc(var(--u) * 4);
     margin: 0;
     text-align: right;
-    min-width: 30rem;
+    min-width: 22rem;
   }
   .record > div { min-width: 0; }
   .record dt { font-size: 9.5px; color: var(--ink-soft); margin-bottom: 2px; }
@@ -656,6 +646,7 @@ const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
       gap: calc(var(--u) * 4);
       align-items: start;
     }
+    .masthead-aside { justify-items: start; gap: calc(var(--u) * 2); }
     .record { text-align: left; min-width: 0; }
   }
 
@@ -671,7 +662,7 @@ const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
   /* Printed --------------------------------------------------------------- */
 
   @media print {
-    .actions, .legend, .to-method { display: none; }
+    .actions, .legend, .to-method, .to-method-top { display: none; }
     .examination { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; }
     .masthead { margin-bottom: 24px; }
   }
