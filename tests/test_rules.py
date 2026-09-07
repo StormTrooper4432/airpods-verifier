@@ -1118,3 +1118,38 @@ class TestEvidenceCollectedNotYetRuled:
         genuine = {e["region_suffix"] for e in observed["genuine"]}
         fake = {e["region_suffix"] for e in observed["counterfeit"]}
         assert genuine & fake
+
+
+class TestProvenanceIsVisible:
+    """Provenance that only exists in the data is provenance the buyer cannot
+    use. Being told an item is fake without being told where the claim comes
+    from is not something anyone can act on or argue with."""
+
+    def _render(self, extraction, **kwargs):
+        return cli.render_report(evaluate(extraction), color=False, **kwargs)
+
+    def test_a_failing_check_shows_its_source(self):
+        text = self._render(make_extraction(extracted_model_number="A2700"))
+        assert "source: Apple" in text
+
+    def test_passing_checks_stay_quiet_by_default(self):
+        # Every line carrying a citation would drown the findings.
+        text = self._render(make_extraction())
+        assert "source:" not in text
+
+    def test_sources_flag_shows_them_all(self):
+        text = self._render(make_extraction(), show_sources=True)
+        assert text.count("source:") >= 5
+
+    def test_json_output_always_carries_provenance(self):
+        report = evaluate(make_extraction(extracted_model_number="A2700")).to_dict()
+        assert all(item["source"].strip() for item in report["evidence_ledger"])
+
+    def test_the_unsourced_rule_says_so_where_a_buyer_sees_it(self):
+        # The serial-length constraint is not externally sourced. If it ever
+        # produces a FAIL, the ledger must admit that rather than implying
+        # authority it does not have.
+        text = self._render(
+            make_extraction(extracted_serial_number="TOOSHORT", serial_case_lid="TOOSHORT"),
+        )
+        assert "UNSOURCED" in text

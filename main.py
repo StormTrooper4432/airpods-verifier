@@ -113,6 +113,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Fail instead of downgrading to a lesser model when the primary is overloaded.",
     )
+    parser.add_argument(
+        "--sources",
+        action="store_true",
+        help="Show the provenance of every check, not only the ones that failed.",
+    )
     parser.add_argument("--json", action="store_true", help="Emit the report as raw JSON.")
     parser.add_argument("--no-color", action="store_true", help="Disable ANSI colour.")
     return parser
@@ -133,7 +138,9 @@ def _wrap(text: str, indent: str, width: int = _RULE_WIDTH) -> str:
     )
 
 
-def render_report(report: VerificationReport, *, color: bool) -> str:
+def render_report(
+    report: VerificationReport, *, color: bool, show_sources: bool = False
+) -> str:
     lines: list[str] = ["", "=" * _RULE_WIDTH, "  EVIDENCE LEDGER", "=" * _RULE_WIDTH]
 
     current_tier: int | None = None
@@ -151,6 +158,12 @@ def render_report(report: VerificationReport, *, color: bool) -> str:
         mark = _colorize(f"[{_STATUS_MARKS[item.status]}]", item.status, color)
         lines.append(f"  {mark} {item.parameter}")
         lines.append(_wrap(item.detail, indent="         "))
+        # Provenance is shown wherever the tool makes an accusation. Being told
+        # an item is fake without being told where that claim comes from is not
+        # something a buyer can act on or argue with.
+        if show_sources or item.status is EvidenceStatus.FAIL:
+            source = _colorize(f"source: {item.source}", EvidenceStatus.UNKNOWN, color)
+            lines.append(_wrap(source, indent="         "))
 
     headline = _VERDICT_HEADLINES[report.summary_verdict]
     status_for_color = {
@@ -252,7 +265,7 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(report.to_dict(), indent=2))
     else:
         color = not args.no_color and sys.stdout.isatty()
-        print(render_report(report, color=color))
+        print(render_report(report, color=color, show_sources=args.sources))
         if result is not None:
             print(f"  {_render_usage(result)}\n", file=sys.stderr)
 
