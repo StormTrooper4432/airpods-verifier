@@ -65,6 +65,11 @@ _REFERENCE_SIZE = 160
 #: Ink threshold on an 8-bit greyscale render.
 _INK_THRESHOLD = 200
 
+#: Punctuation short enough to be removed by the glyph height filter. Full-height
+#: marks like brackets are NOT here - they survive segmentation and must remain
+#: in the expected character sequence.
+_SHORT_MARKS = ".,;:·"
+
 #: Glyphs whose ink aspect ratio separates SF from substitutes by at least 3x
 #: the drift blur induces. Measured, not chosen: P, N, X, Y, H and W all fall
 #: below that bar and are excluded - their blur drift rivals the font signal.
@@ -239,7 +244,30 @@ def segment_glyphs(
 
     components.sort(key=lambda box: box[0])
     components = _merge_stacked(components)
+    components = _drop_outliers(components)
     return [(box, image.crop(box)) for box in components]
+
+
+def _drop_outliers(
+    boxes: list[tuple[int, int, int, int]], min_height_fraction: float = 0.45
+) -> list[tuple[int, int, int, int]]:
+    """Discard components too short to be glyphs on this line.
+
+    Text on one line shares a baseline and a cap height, so real glyphs cluster
+    tightly in height. Print speckle, barcode fragments and JPEG artefacts do
+    not. Without this, a 6x7 noise blob counts as a character, every later glyph
+    pairs with the wrong reference, and the whole line reads as a font mismatch -
+    which is exactly what happened measuring a counterfeit label.
+
+    Punctuation is genuinely short, so this also drops full stops and commas.
+    That is acceptable: they carry no font signal and are never in USABLE_GLYPHS.
+    """
+    if len(boxes) < 3:
+        return boxes
+    heights = sorted(box[3] - box[1] for box in boxes)
+    median_height = heights[len(heights) // 2]
+    floor = median_height * min_height_fraction
+    return [box for box in boxes if (box[3] - box[1]) >= floor]
 
 
 def _merge_stacked(
@@ -300,10 +328,17 @@ def compare_text_line(image: Image.Image, expected_text: str) -> list[GlyphCompa
     measured; the rest carry too little signal to survive blur.
     """
     segments = segment_glyphs(image, threshold=otsu_threshold(image), min_ink_pixels=25)
-    letters = [c for c in expected_text if not c.isspace()]
+    # Punctuation is dropped by the height filter, so compare against the
+    # characters that survive it too.
+    # Only marks the height filter actually removes. Brackets and quotes are
+    # full-height, survive it, and must stay in the expected sequence or the
+    # counts will never line up.
+    letters = [c for c in expected_text if not c.isspace() and c not in _SHORT_MARKS]
     if len(segments) != len(letters):
-        # Component count and character count disagree - split or merged glyphs.
-        # Refuse rather than silently pairing the wrong shapes together.
+        # Component count and character count still disagree, so a glyph split
+        # or merged. Refuse rather than silently pairing the wrong shapes -
+        # mispaired glyphs read as enormous deviations and would manufacture a
+        # counterfeit verdict out of a segmentation bug.
         return []
 
     results: list[GlyphComparison] = []

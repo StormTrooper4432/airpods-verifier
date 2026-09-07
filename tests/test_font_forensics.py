@@ -209,3 +209,34 @@ class TestSegmentation:
         image = Image.new("L", (120, 100), 255)
         image.paste(0, (10, 20, 40, 80))
         assert ff.compare_text_line(image, "AB") == []
+
+
+class TestNoiseFiltering:
+    """Print speckle and JPEG artefacts counted as glyphs, shifting every later
+    pairing by one. That turned a segmentation bug into a +157% "font deviation"
+    on a real label - a counterfeit verdict manufactured out of nothing."""
+
+    def test_speckle_is_not_counted_as_a_glyph(self):
+        image = Image.new("L", (300, 120), 255)
+        for x in (20, 90, 160):                    # three real glyphs
+            image.paste(0, (x, 20, x + 40, 100))
+        image.paste(0, (250, 55, 258, 63))         # a speckle
+        assert len(ff.segment_glyphs(image, min_ink_pixels=10)) == 3
+
+    def test_short_marks_are_dropped_from_both_sides(self):
+        # A full stop is filtered out of the image, so it must also be dropped
+        # from the expected text or the counts can never agree.
+        assert "." in ff._SHORT_MARKS
+        assert "(" not in ff._SHORT_MARKS and ")" not in ff._SHORT_MARKS
+
+    def test_a_line_too_degraded_to_segment_is_refused(self):
+        # Refusing is the correct output. Reporting a deviation derived from
+        # mispaired glyphs would be worse than reporting nothing.
+        image = Image.new("L", (200, 100), 255)
+        image.paste(0, (20, 20, 170, 80))          # one merged blob
+        assert ff.compare_text_line(image, "ABCDE") == []
+
+    def test_outlier_filter_needs_enough_components_to_have_a_median(self):
+        image = Image.new("L", (120, 100), 255)
+        image.paste(0, (10, 40, 30, 60))
+        assert len(ff.segment_glyphs(image, min_ink_pixels=10)) == 1
