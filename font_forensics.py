@@ -248,6 +248,51 @@ def segment_glyphs(
     return [(box, image.crop(box)) for box in components]
 
 
+def raw_components(
+    image: Image.Image, *, threshold: int = _INK_THRESHOLD, min_ink_pixels: int = 15
+) -> list[tuple[int, int, int, int]]:
+    """Connected ink components with NO single-line filtering applied.
+
+    segment_glyphs layers on filters that assume one text line: merging
+    vertically stacked pieces, and dropping components short relative to the
+    line median. Both are wrong across a whole label, where several lines differ
+    in size - on a counterfeit label those filters cut 221 components to 24 and
+    line detection found one line out of several. Layout analysis needs the
+    unfiltered set.
+    """
+    grey = image.convert("L")
+    width, height = grey.size
+    pixels = grey.load()
+    visited = bytearray(width * height)
+    found: list[tuple[int, int, int, int]] = []
+
+    for start_y in range(height):
+        for start_x in range(width):
+            index = start_y * width + start_x
+            if visited[index] or pixels[start_x, start_y] >= threshold:
+                continue
+            stack = [(start_x, start_y)]
+            visited[index] = 1
+            min_x = max_x = start_x
+            min_y = max_y = start_y
+            count = 0
+            while stack:
+                x, y = stack.pop()
+                count += 1
+                min_x, max_x = min(min_x, x), max(max_x, x)
+                min_y, max_y = min(min_y, y), max(max_y, y)
+                for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (-1, -1), (1, -1), (-1, 1)):
+                    nx, ny = x + dx, y + dy
+                    if 0 <= nx < width and 0 <= ny < height:
+                        neighbour = ny * width + nx
+                        if not visited[neighbour] and pixels[nx, ny] < threshold:
+                            visited[neighbour] = 1
+                            stack.append((nx, ny))
+            if count >= min_ink_pixels:
+                found.append((min_x, min_y, max_x + 1, max_y + 1))
+    return found
+
+
 def _drop_outliers(
     boxes: list[tuple[int, int, int, int]], min_height_fraction: float = 0.45
 ) -> list[tuple[int, int, int, int]]:
@@ -447,6 +492,109 @@ def score_font_match(
     )
 
 
+@dataclass(frozen=True)
+class TextLine:
+    """A detected row of similarly-sized glyphs, tightly bounded."""
+
+    box: tuple[int, int, int, int]
+    glyph_count: int
+    median_glyph_height: float
+
+    @property
+    def width(self) -> int:
+        return self.box[2] - self.box[0]
+
+
+def find_text_lines(
+    image: Image.Image,
+    *,
+    min_glyphs: int = 4,
+    height_tolerance: float = 0.45,
+    pad: int = 2,
+) -> list[TextLine]:
+    """Locate text lines and return their TIGHT bounds.
+
+    Bounds come from the components themselves rather than from a sliding band,
+    which removes clipping by construction. Sliding bands were the dominant
+    error source: moving one 36px down a genuine label changed the font score
+    from 0.69% to 4.15% and the apparent glyph height from 30px to 66px, purely
+    from cutting glyphs at the edge.
+
+    Rows are grouped by vertical overlap and kept only when several components
+    share a consistent height, which is what set text does and what print
+    speckle, barcodes and background clutter do not.
+    """
+    mask = adaptive_ink_mask(image)
+    components = raw_components(mask, threshold=128, min_ink_pixels=15)
+    if not components:
+        return []
+
+    width, height = image.size
+    # Anything spanning a large fraction of the frame is background, not a glyph.
+    components = [
+        box for box in components
+        if (box[2] - box[0]) < width * 0.5 and (box[3] - box[1]) < height * 0.5
+    ]
+    if not components:
+        return []
+
+    rows: list[list[tuple[int, int, int, int]]] = []
+    for box in sorted(components, key=lambda b: (b[1], b[0])):
+        for row in rows:
+            top = min(b[1] for b in row)
+            bottom = max(b[3] for b in row)
+            overlap = min(box[3], bottom) - max(box[1], top)
+            shorter = min(box[3] - box[1], bottom - top)
+            if shorter > 0 and overlap / shorter >= 0.5:
+                row.append(box)
+                break
+        else:
+            rows.append([box])
+
+    lines: list[TextLine] = []
+    for row in rows:
+        if len(row) < min_glyphs:
+            continue
+        heights = sorted(b[3] - b[1] for b in row)
+        median = heights[len(heights) // 2]
+        consistent = [h for h in heights if abs(h - median) <= median * height_tolerance]
+        if len(consistent) < min_glyphs:
+            continue
+        lines.append(
+            TextLine(
+                box=(
+                    max(0, min(b[0] for b in row) - pad),
+                    max(0, min(b[1] for b in row) - pad),
+                    min(width, max(b[2] for b in row) + pad),
+                    min(height, max(b[3] for b in row) + pad),
+                ),
+                glyph_count=len(row),
+                median_glyph_height=float(median),
+            )
+        )
+    lines.sort(key=lambda line: line.box[1])
+    return lines
+
+
+def adaptive_ink_mask(image: Image.Image, radius: int = 12, offset: int = 10) -> Image.Image:
+    """Mark pixels meaningfully darker than their own neighbourhood.
+
+    A single global threshold cannot separate print from a photograph: it splits
+    box from background, so on a patterned surface the pattern becomes ink and
+    the grey-on-white text becomes background. Comparing each pixel to a local
+    mean removes that dependence on what else is in frame and handles uneven
+    lighting across a curved box face.
+    """
+    grey = image.convert("L")
+    local_mean = grey.filter(ImageFilter.BoxBlur(radius))
+    ink = Image.new("L", grey.size, 255)
+    ink.putdata([
+        0 if pixel < mean - offset else 255
+        for pixel, mean in zip(grey.get_flattened_data(), local_mean.get_flattened_data())
+    ])
+    return ink
+
+
 def isolate_dominant_line(
     segments: list[tuple[tuple[int, int, int, int], Image.Image]],
     expected_count: int | None = None,
@@ -503,7 +651,16 @@ def compare_text_line(image: Image.Image, expected_text: str) -> list[GlyphCompa
     letters_expected = len(
         [c for c in expected_text if not c.isspace() and c not in _SHORT_MARKS]
     )
-    segments = segment_glyphs(image, threshold=otsu_threshold(image), min_ink_pixels=25)
+    # Same ink detection as find_text_lines. Using Otsu here while layout
+    # analysis used a local adaptive mask made the two disagree about what
+    # counts as ink, so a line located with exactly the right glyph count was
+    # then refused by the measurement step.
+    mask = adaptive_ink_mask(image)
+    boxes = raw_components(mask, threshold=128, min_ink_pixels=15)
+    boxes.sort(key=lambda box: box[0])
+    boxes = _merge_stacked(boxes)
+    boxes = _drop_outliers(boxes)
+    segments = [(box, image.crop(box)) for box in boxes]
     segments = isolate_dominant_line(segments, letters_expected)
     # Punctuation is dropped by the height filter, so compare against the
     # characters that survive it too.

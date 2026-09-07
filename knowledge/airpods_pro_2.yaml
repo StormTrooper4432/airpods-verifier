@@ -503,6 +503,22 @@ counterfeit_observations:
         it must not be the only Tier 1 rule.
       status: informative
 
+# Remaining blocker, now precisely identified: USABLE LETTERS PER LINE.
+#
+# Automatic line detection works - 7 lines on the counterfeit label, 9 on its
+# back panel, in under a third of a second, with bounds taken from the
+# components so nothing clips. Measurement runs end to end. What fails is that
+# label lines rarely carry three usable letters:
+#
+#   serial codes are digit-heavy (HGHP9X4047 offers only S, S, G)
+#   model-number lines are almost entirely digits
+#   digits are tabular, so they deviate uniformly and carry no per-glyph signal
+#
+# USABLE_GLYPHS was derived for uppercase and digits only. The line that would
+# solve this appears on every Apple box - "Designed by Apple in California" -
+# but it is mixed case, and lowercase letterforms have never been characterised.
+# Doing that is the highest-value next step for the font path.
+#
 # Font calibration status against this counterfeit: NOT ACHIEVED. Its serial
 # line is digit-heavy (only S, S, G are usable letters, and clipping removed
 # them), and digits are tabular so they carry no per-glyph signal. Its back

@@ -8,6 +8,8 @@ glyph selection rests on. Those claims are what would silently rot.
 
 from __future__ import annotations
 
+import pathlib
+
 import pytest
 from PIL import Image, ImageFilter
 
@@ -425,3 +427,62 @@ class TestMergedGlyphExclusion:
         ImageDraw.Draw(image).text((20, 40), "CERTS KG", font=font, fill=0)
         results = ff.compare_text_line(image, "CERTS KG")
         assert [r.character for r in results] == [c for c in "CERTSKG" if c in ff.USABLE_GLYPHS]
+
+
+class TestTextLineDetection:
+    """Locating lines automatically, with bounds taken from the components
+    themselves. Sliding a hand-picked band was the dominant error source:
+    moving one 36px down a genuine label changed the score from 0.69% to 4.15%
+    and the apparent glyph height from 30px to 66px, purely from clipping."""
+
+    def _label(self, lines: list[str], size: int = 40) -> Image.Image:
+        from PIL import ImageDraw, ImageFont
+
+        font = ImageFont.truetype(ff.SF_FONT_PATH, size)
+        image = Image.new("L", (900, 120 + len(lines) * size * 2), 245)
+        draw = ImageDraw.Draw(image)
+        for index, text in enumerate(lines):
+            draw.text((40, 40 + index * size * 2), text, font=font, fill=30)
+        return image
+
+    def test_each_printed_line_is_found(self):
+        found = ff.find_text_lines(self._label(["CERTS KGZ", "OFTE ZKRG", "SGT ECRO"]))
+        assert len(found) == 3
+
+    def test_bounds_are_tight_enough_not_to_clip(self):
+        image = self._label(["CERTS KGZ"])
+        line = ff.find_text_lines(image)[0]
+        crop = image.crop(line.box)
+        # No component may touch the top or bottom of its own tight crop.
+        boxes = ff.raw_components(ff.adaptive_ink_mask(crop), threshold=128, min_ink_pixels=15)
+        assert boxes
+        assert not any(b[1] <= 0 or b[3] >= crop.height for b in boxes)
+
+    def test_lines_come_back_in_reading_order(self):
+        found = ff.find_text_lines(self._label(["FIRST GZ", "SECOND KR", "THIRD OE"]))
+        assert [line.box[1] for line in found] == sorted(line.box[1] for line in found)
+
+    def test_a_blank_image_yields_nothing(self):
+        assert ff.find_text_lines(Image.new("L", (400, 200), 255)) == []
+
+
+class TestUnfilteredComponents:
+    """Layout analysis needs raw components; the single-line filters assume one
+    line and destroy a multi-line label. On a counterfeit label they cut 221
+    components to 24 and line detection found one line out of seven."""
+
+    def test_raw_keeps_what_the_line_filters_discard(self):
+        image = Image.new("L", (400, 300), 255)
+        image.paste(0, (20, 20, 60, 80))      # tall
+        image.paste(0, (100, 40, 130, 55))    # short - dropped relative to a line median
+        image.paste(0, (200, 200, 260, 260))  # another line entirely
+        raw = ff.raw_components(image, min_ink_pixels=10)
+        filtered = ff.segment_glyphs(image, min_ink_pixels=10)
+        assert len(raw) >= len(filtered)
+
+    def test_ink_detection_is_shared_by_layout_and_measurement(self):
+        # Layout used a local adaptive mask while measurement used Otsu, so a
+        # line located with exactly the right glyph count was then refused.
+        source = pathlib.Path("font_forensics.py").read_text()
+        measurement = source[source.index("def compare_text_line"):]
+        assert "adaptive_ink_mask" in measurement.split("def ")[1]
