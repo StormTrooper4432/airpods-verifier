@@ -82,7 +82,7 @@ jobs:
         run: npm run build
       - name: Check nothing published carries a serial
         run: |
-          python - <<'PY'
+          python3 - <<'PY'
           import json, pathlib, re, sys
           blob = pathlib.Path("web/src/data/specimens.json").read_text()
           leaked = [t for t in re.findall(r"\b[A-Z0-9]{10}\b", blob)
