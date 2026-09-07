@@ -400,6 +400,16 @@ class GeminiVisionProvider:
         "gemini-flash-lite-latest",
     )
 
+    #: Lite models only (--lite-only). When the full-Flash family is out of
+    #: daily quota, walking it first costs five failed round-trips per post
+    #: before reaching a model that can answer. This skips straight to what
+    #: still has capacity.
+    lite_only_chain = (
+        "gemini-3.5-flash-lite",
+        "gemini-3.1-flash-lite",
+        "gemini-flash-lite-latest",
+    )
+
     def __init__(self, client=None):
         self._client = client
 

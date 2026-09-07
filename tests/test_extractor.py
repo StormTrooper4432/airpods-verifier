@@ -525,3 +525,38 @@ class TestExtendedChain:
         assert not pv.GEMINI_RETIRED_MODELS & set(
             pv.get_provider("gemini").extended_fallback_chain
         )
+
+
+class TestLiteOnlyChain:
+    """When the full-Flash family is out of daily quota, walking it first costs
+    five failed round-trips per post before reaching a model that can answer."""
+
+    def test_lite_only_skips_the_flash_family(self):
+        provider = pv.get_provider("gemini")
+        chain = ve.resolve_model_chain(provider, None, fallback=True, lite_only=True)
+        assert chain == list(provider.lite_only_chain)
+        assert not set(chain) & set(provider.fallback_chain)
+
+    def test_lite_only_still_has_internal_fallback(self):
+        chain = ve.resolve_model_chain(
+            pv.get_provider("gemini"), None, fallback=True, lite_only=True
+        )
+        assert len(chain) >= 2
+
+    def test_lite_only_beats_allow_lite_when_both_are_set(self):
+        provider = pv.get_provider("gemini")
+        chain = ve.resolve_model_chain(
+            provider, None, fallback=True, allow_lite=True, lite_only=True
+        )
+        assert chain == list(provider.lite_only_chain)
+
+    def test_an_explicit_model_still_pins(self):
+        chain = ve.resolve_model_chain(
+            pv.get_provider("gemini"), "gemini-3.8-flash", fallback=True, lite_only=True
+        )
+        assert chain == ["gemini-3.8-flash"]
+
+    def test_lite_only_chain_is_free_tier_and_not_retired(self):
+        provider = pv.get_provider("gemini")
+        assert set(provider.lite_only_chain) <= pv.GEMINI_FREE_TIER_MODELS
+        assert not pv.GEMINI_RETIRED_MODELS & set(provider.lite_only_chain)

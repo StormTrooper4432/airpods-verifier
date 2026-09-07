@@ -194,7 +194,11 @@ def build_instruction(image_count: int) -> str:
 
 
 def resolve_model_chain(
-    vision_provider, model: str | None, fallback: bool, allow_lite: bool = False
+    vision_provider,
+    model: str | None,
+    fallback: bool,
+    allow_lite: bool = False,
+    lite_only: bool = False,
 ) -> list[str]:
     """Models to try, in order.
 
@@ -210,7 +214,12 @@ def resolve_model_chain(
     if not fallback:
         return [vision_provider.default_model]
 
-    attribute = "extended_fallback_chain" if allow_lite else "fallback_chain"
+    if lite_only:
+        attribute = "lite_only_chain"
+    elif allow_lite:
+        attribute = "extended_fallback_chain"
+    else:
+        attribute = "fallback_chain"
     chain = list(
         getattr(vision_provider, attribute, None)
         or getattr(vision_provider, "fallback_chain", ())
@@ -231,6 +240,7 @@ def extract(
     prompts_path: Path | str = PROMPTS_PATH,
     fallback: bool = True,
     allow_lite: bool = False,
+    lite_only: bool = False,
 ) -> ProviderResult:
     """Send photographs to a vision provider and return validated observations.
 
@@ -247,7 +257,7 @@ def extract(
     system_prompt = load_system_prompt(prompts_path)
     images = prepare_images(image_paths)
     instruction = build_instruction(len(images))
-    chain = resolve_model_chain(vision_provider, model, fallback, allow_lite)
+    chain = resolve_model_chain(vision_provider, model, fallback, allow_lite, lite_only)
 
     last_error: ProviderError | None = None
     for index, candidate in enumerate(chain):
