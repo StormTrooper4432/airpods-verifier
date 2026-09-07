@@ -1,51 +1,51 @@
-# AirPods Pro 2 Authenticator
+# AirPods Authenticator
 
-Verify AirPods Pro 2 (Lightning and USB-C) from photographs, and get back an
-itemised **Evidence Ledger** explaining every finding — not a black-box score.
+Verify AirPods Pro 2 from photographs and get back an itemised **Evidence Ledger** —
+every finding cited to a source, every open question turned into a specific photograph
+to take.
 
-> **Status:** proof of concept. The rules engine is complete and tested; the
-> vision stage has been verified against both APIs' request surfaces but has not
-> yet been run against a corpus of real photographs.
+> **Status:** working proof of concept, measured against 20 expert-labelled listings.
+> **0 counterfeits passed as genuine, 0 genuine units accused.** Not production-ready:
+> see [Honest limitations](#honest-limitations).
 
 ---
 
 ## The problem
 
-The secondhand market is full of counterfeit AirPods carrying **cloned but
-valid** serial numbers. Those serials pass Apple's `checkcoverage.apple.com`
-lookup, so the one check most buyers know about returns a green light on a fake.
-The existing third-party verification sites either cover few models or paywall
-the result — which is useless when you are standing in a parking lot deciding
-whether to hand over $200.
+The secondhand market is full of counterfeit AirPods carrying **cloned but valid**
+serial numbers. Those serials pass Apple's `checkcoverage.apple.com` lookup, so the one
+check most buyers know about returns a green light on a fake. Third-party verification
+sites either cover few models or paywall the result — useless when you're standing in a
+parking lot deciding whether to hand over $200.
 
 ## The approach
 
-Counterfeits are hard to detect from a serial number, but easy to detect from
-the box, because Apple's packaging is manufactured to a fixed specification.
-A USB-C box never carries a Lightning model number. A retail Pro 2 box is never
-shrink-wrapped. A 2023 product never has a 2021 copyright line.
+Counterfeits are hard to detect from a serial number and easy to detect from the box,
+because Apple's packaging is manufactured to a fixed specification. A USB-C box never
+carries a Lightning model number. A 2023 product never has a 2026 copyright. A genuine
+set never repeats a serial across its case and earbuds.
 
-Those are facts you can check with `if` statements — so this tool does exactly
-that, and uses an LLM only for the part that genuinely needs vision.
+Those are facts you can check with `if` statements — so the tool does exactly that, and
+uses an LLM only for the part that genuinely needs vision.
 
 ```mermaid
 flowchart LR
     A[Photographs] --> B[Vision LLM]
-    B -->|JSON Schema enforced<br/>server-side| C[VisionExtraction<br/>observations only]
+    B -->|JSON Schema enforced<br/>server-side| C[Observations only]
     C --> D[Rules Engine<br/>pure Python]
-    E[(Hardware matrix<br/>REQUIREMENTS.md)] --> D
-    D --> F[Evidence Ledger<br/>+ verdict + confidence]
+    E[(knowledge/*.yaml<br/>every entry sourced)] --> D
+    F[Local pixel<br/>measurement] --> D
+    D --> G[Evidence Ledger<br/>verdict + next steps]
 ```
 
-**The model is never asked whether the item is genuine.** It is asked what the
-box says. The verdict comes from deterministic rules, which means every finding
-is explainable, reproducible, and unit-testable — and a buyer can independently
-check any line in the ledger.
+**The model is never asked whether the item is genuine.** It's asked what the box says.
+The verdict comes from deterministic rules, so every finding is explainable,
+reproducible, and independently checkable by the buyer.
 
-That boundary is enforced by the API rather than by prompt wording: both
-providers constrain the response to the `VisionExtraction` JSON Schema with
-`additionalProperties: false`, so the model *cannot* return an opinion even if
-it ignores its instructions. [A test asserts this.](tests/test_rules.py)
+That boundary is enforced by the API rather than by prompt wording: the response is
+constrained to a JSON Schema with `additionalProperties: false`, so the model *cannot*
+return an opinion even if it ignores its instructions. A CI job asserts the schema
+still has that property.
 
 ---
 
@@ -54,155 +54,182 @@ it ignores its instructions. [A test asserts this.](tests/test_rules.py)
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
+export GEMINI_API_KEY=...          # free: https://aistudio.google.com/apikey
 
-# Free: get a key at https://aistudio.google.com/apikey
-export GEMINI_API_KEY=...
-
-python main.py box_front.jpg box_underside.jpg case.jpg
+python main.py box_front.jpg box_underside.jpg case_lid.jpg
 ```
 
-Try it with no API key at all, using the bundled synthetic fixtures:
+No API key needed to try it — bundled synthetic fixtures:
 
 ```bash
 python main.py --extraction tests/sample_data/counterfeit_shrinkwrap.json
-```
-
-```
-TIER 1 - HARDWARE IDENTITY MATRIX
-  [FAIL] Model Number Compatibility
-         Cross-variant mismatch: A2700 belongs to Pro 2 Lightning Charging
-         Case, but the item is presented as Pro 2 USB-C. Genuine packaging
-         never pairs one variant's model number with the other's branding.
-
-TIER 2 - PACKAGING & VISUAL SIGNATURES
-  [FAIL] Packaging Seal Type
-         Full plastic shrink wrap detected. Retail AirPods Pro 2 boxes are
-         sealed with paper pull-tabs bearing green arrows on the top and
-         bottom seams and never ship in plastic shrink wrap.
-  ...
-
-  VERDICT: HIGH RISK - do not buy without further checks
-  Confidence: 0.99
 ```
 
 Exit codes: `0` genuine, `1` high risk, `2` inconclusive, `3` pipeline error.
 
 ---
 
-## Choosing a vision provider
+## What it checks
 
-The extraction stage is pluggable. The rules engine is identical either way, and
-both providers get byte-identical prompts and images — so any difference in the
-ledger is a difference in the model, not the harness.
+Ground truth lives in [`knowledge/airpods_pro_2.yaml`](knowledge/airpods_pro_2.yaml).
+**Every factual entry carries a `source`**, and tests enforce it — a rule without
+provenance is an invented specification, which is how a counterfeit detector ends up
+containing counterfeit information.
 
-| Provider | Model | Cost per check¹ | Notes |
+| Tier | Check | Fails when | Source |
 |---|---|---|---|
-| **Gemini** (default) | `gemini-3.8-flash` | **$0** | Google AI Studio free tier. Rate limited. |
-| Claude | `claude-haiku-4-5` | ~$0.009 | ~110 checks per $1 |
-| Claude | `claude-sonnet-5` | ~$0.018 | ~55 checks per $1 |
-| Claude | `claude-opus-5` | ~$0.046 | ~22 checks per $1 |
+| 1 | Model Number Compatibility | A-number belongs to the *other* variant, or isn't an Apple number at all | Apple |
+| 2 | Serial Cross-Match | Serials that must match don't, or serials that must differ are identical | Community guide + Apple |
+| 2 | Packaging Seal Type | Shrink-wrapped with no side pull tab | Community guide |
+| 2 | Serial Label Format | Label prints `(S)Serial` with no space after the marker | Domain expert |
+| 2 | Copyright Year Constraint | Year outside the variant's 2022–2025 range | Apple + domain expert |
+| 2 | Typography & Print Quality | Misspellings printed on the packaging | Community guide |
+| 2 | Serial Number Format | *soft, marked UNSOURCED — cannot disqualify* | — |
+| — | Label Typography | *informational, weight 0 — see below* | Measurement |
+| — | Photographed Surfaces | *observation only* | — |
 
-¹ Three photos downscaled to 1568 px (~8.1K input tokens, ~200 output). Rates
-drift — see each provider's pricing page.
+**Serial Cross-Match is the one that can't be cloned around.** Apple prints a serial in
+four places; the box and case-lid serials must match, and each earbud carries its own.
+A counterfeiter copying one genuine serial passes Apple's lookup but would have to
+reproduce four consistent serials to pass this.
 
-```bash
-python main.py box.jpg                          # Gemini, free
-python main.py box.jpg --provider anthropic     # Claude, needs ANTHROPIC_API_KEY
-python main.py box.jpg --effort low             # cheaper / faster on either
+### Identification beyond Pro 2
+
+The knowledge base covers **28 model numbers** across every AirPods product Apple lists,
+for identification only. Without it, an A-number from another generation is
+indistinguishable from a fabricated one:
+
+> Extracted model A3063 is a genuine Apple model number, but it belongs to **AirPods Pro
+> 3** (introduced 2025), not AirPods Pro 2. This tool only verifies AirPods Pro 2, so no
+> authenticity finding can be made — a counterfeit Pro 3 and a genuine one would both
+> look like this here.
+
+In the 20-post corpus, **3 items weren't Pro 2 at all** (two Pro 3, one AirPods 4 ANC).
+Two of those had previously been reported as suspicious.
+
+### What to photograph next
+
+Rules declare which panels can answer them, which separates *"you didn't show me"* from
+*"I looked and couldn't read it"* — only the first is fixed by another photo. Greedy set
+cover gives the shortest list:
+
 ```
-
-### Two caveats about the free tier
-
-Worth understanding before pointing real users at it:
-
-1. **Google uses free-tier content to improve its products.** Paid tiers
-   explicitly do not. If this becomes a public tool, strangers will be uploading
-   photos that may include serial numbers, faces, or their home in the
-   background — that needs to be disclosed to them, or the app needs a paid key.
-2. **Free-tier rate limits are per-account and capped per day.** They are fine
-   for development and a small launch, and they are a hard ceiling on adoption.
-   Google publishes current limits in the AI Studio dashboard rather than as a
-   fixed table.
-
-Neither is a reason to avoid the free tier for a PoC. Both are reasons to keep
-the provider swappable, which is why it is.
+WHAT TO ASK FOR NEXT
+  1. Photograph the sticker on the underside of the box — it carries the part
+     number, the model numbers and the serial.
+     (resolves: Model Number Compatibility, Serial Number Format)
+  2. Copyright Year Constraint could not be read from the surfaces you did
+     photograph — re-shoot them in even light.
+```
 
 ---
 
-## What the engine checks
+## Measured results
 
-Ground truth lives in [REQUIREMENTS.md](REQUIREMENTS.md); the engine imports it
-as data, so adding a variant means editing a table, not writing rules.
+20 listings from r/AreMyAirpodsAuthentic, labelled **blind** by a domain expert before
+seeing any pipeline output:
 
-**Tier 1 — hardware identity**
+```
+agreement          11/20
+counterfeits passed as genuine      0
+genuine units accused               0
+```
 
-| Check | Fails when |
-|---|---|
-| Model Number Compatibility | The A-number is not a Pro 2 part, or belongs to the *other* variant |
+The disagreements are `INCONCLUSIVE` on items the expert could judge — the tool
+declining rather than being wrong. For a buyer-protection tool that's the correct
+direction to fail: a missed fake costs $200, an unnecessary re-photograph costs nothing.
 
-**Tier 2 — packaging & visual signatures**
+Every rule change in this project came from that corpus. Three checks were **demoted
+after measurement contradicted them**:
 
-| Check | Fails when |
-|---|---|
-| Packaging Seal Type | Plastic shrink wrap is present (genuine boxes use paper pull-tabs) |
-| Copyright Year Constraint | Year predates the variant's release, or is in the future |
-| Serial Number Format | Not 10 or 12 uppercase alphanumerics |
-| Typography & Print Quality | Misspellings or kerning defects in printed text |
+- **Kerning irregularity** — scored 0-for-2, firing only on genuine units. Blur,
+  compression and viewing angle reproduce it on real packaging.
+- **"Shoddy" shrink wrap** — the extractor reported wrap *and* shoddy wrap on an opened
+  box with no plastic on it.
+- **Accent-only misspellings** — a genuine box printing `Audífonos inalámbricos`
+  correctly was accused because OCR dropped the diacritics. Letter substitutions
+  (`MagSate`, `Appie`) still fail; missing accents don't.
 
-Tier is about *evidence class*, not severity. Some Tier 2 findings are
-physically impossible on a genuine unit, so rules carry a separate
-`disqualifying` flag — plastic shrink wrap alone condemns an otherwise perfect
-unit.
+---
 
-### Design decisions worth knowing
+## Honest limitations
 
-- **A `GENUINE` verdict is capped at 0.95 confidence.** This pipeline inspects
-  packaging and printed identifiers. It cannot detect a counterfeit carrying a
-  cloned serial — the exact failure mode of Apple's own lookup. Telling a buyer
-  a photo check is a certainty would reproduce the problem this tool exists to
-  solve, so the ledger says so instead.
-- **Missing evidence is never treated as passing evidence.** An unreadable Tier 1
-  model number forces `INCONCLUSIVE`, even when every visible check passes.
-- **Serial validation is format-only, and sits in Tier 2.** REQUIREMENTS.md does
-  not specify Apple's serial format, and an over-strict length rule would
-  false-positive on genuine units — the worst possible failure for this tool.
+**A `GENUINE` verdict is capped at 0.95 confidence.** This inspects packaging and
+printed identifiers. It cannot detect a counterfeit carrying a cloned serial unless the
+cross-match catches it. Telling a buyer a photo check is a certainty would reproduce the
+problem the tool exists to solve.
+
+**Font comparison does not work, and is disabled.** The tool renders San Francisco —
+Apple's packaging typeface — and compares glyph geometry against it. On synthetic
+renders this separates cleanly (SF 0.65% against 3.4–6.9% for Helvetica, Arial, Verdana
+and Tahoma). On photographs it does not:
+
+```
+genuine AirPods Pro 2    4.72%
+genuine AirPods 4 ANC    2.39%     ← variation within genuine
+counterfeit Pro 3        6.78%        exceeds the gap to counterfeit
+```
+
+Photographed print carries texture, optical blur and sensor noise that rendered glyphs
+don't. The rule is **informational with zero weight** and cannot move a verdict —
+applying the synthetic threshold would have accused two genuine units. See
+`font_forensics.py` for the full measurement record, including two approaches ruled out
+(line advance-width ratios, and perspective-invariant cross-ratios, which are
+mathematically elegant and font-blind at 0.0–0.8% separation).
+
+**Only North American boxes are characterised.** Packaging *content* varies by region —
+languages, regulatory marks, part-number suffix — so content rules don't transfer.
+Typography does not vary, since Apple sets every region in San Francisco.
+
+**The corpus is 20 posts.** Every number above rests on that.
 
 ---
 
 ## Development
 
 ```bash
-pytest                    # 113 tests, no network or API key required
-python -m pyflakes *.py
+pytest                      # full suite, no network or API key required
+python -m pyflakes *.py tools/*.py tests/*.py
+python tools/check_models.py    # probe which provider models actually serve requests
 ```
 
-The rules engine is tested exhaustively on synthetic extractions, and both
-providers are driven by stub clients that capture the request — so CI runs green
-without credentials and without spending money.
-
-Iterate on the rules without re-billing the vision stage:
+Iterate on rules without re-billing the vision stage — cached extractions are re-scored
+against current rules automatically:
 
 ```bash
-python main.py box.jpg --save-extraction run.json   # one API call
-python main.py --extraction run.json                # re-score for free
+python tools/run_corpus.py corpus/ --out results/     # extract once
+python tools/run_corpus.py --score results/           # re-score after any rule change
 ```
 
-That is also how you A/B two models on identical inputs: save an extraction from
-each provider and diff the ledgers.
+Blind labelling is built in: `results/review.csv` ships with `expert_verdict` blank, and
+`--score` prints a confusion matrix that reports *"fake passed as genuine"* separately
+from *"genuine flagged"* rather than averaging them.
 
 ```
 schema.py           Pydantic contracts: the LLM's output + the Evidence Ledger
-rules_engine.py     Ground-truth matrix, the five rules, verdict aggregation
-providers.py        Gemini and Claude backends behind one protocol
-vision_extractor.py Prompt loading, image downscaling, provider dispatch
-main.py             CLI and ledger rendering
-PROMPTS.md          The system prompt, loaded at runtime — edit it here
-REQUIREMENTS.md     Hardware ground truth
+rules_engine.py     Rules, verdict aggregation, panel-aware next steps
+knowledge/*.yaml    Ground truth — every entry sourced
+providers.py        Gemini and Claude behind one protocol
+font_forensics.py   Geometric typeface comparison (informational)
+image_quality.py    Sharpness measurement
+vision_extractor.py Prompt loading, image prep, local pixel analysis
+tools/              Corpus fetch, batch scoring, model probing
 ```
+
+### Notes for anyone extending this
+
+- **Never assert an Apple specification from memory.** Cite Apple's page, ask the domain
+  expert, or probe it live. Model availability included: `gemini-2.5-flash` is in
+  Google's documented free-tier list and returns 404 for new accounts.
+- **Subjective visual judgements have produced a false positive every time they were
+  trusted.** Objective printed features have held up.
+- Reference photographs under `knowledge/real_*` and `knowledge/fake` are **blocked from
+  every vision API in code**, not by convention — they carry real serials, and free-tier
+  terms allow the provider to retain submitted content.
 
 ## Roadmap
 
-- Validate extraction accuracy against a labelled corpus of real listing photos
-- Compare Gemini Flash against Claude on that corpus before committing to one
-- Extend the matrix beyond Pro 2 (Pro 1, AirPods 3/4, Max)
+- Grow the labelled corpus; it has produced every real improvement so far
+- Region ↔ regulatory-mark consistency (data is being collected; not yet enough to rule on)
+- Extend verification beyond Pro 2 — the knowledge base is already structured for it
 - Web frontend so the tool is usable from a phone during a meet-up
