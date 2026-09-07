@@ -10,5 +10,10 @@
   "shrinkwrap_has_pull_tab": null,
   "shrinkwrap_looks_shoddy": null,
   "visible_panels": [],
-  "serial_label_literal": null
+  "serial_label_literal": null,
+  "label_image_index": null,
+  "label_left": null,
+  "label_top": null,
+  "label_right": null,
+  "label_bottom": null
 }

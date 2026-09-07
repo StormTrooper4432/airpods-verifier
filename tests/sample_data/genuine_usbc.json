@@ -13,5 +13,10 @@
     "box_bottom_label",
     "box_back"
   ],
-  "serial_label_literal": null
+  "serial_label_literal": null,
+  "label_image_index": null,
+  "label_left": null,
+  "label_top": null,
+  "label_right": null,
+  "label_bottom": null
 }

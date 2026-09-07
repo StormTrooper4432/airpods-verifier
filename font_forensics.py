@@ -364,7 +364,19 @@ class FontScore:
 
     @property
     def consistent_with_san_francisco(self) -> bool:
-        return self.scatter_percent < FONT_SCATTER_THRESHOLD
+        """True only when the line was actually measurable AND agrees with SF.
+
+        A failed measurement carries scatter 0.0, which without the scoreable
+        guard reads as a perfect match - so a segmentation failure would pass as
+        genuine. Absence of a measurement must never look like evidence of one.
+        """
+        return self.is_scoreable and self.scatter_percent < FONT_SCATTER_THRESHOLD
+
+    @property
+    def differs_from_san_francisco(self) -> bool:
+        """True only when measurable AND disagreeing. Not the negation of the
+        property above: an unmeasurable line is neither."""
+        return self.is_scoreable and self.scatter_percent >= FONT_SCATTER_THRESHOLD
 
 
 #: Below this, per-glyph deviations agree and the line is consistent with San
@@ -452,6 +464,41 @@ def compare_text_line(image: Image.Image, expected_text: str) -> list[GlyphCompa
         if comparison is not None:
             results.append(comparison)
     return results
+
+
+def analyse_label(
+    image_path: "Path | str", box: tuple[int, int, int, int], expected_text: str
+) -> "FontScore | None":
+    """Measure the typography of a label crop against San Francisco.
+
+    Upscales small crops before segmentation - interpolation does not create
+    detail, but it does stop thin strokes vanishing into single pixels, which is
+    what makes neighbouring glyphs merge. It cannot rescue a line below the
+    resolution floor; that is reported rather than papered over.
+    """
+    with Image.open(image_path) as source:
+        crop = source.convert("L").crop(box)
+
+    if crop.width < 4 or crop.height < 4:
+        return None
+    if crop.height < 120:
+        factor = max(2, int(120 / max(1, crop.height)))
+        crop = crop.resize((crop.width * factor, crop.height * factor), Image.LANCZOS)
+
+    threshold = otsu_threshold(crop)
+    segments = segment_glyphs(crop, threshold=threshold, min_ink_pixels=25)
+    heights = [box_[3] - box_[1] for box_, _ in segments]
+    comparisons = compare_text_line(crop, expected_text)
+    if not comparisons:
+        # Segmentation disagreed with the text. Report the size we could see, so
+        # the caller can tell "too small to read" from "read it and it differs".
+        if heights:
+            return FontScore(
+                glyphs=0, offset_percent=0.0, scatter_percent=0.0,
+                letters_measured=0, median_glyph_height_px=_median([float(h) for h in heights]),
+            )
+        return None
+    return score_font_match(comparisons, heights)
 
 
 def sf_available() -> bool:

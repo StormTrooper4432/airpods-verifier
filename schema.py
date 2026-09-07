@@ -127,6 +127,27 @@ class VisionExtraction(BaseModel):
             "Null when the box is not wrapped."
         )
     )
+    # Flat fields rather than a nested model on purpose: a nested Pydantic model
+    # generates $ref/$defs, and strict structured-output validators do not all
+    # support those. A schema rejection would only surface at request time.
+    label_image_index: int | None = Field(
+        description=(
+            "Which supplied image shows the printed label block on the box underside - the panel "
+            "carrying the part number, model numbers and serial. Counting from 1. Null if none does."
+        )
+    )
+    label_left: float | None = Field(
+        description="Left edge of that label block, as a fraction of image width (0-1). Null if absent."
+    )
+    label_top: float | None = Field(
+        description="Top edge of that label block, as a fraction of image height (0-1). Null if absent."
+    )
+    label_right: float | None = Field(
+        description="Right edge of that label block, as a fraction of image width (0-1). Null if absent."
+    )
+    label_bottom: float | None = Field(
+        description="Bottom edge of that label block, as a fraction of image height (0-1). Null if absent."
+    )
     visible_panels: list[PanelName] = Field(
         description=(
             "Which surfaces of the product the images actually show. Empty list if none can be "
@@ -186,6 +207,69 @@ class VisionExtraction(BaseModel):
 # --------------------------------------------------------------------------- #
 # Stage 2: Evidence Ledger output
 # --------------------------------------------------------------------------- #
+
+
+class LabelRegion(BaseModel):
+    """Resolved label bounds. Built from the flat extraction fields, not sent."""
+
+    image_index: int
+    left: float
+    top: float
+    right: float
+    bottom: float
+
+    @classmethod
+    def from_extraction(cls, extraction: "VisionExtraction") -> "LabelRegion | None":
+        values = (
+            extraction.label_image_index, extraction.label_left, extraction.label_top,
+            extraction.label_right, extraction.label_bottom,
+        )
+        if any(v is None for v in values):
+            return None
+        index, left, top, right, bottom = values
+        if right <= left or bottom <= top:
+            return None
+        return cls(image_index=index, left=left, top=top, right=right, bottom=bottom)
+
+    def pixel_box(self, width: int, height: int, pad: float = 0.02) -> tuple[int, int, int, int]:
+        """Pixel crop, padded slightly so edge glyphs are not clipped.
+
+        A crop that clips its final character measured that glyph as a 60%
+        deviation on a genuine label, so the padding is not cosmetic.
+        """
+        return (
+            max(0, int((self.left - pad) * width)),
+            max(0, int((self.top - pad) * height)),
+            min(width, int((self.right + pad) * width)),
+            min(height, int((self.bottom + pad) * height)),
+        )
+
+
+class LocalAnalysis(BaseModel):
+    """Measurements computed locally in Python - never by the LLM.
+
+    The rules engine stays a pure function of data, so pixel work happens during
+    extraction and arrives here as numbers. This is the same division as the
+    rest of the pipeline: something else observes, Python decides.
+
+    Every field is optional because each measurement can legitimately be
+    impossible - no label located, print below the resolution floor, no letters
+    on the line.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    sharpness_score: float | None = None
+    #: Median absolute deviation of per-glyph aspect ratios about their median.
+    #: Low means the deviations agree, which is what genuine print does whatever
+    #: the imaging conditions.
+    font_scatter_percent: float | None = None
+    font_glyphs_measured: int | None = None
+    font_letters_measured: int | None = None
+    median_glyph_height_px: float | None = None
+    font_line_text: str | None = None
+    #: Set when a label was found but its print is too small to measure.
+    font_below_resolution_floor: bool = False
 
 
 class EvidenceStatus(str, Enum):

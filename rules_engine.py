@@ -21,6 +21,7 @@ the product's release), so rules carry an explicit ``disqualifying`` flag.
 
 from __future__ import annotations
 
+import inspect
 import re
 import unicodedata
 from dataclasses import dataclass
@@ -29,9 +30,11 @@ from typing import Callable, Iterable
 
 import yaml
 
+from font_forensics import FONT_SCATTER_THRESHOLD, MINIMUM_GLYPH_HEIGHT_PX
 from schema import (
     VARIANT_UNKNOWN,
     EvidenceItem,
+    LocalAnalysis,
     EvidenceStatus,
     Verdict,
     VerificationReport,
@@ -167,7 +170,7 @@ class Rule:
     weight: float
     #: True when a FAIL is on its own sufficient to call the item high risk.
     disqualifying: bool
-    evaluate: Callable[[VisionExtraction, str], RuleOutcome]
+    evaluate: Callable[..., RuleOutcome]
     #: Where this rule's factual claim comes from. Required, and enforced by a
     #: test: a rule with no provenance is an invented specification, which is
     #: how a counterfeit detector ends up containing counterfeit information.
@@ -600,6 +603,55 @@ PANEL_REQUESTS: dict[str, str] = {
 }
 
 
+def _rule_label_typography(
+    extraction: VisionExtraction, variant: str, local: LocalAnalysis | None = None
+) -> RuleOutcome:
+    """Compare the label's letterforms against San Francisco.
+
+    Wrong font is the most-cited counterfeit tell in the owner's catalogue, and
+    the one an LLM cannot judge - a vision encoder discards glyph geometry before
+    it reasons. So the measurement is made locally in Python and arrives here as
+    a number; this rule only decides what the number means.
+
+    The statistic is scatter, not distance. Two genuine labels sat +2.4% and
+    -6.0% from San Francisco purely from image scale and ink spread, and -6.0%
+    is indistinguishable from Arial. But typefaces differ from each other
+    non-uniformly, so a wrong font makes per-glyph deviations DISAGREE while
+    genuine print makes them agree at any scale.
+    """
+    if local is None or local.font_scatter_percent is None:
+        if local is not None and local.font_below_resolution_floor:
+            height = local.median_glyph_height_px or 0
+            return RuleOutcome(
+                EvidenceStatus.UNKNOWN,
+                f"The label's print is too small in these images to check the letterforms "
+                f"(about {height:.0f} pixels tall; roughly {MINIMUM_GLYPH_HEIGHT_PX} is needed). "
+                f"Photograph the underside label straight on, filling the frame, and the "
+                f"typography can be checked against Apple's own typeface.",
+            )
+        return RuleOutcome(
+            EvidenceStatus.UNKNOWN,
+            "The label's letterforms were not measured. This check needs a close, straight-on "
+            "photograph of the printed label block.",
+        )
+
+    scatter = local.font_scatter_percent
+    if scatter >= FONT_SCATTER_THRESHOLD:
+        return RuleOutcome(
+            EvidenceStatus.FAIL,
+            f"The label's letterforms do not match San Francisco, the typeface Apple sets its "
+            f"packaging in. Per-glyph shape deviations disagree with each other by {scatter:.1f}% "
+            f"(genuine printing measures under {FONT_SCATTER_THRESHOLD:.1f}%; substitute typefaces "
+            f"measure 3-8%). Measured across {local.font_glyphs_measured} glyphs.",
+        )
+    return RuleOutcome(
+        EvidenceStatus.PASS,
+        f"The label's letterforms are consistent with San Francisco, measured across "
+        f"{local.font_glyphs_measured} glyphs (shape deviations agree to within {scatter:.1f}%). "
+        f"This compares letterform geometry against Apple's own typeface, not appearance.",
+    )
+
+
 # --------------------------------------------------------------------------- #
 # Rule registry
 # --------------------------------------------------------------------------- #
@@ -653,6 +705,18 @@ RULES: tuple[Rule, ...] = (
     ),
     Rule(
         tier=2,
+        parameter="Label Typography",
+        weight=3.0,
+        disqualifying=True,
+        evaluate=_rule_label_typography,
+        source=(
+            "Measured against San Francisco (Apple's packaging typeface, shipped with macOS); "
+            "thresholds from 2 genuine labels and 4 substitute typefaces"
+        ),
+        answerable_from=("box_bottom_label",),
+    ),
+    Rule(
+        tier=2,
         parameter="Typography & Print Quality",
         weight=1.5,
         disqualifying=False,
@@ -679,7 +743,25 @@ _TOTAL_WEIGHT = sum(rule.weight for rule in RULES if not rule.informational)
 # --------------------------------------------------------------------------- #
 
 
-def evaluate(extraction: VisionExtraction) -> VerificationReport:
+def _apply(
+    rule: Rule, extraction: VisionExtraction, variant: str, local: LocalAnalysis | None
+) -> RuleOutcome:
+    """Call a rule with the arguments it declares.
+
+    Most rules are pure functions of the extraction; only the ones needing
+    locally computed measurements take a third parameter. Deciding by signature
+    rather than by catching TypeError matters - catching it would swallow a
+    genuine TypeError raised inside a rule and silently rerun it with fewer
+    arguments.
+    """
+    if len(inspect.signature(rule.evaluate).parameters) >= 3:
+        return rule.evaluate(extraction, variant, local)
+    return rule.evaluate(extraction, variant)
+
+
+def evaluate(
+    extraction: VisionExtraction, local: LocalAnalysis | None = None
+) -> VerificationReport:
     """Run every rule and fold the outcomes into a verdict + Evidence Ledger."""
     variant = resolve_variant(extraction)
 
@@ -694,7 +776,7 @@ def evaluate(extraction: VisionExtraction) -> VerificationReport:
     tier1_unresolved = False
 
     for rule in RULES:
-        outcome = rule.evaluate(extraction, variant)
+        outcome = _apply(rule, extraction, variant, local)
         ledger.append(
             EvidenceItem(
                 tier=rule.tier,

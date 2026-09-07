@@ -26,6 +26,7 @@ from rules_engine import (
 )
 from schema import (
     VARIANT_LIGHTNING,
+    LocalAnalysis,
     VARIANT_UNKNOWN,
     VARIANT_USB_C,
     EvidenceStatus,
@@ -42,6 +43,11 @@ GENUINE_USB_C = {
     "extracted_model_number": "A3047",
     "extracted_serial_number": "H4XQ7K2LMN9P",
     "serial_label_literal": "(S) Serial No. H4XQ7K2LMN9P",
+    "label_image_index": None,
+    "label_left": None,
+    "label_top": None,
+    "label_right": None,
+    "label_bottom": None,
     "copyright_year": 2023,
     "has_plastic_shrinkwrap": False,
     "has_paper_pull_tabs": True,
@@ -51,6 +57,25 @@ GENUINE_USB_C = {
     "font_kerning_irregularities": False,
     "visible_spelling_errors": [],
 }
+
+
+#: A label photographed well enough to measure, matching San Francisco. Genuine
+#: labels measured 0.90% scatter; the threshold is 2.0%.
+GOOD_FONT = LocalAnalysis(
+    font_scatter_percent=0.9, font_glyphs_measured=9, font_letters_measured=4,
+    median_glyph_height_px=80.0,
+)
+
+#: The same label set in something other than San Francisco.
+WRONG_FONT = LocalAnalysis(
+    font_scatter_percent=4.4, font_glyphs_measured=9, font_letters_measured=4,
+    median_glyph_height_px=80.0,
+)
+
+#: A label located but photographed too small to measure.
+TOO_SMALL_FONT = LocalAnalysis(
+    median_glyph_height_px=7.0, font_below_resolution_floor=True,
+)
 
 
 def make_extraction(**overrides) -> VisionExtraction:
@@ -439,7 +464,11 @@ class TestTypographyRule:
 
 class TestVerdictAggregation:
     def test_clean_unit_is_genuine_but_never_fully_certain(self):
-        report = evaluate(make_extraction())
+        # A clean unit now also needs its letterforms measured. Without a close
+        # enough photograph of the label the tool declines to clear the item,
+        # because "wrong font" is the most-cited counterfeit tell and going
+        # unchecked is missing evidence rather than absent risk.
+        report = evaluate(make_extraction(), GOOD_FONT)
         assert report.summary_verdict is Verdict.GENUINE
         # Capped below 1.0: photo evidence cannot rule out a cloned serial.
         assert 0.9 <= report.confidence_score <= 0.95
@@ -697,7 +726,9 @@ class TestPanelAwareNextSteps:
         assert any("re-shoot" in step for step in steps)
 
     def test_no_open_checks_means_no_busywork(self):
-        report = evaluate(make_extraction(visible_panels=["box_bottom_label", "box_back"]))
+        report = evaluate(
+            make_extraction(visible_panels=["box_bottom_label", "box_back"]), GOOD_FONT
+        )
         assert report.summary_verdict is Verdict.GENUINE
         assert report.next_steps == []
 
@@ -826,3 +857,57 @@ class TestImageQuality:
         from image_quality import sharpest
 
         assert sharpest([]) is None
+
+
+class TestLabelTypographyRule:
+    """Wrong font is the most-cited tell in the owner's catalogue and the one an
+    LLM cannot judge. The measurement happens locally in Python; this rule only
+    decides what the number means."""
+
+    def test_matching_letterforms_pass(self):
+        report = evaluate(make_extraction(), GOOD_FONT)
+        assert status_of(report, "Label Typography") is EvidenceStatus.PASS
+
+    def test_mismatched_letterforms_fail(self):
+        report = evaluate(make_extraction(), WRONG_FONT)
+        assert status_of(report, "Label Typography") is EvidenceStatus.FAIL
+        assert report.summary_verdict is Verdict.HIGH_RISK_SUSPECTED
+
+    def test_print_below_the_resolution_floor_is_unknown_with_advice(self):
+        report = evaluate(make_extraction(), TOO_SMALL_FONT)
+        detail = detail_of(report, "Label Typography")
+        assert status_of(report, "Label Typography") is EvidenceStatus.UNKNOWN
+        assert "too small" in detail and "pixels tall" in detail
+        assert report.summary_verdict is not Verdict.HIGH_RISK_SUSPECTED
+
+    def test_no_measurement_at_all_is_unknown(self):
+        report = evaluate(make_extraction())
+        assert status_of(report, "Label Typography") is EvidenceStatus.UNKNOWN
+
+    def test_an_unmeasured_font_lowers_confidence_without_blocking(self):
+        # Deliberately not a hard blocker. Requiring a macro shot of the print
+        # before anything can be cleared would make the tool unusable, so an
+        # unmeasured font counts against coverage instead - a unit clean on
+        # every other check still clears, but with visibly less confidence.
+        without = evaluate(make_extraction())
+        with_font = evaluate(make_extraction(), GOOD_FONT)
+        assert without.summary_verdict is Verdict.GENUINE
+        assert with_font.summary_verdict is Verdict.GENUINE
+        assert without.confidence_score < with_font.confidence_score
+
+    def test_it_tips_a_thinly_evidenced_item_out_of_genuine(self):
+        # The safety trade this rule exists to make. On the labelled corpus it
+        # turned a counterfeit that had passed as GENUINE @ 0.62 into
+        # INCONCLUSIVE, because that item was already near the coverage floor.
+        # A missed fake costs a buyer $200; a needless re-photograph costs
+        # nothing.
+        thin = make_extraction(
+            extracted_serial_number=None, serial_label_literal=None,
+            copyright_year=None, has_paper_pull_tabs=False,
+        )
+        assert evaluate(thin).summary_verdict is not Verdict.GENUINE
+
+    def test_the_rule_only_answers_from_the_label_panel(self):
+        rule = next(r for r in RULES if r.parameter == "Label Typography")
+        assert rule.answerable_from == ("box_bottom_label",)
+        assert rule.disqualifying and not rule.source.startswith("UNSOURCED")
