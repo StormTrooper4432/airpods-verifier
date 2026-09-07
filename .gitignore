@@ -24,3 +24,6 @@ results/
 # Genuine reference photographs (owner's own units). Measurements derived from
 # them live in knowledge/*.yaml; the images themselves stay local.
 knowledge/real_*/
+
+# macOS
+.DS_Store
