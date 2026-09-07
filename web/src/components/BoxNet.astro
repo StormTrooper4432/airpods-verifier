@@ -180,7 +180,6 @@ const markGlyph = (s: Status) => (s === 'FAIL' ? 'fail' : s === 'PASS' ? 'pass' 
           <span class="panel-hit-cue" aria-hidden="true">
             {exposed ? 'replace' : 'add photo'}
           </span>
-          <img class="panel-shot" alt="" hidden />
         </label>
       );
     })}
@@ -306,21 +305,23 @@ const markGlyph = (s: Status) => (s === 'FAIL' ? 'fail' : s === 'PASS' ? 'pass' 
     opacity: 0;
     transition: opacity 140ms cubic-bezier(0.16, 1, 0.3, 1);
   }
+  /* The photograph is its own "loaded" indicator; a permanent badge over it
+     is noise. The cue returns on hover and focus, where it names the action. */
   label.panel-hit:hover .panel-hit-cue,
-  label.panel-hit:focus-within .panel-hit-cue,
-  label.panel-hit.is-loaded .panel-hit-cue { opacity: 1; }
+  label.panel-hit:focus-within .panel-hit-cue { opacity: 1; }
   label.panel-hit.is-loaded .panel-hit-cue { background: var(--ink); }
 
-  .panel-shot {
+  /* Created by script when a photograph is picked; never shipped empty. */
+  :global(.panel-shot) {
     position: absolute;
     inset: 0;
     width: 100%;
     height: 100%;
     object-fit: cover;
-    opacity: 0.42;
+    opacity: 0.58;
     mix-blend-mode: multiply;
   }
-  .panel-shot[hidden] { display: none; }
+
 
   /* At arm's length on a phone the plot is ~340px wide, so its type is set in
      user units large enough to survive that scale rather than shrinking with it. */
