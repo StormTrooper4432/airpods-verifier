@@ -1,0 +1,49 @@
+---
+version: 1
+slug: "web-src-pages-index-astro"
+primary_target: "web/src/pages/index.astro"
+related_targets: []
+---
+
+## Scope
+
+The verification surface itself: a buyer brings photographs of an AirPods Pro 2 box and case and receives an Evidence Ledger. Visitor mode: **Operate** — the visitor completes an examination. A first-time visitor still has to understand within seconds what this is and why Apple's own serial lookup does not settle it, but that understanding is carried by the sheet doing its job, not by a marketing hero above it.
+
+## Audience and job
+
+A buyer standing over a stranger's box at a meet-up, phone in daylight, minutes to decide; and the same buyer at a desk working through listing photos before travelling. Both are primary (PRODUCT.md `## Users`). The job: find out what the photos already prove, what they cannot, and which photograph would settle it.
+
+## Proof and content
+
+Real: the nine rules and their weights, every source string in `knowledge/airpods_pro_2.yaml`, the panel vocabulary, the measured corpus result (20 blind-labelled posts, 12/20 agreement, 0 fakes passed, 0 genuine accused). Demonstration ledgers are authored at full fidelity from real corpus posts and labelled synthetic. Nothing about accuracy, pricing, users, or endorsement is invented.
+
+## Constraints
+
+- The LLM never renders a verdict; the surface must make the extraction/decision boundary visible rather than claim it.
+- No percentage authenticity score anywhere. Coverage is coverage; a grade is a grade.
+- INCONCLUSIVE is a first-class outcome with equal dignity to a verdict, never styled as a failure.
+- Colour is never the sole signal for any state (an outdoor phone screen, and the product's own accessibility principle).
+- Uploaded photographs carry strangers' serial numbers; the free-tier retention disclosure is part of the surface, not a footnote nobody reads.
+
+## Direction contract
+
+THESIS: The verdict is a graded examination certificate, not a badge. Refuses the drop-zone hero with a colour-coded score.
+
+OWN-WORLD: Security-paper #E9EDEF, blue-black #0D1417, intaglio green #0B6B4F owning border, plot and rail; vermilion #C2371D only on struck FAIL marks. Archivo/Archivo Narrow, tabular figures. One hard unit; sections split by voids, not hairlines. State is a mark, never a hue.
+
+STORY: A buyer over a stranger's box sees what is still unphotographed, reads every finding with its citation, and can walk or pay.
+
+FIRST VIEWPORT: Full-bleed sheet, guilloche border. Left: the box unfolded as a net — front, back, label, sides, case lid — findings plotted on the panel they came from; unexposed panels are the primary action. Right: graded rows, source in fine print beneath, grade struck across their head. Empty is a blank ruled record.
+
+FORM: Graded Examination Report; #5 of 7, assigned by roll (my #1: field-guide plate); seed 11c09197.
+
+FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance.
+
+## Memorable moment
+
+The box net. Findings are marked at the panel they were read from, and the panels nobody photographed sit unexposed on the sheet — so the gap in the evidence is the same object as the instruction for closing it.
+
+## Unresolved
+
+- Whether the sheet prints (a real `@media print` certificate) or stays screen-only — decide during the sections phase.
+- Hosting and the API key path for a public deployment; the surface is built against the existing Python pipeline's JSON contract, not a chosen backend.

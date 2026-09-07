@@ -1,0 +1,671 @@
+---
+import Sheet from '../layouts/Sheet.astro';
+import BoxNet from '../components/BoxNet.astro';
+import Ledger from '../components/Ledger.astro';
+import Grade from '../components/Grade.astro';
+import Mark from '../components/Mark.astro';
+import specimenData from '../data/specimens.json';
+import {
+  blankLedger,
+  plotPanel,
+  PANELS,
+  RULES,
+  RULE_BY_PARAMETER,
+  TOTAL_WEIGHT,
+  type Finding,
+  type PanelId,
+  type Specimen,
+} from '../data/sheet';
+import { examine, shotsFrom, ExamineError } from '../lib/examine';
+
+const specimens = specimenData as unknown as Specimen[];
+
+let result: Awaited<ReturnType<typeof examine>> | null = null;
+let failure: { problem: string; recovery: string } | null = null;
+
+if (Astro.request.method === 'POST') {
+  try {
+    result = await examine(shotsFrom(await Astro.request.formData()));
+  } catch (err) {
+    failure =
+      err instanceof ExamineError
+        ? { problem: err.message, recovery: err.recovery }
+        : {
+            problem: 'The examination stopped on an error the sheet did not expect.',
+            recovery: 'Try again. If it repeats, the server log carries the detail.',
+          };
+  }
+}
+
+const items = result ? result.report.evidence_ledger : blankLedger();
+const shown: PanelId[] = result ? result.panels : [];
+const findings: Finding[] = items.map((item, i) => ({
+  n: i + 1,
+  parameter: item.parameter,
+  status: item.status,
+  panel: plotPanel(RULE_BY_PARAMETER[item.parameter], shown),
+}));
+
+/** Which surface unlocks the most evidence weight, computed from the rules. */
+const weightBehind = (panel: PanelId) =>
+  RULES.filter((r) => r.answerableFrom.includes(panel)).reduce((n, r) => n + r.weight, 0);
+const startHere = PANELS.map((p) => ({ panel: p, weight: weightBehind(p.id) }))
+  .filter((p) => p.weight > 0)
+  .sort((a, b) => b.weight - a.weight)
+  .slice(0, 2);
+
+const examinedAt = result
+  ? new Date().toISOString().slice(0, 16).replace('T', ' ')
+  : null;
+
+const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
+
+const specimenFindings = (s: Specimen): Finding[] =>
+  s.report.evidence_ledger.map((item, i) => ({
+    n: i + 1,
+    parameter: item.parameter,
+    status: item.status,
+    panel: plotPanel(RULE_BY_PARAMETER[item.parameter], s.panels),
+  }));
+---
+
+<Sheet
+  title="AirPods Pro 2 Examination Record"
+  description="A graded examination record for AirPods Pro 2 packaging and hardware. Nine cited checks, run by a deterministic rules engine — never by a language model."
+>
+  <header class="masthead">
+    <div class="masthead-title">
+      <h1>
+        <span class="masthead-product">AirPods Pro&nbsp;2</span>
+        <span class="masthead-kind">Examination record</span>
+      </h1>
+      <p class="masthead-stand">
+        A counterfeit carries a cloned serial that clears Apple&rsquo;s own coverage lookup.
+        This record never asks Apple. It reads the printed box against Apple&rsquo;s published
+        hardware matrix, and the four serials against each other.
+      </p>
+    </div>
+
+    <dl class="record">
+      <div><dt class="caps">Examined</dt><dd>{examinedAt ?? '——'}</dd></div>
+      <div><dt class="caps">Variant</dt><dd>{result?.variant ?? '——'}</dd></div>
+      <div>
+        <dt class="caps">Surfaces</dt>
+        <dd><b>{shown.length}</b><span class="of">of</span><b>{PANELS.length}</b></dd>
+      </div>
+      <div>
+        <dt class="caps">Checks on record</dt>
+        <dd><b>{RULES.length}</b><span class="of">·</span><b>{fmt(TOTAL_WEIGHT)}</b>
+          <span class="unit">weight</span></dd>
+      </div>
+    </dl>
+  </header>
+
+  <form
+    class="examination"
+    id="examination"
+    method="POST"
+    enctype="multipart/form-data"
+    aria-describedby="upload-disclosure"
+  >
+    <section class="col-plot" aria-labelledby="plot-h">
+      <h2 id="plot-h" class="section-h">Plot</h2>
+      <p class="section-note fine">
+        The carton laid flat, with the case and buds beneath it. Each finding is marked at
+        the surface it was read from. A surface nobody photographed is drawn unexposed and
+        stays on the record.
+      </p>
+
+      <BoxNet
+        shown={shown}
+        findings={result ? findings : []}
+        showWeights={!result}
+        interactive={true}
+      />
+
+      <ul class="legend" aria-label="What the marks mean" hidden={!result}>
+        <li><Mark status="PASS" size={16} /><span>Check ran, no finding</span></li>
+        <li><Mark status="FAIL" size={16} /><span>Struck: the check failed</span></li>
+        <li><Mark status="UNKNOWN" size={16} /><span>On the record, could not run</span></li>
+      </ul>
+
+      <div class="actions">
+        <button type="submit" class="run">Run the examination</button>
+        <p class="fine actions-note" role="status">
+          Reading a set of photographs takes about a minute. The record fills in when the
+          engine returns.
+        </p>
+        <p class="fine actions-note" id="upload-disclosure">
+          Photographs are read by Google&rsquo;s Gemini free tier. Google may use free-tier
+          content to improve its products. Your box label carries a serial &mdash; do not send
+          a photograph you would not publish.
+        </p>
+      </div>
+
+      {failure && (
+        <div class="notice" role="alert">
+          <p class="notice-head"><Mark status="FAIL" size={16} />{failure.problem}</p>
+          <p class="notice-fix">{failure.recovery}</p>
+        </div>
+      )}
+    </section>
+
+    <section class="col-findings" aria-labelledby="findings-h">
+      <h2 id="findings-h" class="sr-only">Findings</h2>
+      <Grade
+        verdict={result?.report.summary_verdict ?? null}
+        score={result?.report.confidence_score ?? null}
+        items={items}
+        striking={Boolean(result)}
+      />
+      <h3 class="section-h rows-h">Findings</h3>
+      <Ledger items={items} striking={Boolean(result)} />
+    </section>
+  </form>
+
+  <section class="settle" aria-labelledby="settle-h">
+    <h2 id="settle-h" class="section-h">What would settle it</h2>
+    {result && result.report.next_steps.length > 0 ? (
+      <ol class="steps">
+        {result.report.next_steps.map((step) => <li>{step}</li>)}
+      </ol>
+    ) : result ? (
+      <p class="steps-none">
+        Nothing further. Every check that these photographs can answer has been answered.
+      </p>
+    ) : (
+      <ol class="steps">
+        {startHere.map(({ panel, weight }) => (
+          <li>
+            Photograph <b>{panel.phrase}</b>.
+            {panel.carries ? ` ${panel.carries}` : ''}
+            <span class="steps-weight">
+              {' '}Unlocks {fmt(weight)} of {fmt(TOTAL_WEIGHT)} evidence weight.
+            </span>
+          </li>
+        ))}
+      </ol>
+    )}
+  </section>
+
+  <section class="specimens" aria-labelledby="specimens-h">
+    <h2 id="specimens-h" class="section-h">Filed records</h2>
+    <p class="section-note fine">
+      Three real examinations from the labelled corpus, printed exactly as the engine
+      returned them. Serials are redacted: they belong to the people who posted the
+      photographs.
+    </p>
+
+    {specimens.map((s) => (
+      <article class="specimen">
+        <div class="specimen-head">
+          <h3>{s.title}</h3>
+          <p class="specimen-stand">{s.standfirst}</p>
+          <p class="fine specimen-meta">
+            <span class="caps">{s.variant}</span>
+            <span class="sep" aria-hidden="true">/</span>
+            {s.panels.length} of {PANELS.length} surfaces photographed
+          </p>
+        </div>
+        <div class="specimen-plot">
+          <BoxNet shown={s.panels as PanelId[]} findings={specimenFindings(s)} />
+        </div>
+        <div class="specimen-findings">
+          <Grade
+            verdict={s.report.summary_verdict}
+            score={s.report.confidence_score}
+            items={s.report.evidence_ledger}
+          />
+          <Ledger items={s.report.evidence_ledger} condensed={true} />
+        </div>
+      </article>
+    ))}
+  </section>
+
+  <section class="method" aria-labelledby="method-h">
+    <h2 id="method-h" class="section-h">How the record is made</h2>
+
+    <div class="method-grid">
+      <div>
+        <h3>The model reads. It never grades.</h3>
+        <p>
+          A vision model transcribes each photograph into a fixed schema &mdash; model number,
+          copyright year, the literal serial line, which surfaces are visible. The schema
+          forbids extra fields and has no verdict field in it, so the model is structurally
+          unable to return one. Every grade on this sheet comes from Python evaluating
+          constraints.
+        </p>
+      </div>
+      <div>
+        <h3>Every check carries a citation.</h3>
+        <p>
+          A rule without provenance is an invented specification &mdash; a polished counterfeit
+          detector containing counterfeit information. Each of the {RULES.length} checks names
+          its source in fine print beneath the finding, and the test suite fails if a rule
+          ships without one.
+        </p>
+      </div>
+      <div>
+        <h3>Measured, not asserted.</h3>
+        <p>
+          Twenty listings were labelled blind by a domain expert and then scored:
+          twelve agreements, <b>no counterfeit passed</b>, and <b>no genuine unit was
+          accused</b>. Three checks that looked convincing in synthetic tests &mdash; kerning
+          irregularity, packaging wrap quality, typeface comparison &mdash; produced a false
+          positive on first contact with real photographs and were demoted.
+        </p>
+      </div>
+    </div>
+
+    <div class="scroll-x">
+    <table class="register">
+      <caption class="fine">The register of checks, in the order the ledger prints them.</caption>
+      <thead>
+        <tr>
+          <th scope="col" class="caps">#</th>
+          <th scope="col" class="caps">Check</th>
+          <th scope="col" class="caps num">Tier</th>
+          <th scope="col" class="caps num">Weight</th>
+          <th scope="col" class="caps">Effect</th>
+          <th scope="col" class="caps">Source</th>
+        </tr>
+      </thead>
+      <tbody>
+        {RULES.map((rule, i) => (
+          <tr class={rule.informational ? 'is-informational' : undefined}>
+            <td class="num">{String(i + 1).padStart(2, '0')}</td>
+            <th scope="row">{rule.parameter}</th>
+            <td class="num">{rule.tier}</td>
+            <td class="num">{rule.weight.toFixed(1)}</td>
+            <td>
+              {rule.informational
+                ? 'Reports only'
+                : rule.disqualifying
+                  ? 'Disqualifying'
+                  : 'Contributes'}
+            </td>
+            <td class="src">{rule.source}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+    </div>
+  </section>
+
+  <section class="limits" aria-labelledby="limits-h">
+    <h2 id="limits-h" class="section-h">What this record cannot do</h2>
+    <ul class="limit-list">
+      <li>
+        <b>It does not contact Apple.</b> Counterfeits clone valid serials, so{' '}
+        <span class="mono-ish">checkcoverage.apple.com</span> returns a clean result for them.
+        Check it as well &mdash; it catches a serial that was never issued &mdash; but a pass
+        there is not evidence.
+      </li>
+      <li>
+        <b>It covers AirPods Pro 2 only.</b> Twenty-eight other Apple model numbers are
+        recognised well enough to say &ldquo;this is a different product, and I decline to
+        grade it&rdquo;. That refusal is the feature; the alternative is a Pro 2 packaging
+        rule accusing a genuine AirPods 4.
+      </li>
+      <li>
+        <b>Typeface comparison does not vote.</b> It ships at weight 0. Four genuine labels
+        scattered 2.4&ndash;4.7% against San Francisco and the one counterfeit measured 6.8%:
+        the variation inside the genuine group is wider than the gap to the fake, so the
+        check reports and stays out of the grade until it is calibrated.
+      </li>
+      <li>
+        <b>Inconclusive is not a pass.</b> Coverage is never rescoped to the surfaces you
+        happened to send, because that would clear a unit whose box nobody photographed.
+      </li>
+      <li>
+        <b>Your photographs leave this machine.</b> They are sent to Google&rsquo;s Gemini
+        free tier, whose terms allow the content to be used to improve Google&rsquo;s
+        products. The box label carries a serial number.
+      </li>
+    </ul>
+  </section>
+
+  <footer class="colophon">
+    <p class="fine">
+      Evidence ledger produced by a deterministic rules engine over a schema-constrained
+      vision extraction. Grades, weights and sources on this page are read from the same
+      rule table the command line uses.
+    </p>
+  </footer>
+</Sheet>
+
+<script>
+  const form = document.querySelector<HTMLFormElement>('#examination');
+  if (form) {
+    // Photo previews and the busy state are progressive: the form posts and the
+    // record renders with scripting off.
+    form.querySelectorAll<HTMLInputElement>('.panel-file').forEach((input) => {
+      input.addEventListener('change', () => {
+        const hit = input.closest<HTMLLabelElement>('.panel-hit');
+        const img = hit?.querySelector<HTMLImageElement>('.panel-shot');
+        const cue = hit?.querySelector<HTMLElement>('.panel-hit-cue');
+        const file = input.files?.[0];
+        if (!hit || !img) return;
+        if (!file) {
+          hit.classList.remove('is-loaded');
+          img.hidden = true;
+          return;
+        }
+        if (img.src.startsWith('blob:')) URL.revokeObjectURL(img.src);
+        img.src = URL.createObjectURL(file);
+        img.hidden = false;
+        hit.classList.add('is-loaded');
+        if (cue) cue.textContent = 'replace';
+      });
+    });
+
+    form.addEventListener('submit', () => {
+      const run = form.querySelector<HTMLButtonElement>('.run');
+      if (!run) return;
+      run.disabled = true;
+      run.dataset.busy = 'true';
+      run.textContent = 'Examining… about a minute';
+    });
+  }
+</script>
+
+<style>
+  .section-h {
+    font-family: var(--narrow);
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--intaglio);
+    margin: 0 0 calc(var(--u) * 1.5);
+  }
+  .section-note { margin: 0 0 calc(var(--u) * 3); max-width: 62ch; }
+  .rows-h {
+    padding-top: calc(var(--u) * 1);
+    border-top: 2px solid var(--intaglio);
+    margin-bottom: calc(var(--u) * 2);
+  }
+
+  /* Masthead ------------------------------------------------------------- */
+
+  .masthead {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: calc(var(--u) * 6);
+    align-items: end;
+    padding-bottom: calc(var(--u) * 4);
+    border-bottom: 2px solid var(--ink);
+    margin-bottom: calc(var(--u) * 6);
+  }
+
+  .masthead h1 { margin: 0; display: grid; gap: calc(var(--u) * 0.5); }
+  .masthead-product {
+    display: block;
+    font-family: var(--narrow);
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: clamp(38px, 6.6vw, 88px);
+    line-height: 0.88;
+    letter-spacing: -0.006em;
+  }
+  .masthead-kind {
+    display: block;
+    font-family: var(--narrow);
+    font-weight: 400;
+    text-transform: uppercase;
+    letter-spacing: 0.3em;
+    font-size: clamp(12px, 1.5vw, 17px);
+    color: var(--intaglio);
+  }
+  .masthead-stand {
+    margin: calc(var(--u) * 3) 0 0;
+    max-width: 58ch;
+    font-size: 17px;
+    line-height: calc(var(--u) * 3.5);
+  }
+
+  .record {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, auto));
+    gap: calc(var(--u) * 2) calc(var(--u) * 5);
+    margin: 0;
+    text-align: right;
+  }
+  .record dt { font-size: 9.5px; color: var(--ink-soft); margin-bottom: 2px; }
+  .record dd { margin: 0; font-size: 16px; font-weight: 500; white-space: nowrap; }
+  .record b { font-weight: 700; }
+  .of { padding: 0 0.4em; color: var(--ink-soft); font-weight: 400; }
+  .unit { font-family: var(--narrow); color: var(--ink-soft); padding-left: 0.4em; font-size: 13px; }
+
+  /* The examination ------------------------------------------------------ */
+
+  .examination {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    gap: calc(var(--u) * 8);
+    align-items: start;
+    margin-bottom: calc(var(--u) * 12);
+  }
+
+  .col-plot {
+    position: sticky;
+    top: calc(var(--u) * 3);
+  }
+
+  .legend {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: calc(var(--u) * 1) calc(var(--u) * 3);
+    padding: 0;
+    margin: calc(var(--u) * 3) 0 0;
+    font-family: var(--narrow);
+    font-size: 12px;
+    color: var(--ink-soft);
+  }
+  .legend li { display: flex; align-items: center; gap: calc(var(--u) * 1); }
+
+  .actions {
+    margin-top: calc(var(--u) * 4);
+    display: grid;
+    gap: calc(var(--u) * 2);
+    justify-items: start;
+  }
+
+  .run {
+    font-family: var(--narrow);
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--paper);
+    background: var(--ink);
+    border: 2px solid var(--ink);
+    padding: calc(var(--u) * 1.75) calc(var(--u) * 4);
+    cursor: pointer;
+    transition:
+      background 160ms cubic-bezier(0.16, 1, 0.3, 1),
+      color 160ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .run:hover { background: var(--intaglio); border-color: var(--intaglio); }
+  .run:disabled { background: none; color: var(--ink-soft); border-color: var(--intaglio-hair); cursor: progress; }
+
+  .actions-note { max-width: 56ch; margin: 0; }
+
+  .notice {
+    margin-top: calc(var(--u) * 3);
+    padding: calc(var(--u) * 2) calc(var(--u) * 3);
+    border: 2px solid var(--struck);
+    max-width: 62ch;
+  }
+  .notice-head {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--u) * 1.5);
+    margin: 0 0 calc(var(--u) * 1);
+    font-weight: 600;
+    color: var(--struck);
+  }
+  .notice-fix { margin: 0; color: var(--ink-soft); }
+
+  /* Next steps ------------------------------------------------------------ */
+
+  .settle { margin-bottom: calc(var(--u) * 12); max-width: 78ch; }
+  .steps { margin: 0; padding-left: calc(var(--u) * 3); }
+  .steps li { margin-bottom: calc(var(--u) * 2); line-height: calc(var(--u) * 3); }
+  .steps li::marker { color: var(--intaglio); font-weight: 700; font-family: var(--narrow); }
+  .steps-weight { color: var(--ink-soft); }
+  .steps-none { margin: 0; color: var(--ink-soft); }
+
+  /* Filed records --------------------------------------------------------- */
+
+  .specimens { margin-bottom: calc(var(--u) * 12); }
+
+  .specimen {
+    display: grid;
+    grid-template-columns: minmax(0, 22ch) minmax(0, 1fr) minmax(0, 1.25fr);
+    gap: calc(var(--u) * 5);
+    align-items: start;
+    padding: calc(var(--u) * 6) 0;
+    border-top: 1px solid var(--intaglio-hair);
+  }
+  .specimen h3 {
+    margin: 0 0 calc(var(--u) * 1.5);
+    font-size: 19px;
+    font-weight: 600;
+    line-height: calc(var(--u) * 3);
+    letter-spacing: -0.012em;
+  }
+  .specimen-stand { margin: 0 0 calc(var(--u) * 2); color: var(--ink-soft); }
+  .specimen-meta { margin: 0; }
+  .specimen-meta .sep { padding: 0 0.5em; color: var(--intaglio); }
+
+  /* The register ---------------------------------------------------------- */
+
+  .method { margin-bottom: calc(var(--u) * 12); }
+
+  .method-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(28ch, 1fr));
+    gap: calc(var(--u) * 5);
+    margin-bottom: calc(var(--u) * 8);
+  }
+  .method-grid h3 {
+    margin: 0 0 calc(var(--u) * 1.5);
+    font-size: 19px;
+    font-weight: 600;
+    letter-spacing: -0.012em;
+    line-height: calc(var(--u) * 3);
+  }
+  .method-grid p { margin: 0; line-height: calc(var(--u) * 3); max-width: 46ch; }
+
+  /* Wide content scrolls inside its own box; the page body never does. */
+  .scroll-x {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+  }
+
+  .register {
+    width: 100%;
+    min-width: 34rem;
+    border-collapse: collapse;
+    text-align: left;
+  }
+  .register caption { text-align: left; padding-bottom: calc(var(--u) * 1.5); }
+  .register th,
+  .register td {
+    padding: calc(var(--u) * 1.5) calc(var(--u) * 2) calc(var(--u) * 1.5) 0;
+    border-bottom: 1px solid var(--intaglio-hair);
+    vertical-align: baseline;
+  }
+  .register thead th {
+    font-size: 9.5px;
+    color: var(--intaglio);
+    border-bottom: 2px solid var(--intaglio);
+    padding-bottom: calc(var(--u) * 1);
+  }
+  .register tbody th { font-weight: 600; }
+  .register .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .register thead .num { text-align: right; }
+  .register .src {
+    font-family: var(--narrow);
+    font-size: 12px;
+    color: var(--ink-soft);
+    line-height: calc(var(--u) * 2);
+    min-width: 26ch;
+  }
+  .register .is-informational th,
+  .register .is-informational td { color: var(--ink-soft); }
+
+  /* Limits ---------------------------------------------------------------- */
+
+  .limits { margin-bottom: calc(var(--u) * 10); }
+  .limit-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: calc(var(--u) * 3);
+    max-width: 82ch;
+  }
+  .limit-list li {
+    line-height: calc(var(--u) * 3);
+    padding-left: calc(var(--u) * 3);
+    position: relative;
+  }
+  /* A printed bullet, not an empty checkbox: these are statements, not checks. */
+  .limit-list li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: calc(var(--u) * 1.5);
+    width: calc(var(--u) * 1.5);
+    height: 2px;
+    background: var(--intaglio);
+  }
+  .mono-ish { font-family: var(--narrow); letter-spacing: 0.02em; }
+
+  .colophon {
+    padding-top: calc(var(--u) * 4);
+    border-top: 2px solid var(--ink);
+  }
+  .colophon p { max-width: 76ch; }
+
+  /* Narrower ---------------------------------------------------------------
+     The examination is one column on a phone, plot first: at a meet-up the
+     buyer is adding photographs, not reading a register. */
+
+  @media (max-width: 1100px) {
+    .examination { grid-template-columns: minmax(0, 1fr); gap: calc(var(--u) * 7); }
+    .col-plot { position: static; }
+    .specimen { grid-template-columns: minmax(0, 1fr); gap: calc(var(--u) * 4); }
+  }
+
+  @media (max-width: 860px) {
+    .masthead {
+      grid-template-columns: minmax(0, 1fr);
+      gap: calc(var(--u) * 4);
+      align-items: start;
+    }
+    .record { text-align: left; justify-content: start; }
+    .register .src { display: none; }
+    .register { min-width: 26rem; }
+    .register th, .register td { padding-right: calc(var(--u) * 1.5); }
+  }
+
+  @media (max-width: 560px) {
+    .record { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: calc(var(--u) * 2); }
+    .masthead-stand { font-size: 16px; margin-top: calc(var(--u) * 2); }
+    .masthead { padding-bottom: calc(var(--u) * 3); margin-bottom: calc(var(--u) * 4); }
+    .examination { gap: calc(var(--u) * 5); }
+    .section-note { margin-bottom: calc(var(--u) * 2); }
+  }
+
+  /* Printed --------------------------------------------------------------- */
+
+  @media print {
+    .actions, .legend, .specimens, .method, .limits { display: none; }
+    .examination { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; }
+    .masthead { margin-bottom: 24px; }
+  }
+</style>

@@ -67,6 +67,25 @@ python main.py --extraction tests/sample_data/counterfeit_shrinkwrap.json
 
 Exit codes: `0` genuine, `1` high risk, `2` inconclusive, `3` pipeline error.
 
+### The web sheet
+
+The same pipeline behind a browser. It renders the verdict as a graded examination
+record: the box drawn unfolded as a plot diagram with each finding marked at the
+surface it was read from, the graded rows beside it, and every check's source in fine
+print beneath its finding.
+
+```bash
+cd web
+npm install
+npm run build && npm run preview     # http://localhost:4321
+```
+
+`GEMINI_API_KEY` must be set in the server's environment. The examination is a plain
+form POST — it works with JavaScript disabled — and `web/src/lib/examine.ts` shells out
+to `main.py`, so the browser never sees a rule and never renders a verdict of its own.
+`web/src/data/sheet.ts` restates the rule table for the register and the plot;
+`tests/test_web_contract.py` fails the build if that copy drifts from `rules_engine.py`.
+
 ---
 
 ## What it checks
@@ -214,6 +233,7 @@ font_forensics.py   Geometric typeface comparison (informational)
 image_quality.py    Sharpness measurement
 vision_extractor.py Prompt loading, image prep, local pixel analysis
 tools/              Corpus fetch, batch scoring, model probing
+web/                Astro front end — the examination record
 ```
 
 ### Notes for anyone extending this
@@ -226,6 +246,9 @@ tools/              Corpus fetch, batch scoring, model probing
 - Reference photographs under `knowledge/real_*` and `knowledge/fake` are **blocked from
   every vision API in code**, not by convention — they carry real serials, and free-tier
   terms allow the provider to retain submitted content.
+- **Nothing published carries a whole serial.** The filed records on the web sheet come
+  from real corpus examinations with the serials masked, and both the test suite and CI
+  fail on a serial-shaped token in `web/src/data/specimens.json`.
 
 ## Roadmap
 

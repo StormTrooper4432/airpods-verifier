@@ -1,0 +1,258 @@
+[
+  {
+    "id": "specimen-a",
+    "title": "Sealed retail unit, seven panels",
+    "standfirst": "The strongest reading this tool produces on a sealed box \u2014 and it still stops short of certain.",
+    "panels": [
+      "box_back",
+      "box_side",
+      "box_bottom_label",
+      "box_front",
+      "case_exterior",
+      "earbud",
+      "accessories"
+    ],
+    "variant": "Pro 2 USB-C",
+    "report": {
+      "summary_verdict": "GENUINE",
+      "confidence_score": 0.79,
+      "evidence_ledger": [
+        {
+          "tier": 1,
+          "parameter": "Model Number Compatibility",
+          "status": "PASS",
+          "detail": "Extracted model A3047 matches Pro 2 USB-C part.",
+          "source": "Apple, 'Identify your AirPods' (support.apple.com)"
+        },
+        {
+          "tier": 2,
+          "parameter": "Packaging Seal Type",
+          "status": "PASS",
+          "detail": "Paper pull-tab seals with green arrows are present and the box is not wrapped, matching Apple's retail packaging for this generation.",
+          "source": "r/AreMyAirpodsAuthentic community guide, Step 1 (ruled authoritative by owner)"
+        },
+        {
+          "tier": 2,
+          "parameter": "Copyright Year Constraint",
+          "status": "PASS",
+          "detail": "Copyright year 2024 is consistent with Pro 2 USB-C (minimum 2023).",
+          "source": "Apple 'Identify your AirPods' (introduction years); owner (2025 ceiling)"
+        },
+        {
+          "tier": 2,
+          "parameter": "Serial Number Format",
+          "status": "PASS",
+          "detail": "Serial DKM4\u2022\u2022\u2022\u2022PT is well-formed (10 uppercase alphanumeric characters). Format only -- this check cannot detect a cloned serial copied from a genuine unit, so confirm it separately at checkcoverage.apple.com.",
+          "source": "Observed on 4 genuine units, 7 corpus listings and 2 counterfeits: 10 characters throughout, except AirPods Pro 1 at 12. Well-formedness only - both counterfeits used 10 characters too, so length does not discriminate"
+        },
+        {
+          "tier": 2,
+          "parameter": "Serial Cross-Match",
+          "status": "UNKNOWN",
+          "detail": "Only 1 of the four serials was legible, so they cannot be cross-checked. Apple prints one on the box label, one under the case lid and one on each earbud stem. Photograph: case lid, left earbud, right earbud.",
+          "source": "r/AreMyAirpodsAuthentic community guide, Step 2 (four serial locations); Apple 'Identify your AirPods' (serial is on the underside of the case lid)"
+        },
+        {
+          "tier": 2,
+          "parameter": "Serial Label Format",
+          "status": "PASS",
+          "detail": "The box label prints '(S) Serial' with the expected space after the (S) marker ('(S) Serial No. DKM4\u2022\u2022\u2022\u2022PT').",
+          "source": "Project owner (domain expert); corroborated by community-guide label photographs"
+        },
+        {
+          "tier": 2,
+          "parameter": "Label Typography",
+          "status": "UNKNOWN",
+          "detail": "The label's letterforms were not measured. This check needs a close, straight-on photograph of the printed label block.",
+          "source": "Measured against San Francisco (Apple's packaging typeface, shipped with macOS). NOT CALIBRATED - reported as an observation, never as a finding"
+        },
+        {
+          "tier": 2,
+          "parameter": "Typography & Print Quality",
+          "status": "PASS",
+          "detail": "No misspelled text was found in the printed packaging copy.",
+          "source": "Community guide (printed misspellings); corpus measurement (kerning excluded)"
+        },
+        {
+          "tier": 2,
+          "parameter": "Photographed Surfaces",
+          "status": "UNKNOWN",
+          "detail": "Images show: the box rear panel, a box side, the box underside label, the box front, the case exterior, an earbud, accessories. Not photographed: the underside of the case lid (serial).",
+          "source": "Observation only - no factual claim made"
+        }
+      ],
+      "next_steps": [
+        "Open the case and photograph the underside of the lid - the serial is printed there, and it should match the serial on the box. (resolves: Serial Cross-Match)"
+      ]
+    }
+  },
+  {
+    "id": "specimen-b",
+    "title": "Counterfeit caught on the label",
+    "standfirst": "A listing whose serial passes Apple's own coverage lookup. Its punctuation does not.",
+    "panels": [
+      "box_front",
+      "box_bottom_label",
+      "case_exterior"
+    ],
+    "variant": "Pro 2 Lightning",
+    "report": {
+      "summary_verdict": "HIGH_RISK_SUSPECTED",
+      "confidence_score": 0.85,
+      "evidence_ledger": [
+        {
+          "tier": 1,
+          "parameter": "Model Number Compatibility",
+          "status": "PASS",
+          "detail": "Extracted model A2698 matches Pro 2 Lightning part.",
+          "source": "Apple, 'Identify your AirPods' (support.apple.com)"
+        },
+        {
+          "tier": 2,
+          "parameter": "Packaging Seal Type",
+          "status": "UNKNOWN",
+          "detail": "Neither plastic wrap nor paper pull-tabs are visible, which is expected for an already-opened box. Seal type could not be assessed from these images.",
+          "source": "r/AreMyAirpodsAuthentic community guide, Step 1 (ruled authoritative by owner)"
+        },
+        {
+          "tier": 2,
+          "parameter": "Copyright Year Constraint",
+          "status": "UNKNOWN",
+          "detail": "No copyright year was legible. It is printed in the fine print block on the underside of the box.",
+          "source": "Apple 'Identify your AirPods' (introduction years); owner (2025 ceiling)"
+        },
+        {
+          "tier": 2,
+          "parameter": "Serial Number Format",
+          "status": "PASS",
+          "detail": "Serial KY26\u2022\u2022\u2022\u20226F is well-formed (10 uppercase alphanumeric characters). Format only -- this check cannot detect a cloned serial copied from a genuine unit, so confirm it separately at checkcoverage.apple.com.",
+          "source": "Observed on 4 genuine units, 7 corpus listings and 2 counterfeits: 10 characters throughout, except AirPods Pro 1 at 12. Well-formedness only - both counterfeits used 10 characters too, so length does not discriminate"
+        },
+        {
+          "tier": 2,
+          "parameter": "Serial Cross-Match",
+          "status": "UNKNOWN",
+          "detail": "Only 1 of the four serials was legible, so they cannot be cross-checked. Apple prints one on the box label, one under the case lid and one on each earbud stem. Photograph: case lid, left earbud, right earbud.",
+          "source": "r/AreMyAirpodsAuthentic community guide, Step 2 (four serial locations); Apple 'Identify your AirPods' (serial is on the underside of the case lid)"
+        },
+        {
+          "tier": 2,
+          "parameter": "Serial Label Format",
+          "status": "FAIL",
+          "detail": "The box label prints '(S)Serial' with no space after the (S) marker ('(S)Serial No. KY26\u2022\u2022\u2022\u20226F'). Genuine Apple labels place a space there. This is one of the most reliable single tells on the printed label.",
+          "source": "Project owner (domain expert); corroborated by community-guide label photographs"
+        },
+        {
+          "tier": 2,
+          "parameter": "Label Typography",
+          "status": "UNKNOWN",
+          "detail": "The label's letterforms were not measured. This check needs a close, straight-on photograph of the printed label block.",
+          "source": "Measured against San Francisco (Apple's packaging typeface, shipped with macOS). NOT CALIBRATED - reported as an observation, never as a finding"
+        },
+        {
+          "tier": 2,
+          "parameter": "Typography & Print Quality",
+          "status": "PASS",
+          "detail": "No misspelled text was found in the printed packaging copy.",
+          "source": "Community guide (printed misspellings); corpus measurement (kerning excluded)"
+        },
+        {
+          "tier": 2,
+          "parameter": "Photographed Surfaces",
+          "status": "UNKNOWN",
+          "detail": "Images show: the box front, the box underside label, the case exterior. Not photographed: the underside of the case lid (serial).",
+          "source": "Observation only - no factual claim made"
+        }
+      ],
+      "next_steps": [
+        "Open the case and photograph the underside of the lid - the serial is printed there, and it should match the serial on the box. (resolves: Serial Cross-Match)",
+        "Re-shoot the surfaces you already photographed in even light, filling the frame with the fine print - the text was not legible enough to check Copyright Year Constraint, Packaging Seal Type."
+      ]
+    }
+  },
+  {
+    "id": "specimen-c",
+    "title": "Hardware only, no box",
+    "standfirst": "Three panels of hardware and no packaging. Most of the record stays unstruck.",
+    "panels": [
+      "case_exterior",
+      "case_lid_underside",
+      "earbud"
+    ],
+    "variant": "Pro 2 USB-C",
+    "report": {
+      "summary_verdict": "INCONCLUSIVE",
+      "confidence_score": 0.33,
+      "evidence_ledger": [
+        {
+          "tier": 1,
+          "parameter": "Model Number Compatibility",
+          "status": "PASS",
+          "detail": "Extracted model A2968 matches Pro 2 USB-C MagSafe Charging Case (USB-C).",
+          "source": "Apple, 'Identify your AirPods' (support.apple.com)"
+        },
+        {
+          "tier": 2,
+          "parameter": "Packaging Seal Type",
+          "status": "UNKNOWN",
+          "detail": "Neither plastic wrap nor paper pull-tabs are visible, which is expected for an already-opened box. Seal type could not be assessed from these images.",
+          "source": "r/AreMyAirpodsAuthentic community guide, Step 1 (ruled authoritative by owner)"
+        },
+        {
+          "tier": 2,
+          "parameter": "Copyright Year Constraint",
+          "status": "UNKNOWN",
+          "detail": "No copyright year was legible. It is printed in the fine print block on the underside of the box.",
+          "source": "Apple 'Identify your AirPods' (introduction years); owner (2025 ceiling)"
+        },
+        {
+          "tier": 2,
+          "parameter": "Serial Number Format",
+          "status": "UNKNOWN",
+          "detail": "No serial number was legible in the supplied images.",
+          "source": "Observed on 4 genuine units, 7 corpus listings and 2 counterfeits: 10 characters throughout, except AirPods Pro 1 at 12. Well-formedness only - both counterfeits used 10 characters too, so length does not discriminate"
+        },
+        {
+          "tier": 2,
+          "parameter": "Serial Cross-Match",
+          "status": "UNKNOWN",
+          "detail": "Only 0 of the four serials was legible, so they cannot be cross-checked. Apple prints one on the box label, one under the case lid and one on each earbud stem. Photograph: box label, case lid, left earbud, right earbud.",
+          "source": "r/AreMyAirpodsAuthentic community guide, Step 2 (four serial locations); Apple 'Identify your AirPods' (serial is on the underside of the case lid)"
+        },
+        {
+          "tier": 2,
+          "parameter": "Serial Label Format",
+          "status": "UNKNOWN",
+          "detail": "The serial line on the box label was not legible, so the '(S) Serial' marker could not be checked. Photograph the underside label straight on and close up.",
+          "source": "Project owner (domain expert); corroborated by community-guide label photographs"
+        },
+        {
+          "tier": 2,
+          "parameter": "Label Typography",
+          "status": "UNKNOWN",
+          "detail": "The label's letterforms were not measured. This check needs a close, straight-on photograph of the printed label block.",
+          "source": "Measured against San Francisco (Apple's packaging typeface, shipped with macOS). NOT CALIBRATED - reported as an observation, never as a finding"
+        },
+        {
+          "tier": 2,
+          "parameter": "Typography & Print Quality",
+          "status": "PASS",
+          "detail": "No misspelled text was found in the printed packaging copy.",
+          "source": "Community guide (printed misspellings); corpus measurement (kerning excluded)"
+        },
+        {
+          "tier": 2,
+          "parameter": "Photographed Surfaces",
+          "status": "UNKNOWN",
+          "detail": "Images show: the case exterior, the underside of the case lid, an earbud. Not photographed: the box underside label (model number and serial).",
+          "source": "Observation only - no factual claim made"
+        }
+      ],
+      "next_steps": [
+        "Photograph the sticker on the underside of the box - it carries the part number, the model numbers and the serial. (resolves: Copyright Year Constraint, Serial Cross-Match, Serial Label Format)",
+        "Photograph the back of the box - it carries the copyright line and the regulatory marks. (resolves: Packaging Seal Type)",
+        "Re-shoot the surfaces you already photographed in even light, filling the frame with the fine print - the text was not legible enough to check Serial Number Format."
+      ]
+    }
+  }
+]

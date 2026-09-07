@@ -1,0 +1,209 @@
+---
+/**
+ * The grade struck at the head of the rows, and the coverage rail beneath it.
+ *
+ * Two different numbers, never merged: how much of the examination actually
+ * ran, and how strongly the finding is held. There is no authenticity
+ * percentage on this sheet, because the pipeline does not produce one.
+ */
+import {
+  RULE_BY_PARAMETER,
+  RULES,
+  TOTAL_WEIGHT,
+  VERDICT_GRADE,
+  type EvidenceItem,
+  type Verdict,
+} from '../data/sheet';
+
+interface Props {
+  /** null before anything is examined: the field is ruled and left blank. */
+  verdict: Verdict | null;
+  score: number | null;
+  items: EvidenceItem[];
+  striking?: boolean;
+}
+const { verdict, score, items, striking = false } = Astro.props;
+
+const statusOf = new Map(items.map((i) => [i.parameter, i.status]));
+
+const segments = RULES.filter((r) => r.weight > 0).map((rule) => {
+  const status = statusOf.get(rule.parameter) ?? 'UNKNOWN';
+  return { rule, status, resolved: status !== 'UNKNOWN' };
+});
+
+const resolvedWeight = segments
+  .filter((s) => s.resolved)
+  .reduce((n, s) => n + s.rule.weight, 0);
+
+const failed = items.filter((i) => i.status === 'FAIL');
+const disqualifying = failed.filter((i) => RULE_BY_PARAMETER[i.parameter]?.disqualifying);
+
+const word = verdict ? verdict.replace(/_/g, ' ') : '';
+const kind = verdict ? verdict.toLowerCase().replace(/_/g, '-') : 'blank';
+
+const gloss =
+  verdict === null
+    ? 'Nothing has been examined yet. Every check below is on the record and none of them has run.'
+    : verdict === 'HIGH_RISK_SUSPECTED'
+    ? `${VERDICT_GRADE[verdict]}: ${(disqualifying.length ? disqualifying : failed)
+        .map((f) => f.parameter)
+        .join(', ')}`
+    : verdict === 'GENUINE'
+      ? 'No disqualifying finding, and enough of the examination ran to say so.'
+      : 'Not enough of the examination could run. This is not a pass.';
+
+const scoreLabel =
+  verdict === null || verdict === 'INCONCLUSIVE'
+    ? 'Evidence coverage'
+    : 'Confidence in the finding';
+/** The second figure restates coverage on a blank or inconclusive record. */
+const showFinding = verdict !== null && verdict !== 'INCONCLUSIVE' && score !== null;
+const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
+---
+
+<header class:list={['grade', `grade-${kind}`, striking && 'is-striking']}>
+  <p class="caps grade-key">Grade</p>
+  {verdict ? (
+    <p class="grade-word">{word}</p>
+  ) : (
+    <p class="grade-word is-unfilled">Not yet graded</p>
+  )}
+  <p class="grade-gloss">{gloss}</p>
+
+  <div class="rail" role="img"
+       aria-label={`Examination coverage: ${fmt(resolvedWeight)} of ${fmt(TOTAL_WEIGHT)} evidence weight resolved.`}>
+    {segments.map(({ rule, status, resolved }) => (
+      <span
+        class:list={['seg', `seg-${status.toLowerCase()}`, resolved && 'is-resolved']}
+        style={`flex-grow:${rule.weight}`}
+        title={`${rule.parameter} — weight ${rule.weight.toFixed(1)} — ${
+          resolved ? status.toLowerCase() : 'not resolved'
+        }`}
+      ></span>
+    ))}
+  </div>
+
+  <dl class="readout">
+    <div>
+      <dt class="caps">Examination coverage</dt>
+      <dd>
+        {resolvedWeight > 0
+          ? <b>{fmt(resolvedWeight)}</b>
+          : <span class="unfilled-value">&mdash;&mdash;</span>}<span class="of">of</span><b>{fmt(TOTAL_WEIGHT)}</b>
+        <span class="unit">evidence weight</span>
+      </dd>
+    </div>
+    {showFinding && (
+      <div>
+        <dt class="caps">{scoreLabel}</dt>
+        <dd><b>{(score ?? 0).toFixed(2)}</b></dd>
+      </div>
+    )}
+  </dl>
+</header>
+
+<style>
+  .grade { margin: 0 0 calc(var(--u) * 4); }
+
+  .grade-key {
+    margin: 0 0 calc(var(--u) * 1);
+    font-size: 10.5px;
+    color: var(--intaglio);
+  }
+
+  .grade-word {
+    font-family: var(--narrow);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.005em;
+    font-size: clamp(34px, 5.4vw, 62px);
+    line-height: 0.92;
+    margin: 0;
+    padding-bottom: calc(var(--u) * 1.5);
+    color: var(--ink);
+    border-bottom: 3px solid var(--ink);
+  }
+  .grade-high-risk-suspected .grade-word { color: var(--struck); border-bottom-color: var(--struck); }
+  .grade-genuine .grade-word { color: var(--intaglio); border-bottom-color: var(--intaglio); }
+  .grade-inconclusive .grade-word {
+    color: var(--ink-soft);
+    border-bottom: 3px dashed var(--ink-soft);
+  }
+  /* The unfilled field of a blank record: ruled, waiting, not an error. */
+  .grade-blank .grade-word {
+    color: var(--ink-soft);
+    border-bottom: 3px solid var(--intaglio-hair);
+    font-size: clamp(26px, 3.6vw, 42px);
+  }
+  .unfilled-value { color: var(--ink-soft); letter-spacing: -0.08em; }
+
+  .grade-gloss {
+    margin: calc(var(--u) * 1.5) 0 calc(var(--u) * 3);
+    max-width: 56ch;
+    line-height: calc(var(--u) * 3);
+  }
+
+  .rail {
+    display: flex;
+    gap: 3px;
+    height: calc(var(--u) * 2);
+    margin-bottom: calc(var(--u) * 1.5);
+  }
+  .seg {
+    flex-basis: 0;
+    border: 1px solid var(--ink-soft);
+    background: transparent;
+    border-style: dashed;
+  }
+  .seg.is-resolved { border-style: solid; }
+  .seg-pass { border-color: var(--intaglio); background: var(--intaglio); }
+  .seg-fail {
+    border-color: var(--struck);
+    background: repeating-linear-gradient(
+      -45deg,
+      var(--struck) 0 2px,
+      transparent 2px 5px
+    );
+  }
+
+  .readout {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 calc(var(--u) * 5);
+    margin: 0;
+  }
+  .readout dt {
+    font-size: 10px;
+    color: var(--ink-soft);
+    margin-bottom: 2px;
+  }
+  .readout dd {
+    margin: 0;
+    font-size: 15px;
+    line-height: calc(var(--u) * 3);
+  }
+  .readout b { font-weight: 700; }
+  .of { padding: 0 0.45em; color: var(--ink-soft); }
+  .unit {
+    font-family: var(--narrow);
+    color: var(--ink-soft);
+    padding-left: 0.5em;
+  }
+
+  .is-striking .grade-word {
+    animation: grade-strike 520ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+    animation-delay: 560ms;
+  }
+  .is-striking .seg {
+    animation: seg-in 380ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+    animation-delay: 640ms;
+  }
+  @keyframes grade-strike {
+    from { opacity: 0; letter-spacing: 0.16em; filter: blur(4px); }
+    to   { opacity: 1; letter-spacing: 0.005em; filter: none; }
+  }
+  @keyframes seg-in {
+    from { opacity: 0; transform: scaleX(0.2); transform-origin: left; }
+    to   { opacity: 1; transform: none; }
+  }
+</style>

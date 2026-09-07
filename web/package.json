@@ -1,0 +1,19 @@
+{
+  "name": "airpods-verifier-web",
+  "type": "module",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "node ./dist/server/entry.mjs",
+    "check": "astro check"
+  },
+  "dependencies": {
+    "@astrojs/node": "^11.1.5",
+    "astro": "^7.3.1"
+  },
+  "devDependencies": {
+    "puppeteer-core": "^25.10.0"
+  }
+}

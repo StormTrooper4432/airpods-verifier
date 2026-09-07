@@ -1,0 +1,342 @@
+---
+/**
+ * The plot: the carton laid flat, findings marked at the panel they were read
+ * from. A panel nobody photographed is drawn unexposed and stays on the sheet —
+ * the gap in the evidence and the instruction for closing it are one object.
+ */
+import {
+  PANELS,
+  PLOT_VIEWBOX,
+  RULES,
+  type Finding,
+  type PanelId,
+  type Status,
+} from '../data/sheet';
+
+interface Props {
+  shown: PanelId[];
+  findings?: Finding[];
+  interactive?: boolean;
+  /** On an unstruck record, print what each surface is worth instead of marks. */
+  showWeights?: boolean;
+  caption?: string;
+}
+
+const { shown, findings = [], interactive = false, showWeights = false, caption } =
+  Astro.props;
+
+const [vbx, vby, vbw, vbh] = PLOT_VIEWBOX.split(' ').map(Number);
+const pct = (v: number, span: number, origin: number) => ((v - origin) / span) * 100;
+
+/**
+ * The cut edge of the carton, traced once around the whole net. Fold lines are
+ * drawn separately and lighter, so the flat sheet reads as one folded object
+ * rather than a row of boxes.
+ */
+const CUT =
+  'M100 140 H200 V52 H480 V140 H860 V420 H480 V508 H200 V420 H100 Z';
+const FOLDS = [
+  'M200 140 V420',
+  'M480 140 V420',
+  'M580 140 V420',
+  'M200 140 H480',
+  'M200 420 H480',
+];
+
+/** Hardware silhouettes, authored in a 100x100 field at one stroke weight. */
+const FIGURES: Record<string, string[]> = {
+  case: [
+    'M14 44 A22 22 0 0 1 36 22 H64 A22 22 0 0 1 86 44 V60 A22 22 0 0 1 64 82 H36 A22 22 0 0 1 14 60 Z',
+    'M14 47 H86',
+    'M46 34 H54',
+  ],
+  lid: [
+    'M14 44 A22 22 0 0 1 36 22 H64 A22 22 0 0 1 86 44 V60 A22 22 0 0 1 64 82 H36 A22 22 0 0 1 14 60 Z',
+    'M26 38 A12 12 0 0 1 38 26 H62 A12 12 0 0 1 74 38 V58 A12 12 0 0 1 62 70 H38 A12 12 0 0 1 26 58 Z',
+    'M34 44 H66',
+    'M34 52 H62',
+    'M34 60 H54',
+  ],
+  bud: [
+    'M32 32 A18 15 0 0 1 68 32 V40 A18 15 0 0 1 32 40 Z',
+    'M42 42 H58 V76 A8 8 0 0 1 42 76 Z',
+    'M42 62 H58',
+  ],
+  tips: [
+    'M22 72 C22 48 30 38 40 38 C50 38 58 48 58 72 C48 78 32 78 22 72 Z',
+    'M56 74 C56 56 62 48 70 48 C78 48 84 56 84 74 C76 79 64 79 56 74 Z',
+  ],
+};
+
+/** What is still riding on a surface, straight off the rule table. */
+const weightBehind = (panel: PanelId) =>
+  RULES.filter((r) => r.answerableFrom.includes(panel)).reduce((n, r) => n + r.weight, 0);
+const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
+
+const placed = PANELS.flatMap((panel) => {
+  const exposed = shown.includes(panel.id);
+  const marks = findings.filter((f) => f.panel === panel.id);
+  const weight = weightBehind(panel.id);
+  return panel.boxes.map((box, i) => {
+    const s = Math.min(box.w, box.h) / 100;
+    return {
+      panel,
+      box,
+      exposed,
+      weight,
+      figure: panel.figure ? FIGURES[panel.figure] : undefined,
+      scale: s,
+      ox: box.x + (box.w - 100 * s) / 2,
+      oy: box.y + (box.h - 100 * s) / 2,
+      // A panel drawn twice (the two side flaps) carries its marks once.
+      marks: i === 0 ? marks : [],
+      isPrimary: i === 0,
+    };
+  });
+});
+
+const markGlyph = (s: Status) => (s === 'FAIL' ? 'fail' : s === 'PASS' ? 'pass' : 'unknown');
+---
+
+<figure class="plot">
+  <svg viewBox={PLOT_VIEWBOX} class="plot-net" role="img"
+       aria-label="The AirPods Pro 2 carton laid flat, with each examined surface marked.">
+    <defs>
+      <pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse"
+               patternTransform="rotate(45)">
+        <line x1="0" y1="0" x2="0" y2="8" />
+      </pattern>
+    </defs>
+
+    {placed.map(({ panel, box, exposed, weight, figure, scale, ox, oy, marks, isPrimary }) => (
+      <g class:list={['panel', exposed ? 'is-exposed' : 'is-blank',
+                      panel.group === 'hardware' && 'is-hardware']}
+         data-panel={panel.id}>
+        <rect x={box.x} y={box.y} width={box.w} height={box.h} class="panel-field" />
+        {!exposed && (
+          <rect x={box.x} y={box.y} width={box.w} height={box.h} class="panel-hatch" />
+        )}
+        {panel.group === 'hardware' && (
+          <rect x={box.x} y={box.y} width={box.w} height={box.h} class="panel-edge" />
+        )}
+
+        {figure && (
+          <g transform={`translate(${ox} ${oy}) scale(${scale})`} class="figure">
+            {figure.map((d) => <path d={d} />)}
+          </g>
+        )}
+
+        {isPrimary && (
+          <text x={box.x + 10} y={box.y + 21} class="panel-label">
+            {(panel.plotLabel ?? panel.label).toUpperCase()}
+          </text>
+        )}
+        {isPrimary && panel.short && box.w >= 160 && !showWeights && (
+          <text x={box.x + 10} y={box.y + 40} class="panel-short">{panel.short}</text>
+        )}
+        {isPrimary && showWeights && weight > 0 && (
+          <text x={box.x + 10} y={box.y + 48} class="panel-weight">
+            {fmt(weight)}<tspan class="panel-weight-unit" dx="5">weight</tspan>
+          </text>
+        )}
+
+        {marks.map((m, i) => {
+          const mx = box.x + 10 + (i % 5) * 34;
+          const my = box.y + box.h - 42;
+          return (
+            <g class="mark-at" transform={`translate(${mx} ${my})`}>
+              <g class={`mark mark-${markGlyph(m.status)}`}>
+                <rect x="0" y="0" width="19" height="19" class="mark-box" />
+                {m.status === 'PASS' && <path d="M4 10 L8 14 L15.5 5.5" class="mark-tick" />}
+                {m.status === 'FAIL' && <path d="M3 3 L16 16 M16 3 L3 16" class="mark-strike" />}
+                <text x="9.5" y="31" class="mark-n">{m.n}</text>
+                <title>{`${m.n}. ${m.parameter} — ${m.status}`}</title>
+              </g>
+            </g>
+          );
+        })}
+      </g>
+    ))}
+
+    {FOLDS.map((d) => <path d={d} class="fold" />)}
+    <path d={CUT} class="cut" />
+  </svg>
+
+  <div class="plot-overlay">
+    {placed.filter((p) => p.isPrimary).map(({ panel, box, exposed }) => {
+      const style = `left:${pct(box.x, vbw, vbx)}%;top:${pct(box.y, vbh, vby)}%;` +
+        `width:${(box.w / vbw) * 100}%;height:${(box.h / vbh) * 100}%`;
+      if (!interactive) return <div class="panel-hit is-static" style={style}></div>;
+      const id = `shot-${panel.id}`;
+      return (
+        <label class="panel-hit" style={style} for={id} data-panel={panel.id}>
+          <input class="sr-only panel-file" type="file" id={id}
+                 name={`panel_${panel.id}`} accept="image/jpeg,image/png,image/webp,image/heic" />
+          <span class="sr-only">
+            {panel.label}{exposed ? ', photographed. Choose a different photograph.'
+                                  : ', not photographed. Add the photograph.'}
+            {panel.carries ? ` It carries: ${panel.carries}` : ''}
+          </span>
+          <span class="panel-hit-cue" aria-hidden="true">
+            {exposed ? 'replace' : 'add photo'}
+          </span>
+          <img class="panel-shot" alt="" hidden />
+        </label>
+      );
+    })}
+  </div>
+
+  {caption && <figcaption class="fine plot-caption">{caption}</figcaption>}
+</figure>
+
+<style>
+  .plot { margin: 0; position: relative; }
+
+  .plot-net { display: block; width: 100%; height: auto; overflow: visible; }
+
+  #hatch line { stroke: var(--paper-deep); stroke-width: 2.4; }
+
+  .panel-field { fill: var(--paper-field); }
+  .is-blank .panel-field { fill: var(--paper); }
+  .panel-hatch { fill: url(#hatch); }
+
+  /* The carton is one folded object: a solid cut edge, lighter folds inside. */
+  .cut {
+    fill: none;
+    stroke: var(--ink);
+    stroke-width: 2.4;
+    stroke-linejoin: miter;
+  }
+  .fold {
+    fill: none;
+    stroke: var(--intaglio);
+    stroke-width: 1;
+    stroke-dasharray: 9 5;
+    opacity: 0.85;
+  }
+
+  .panel-edge { fill: none; stroke: var(--intaglio); stroke-width: 1.4; }
+  .is-blank .panel-edge { stroke: var(--intaglio-soft); stroke-dasharray: 5 4; }
+
+  .figure path {
+    fill: none;
+    stroke: var(--intaglio);
+    stroke-width: 1.8;
+    stroke-linejoin: round;
+    vector-effect: non-scaling-stroke;
+  }
+  .is-blank .figure path { stroke: var(--intaglio-soft); }
+
+  .panel-label {
+    font-family: var(--narrow);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    fill: var(--intaglio);
+  }
+  .is-blank .panel-label { fill: var(--ink-soft); }
+
+  .panel-short {
+    font-family: var(--narrow);
+    font-size: 12px;
+    fill: var(--ink-soft);
+  }
+
+  .panel-weight {
+    font-family: var(--narrow);
+    font-size: 22px;
+    font-weight: 700;
+    fill: var(--intaglio);
+  }
+  .panel-weight-unit {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    fill: var(--ink-soft);
+  }
+
+  /* State is a struck mark, never a hue: every mark reads with colour removed. */
+  .mark-box { fill: var(--paper); stroke: var(--ink); stroke-width: 1.6; }
+  .mark-tick,
+  .mark-strike { fill: none; stroke-width: 2.4; stroke-linecap: square; }
+  .mark-tick { stroke: var(--intaglio); }
+  .mark-pass .mark-box { stroke: var(--intaglio); }
+  .mark-strike { stroke: var(--struck); }
+  .mark-fail .mark-box { stroke: var(--struck); }
+  .mark-unknown .mark-box { stroke: var(--ink-soft); stroke-dasharray: 3.5 3; }
+  .mark-n {
+    font-family: var(--narrow);
+    font-size: 13px;
+    font-weight: 700;
+    text-anchor: middle;
+    fill: var(--ink);
+  }
+  .mark-unknown .mark-n { fill: var(--ink-soft); }
+
+  .plot-overlay { position: absolute; inset: 0; }
+  @media (max-width: 720px) {
+    .plot { position: relative; }
+  }
+
+  .panel-hit {
+    position: absolute;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    overflow: hidden;
+    display: grid;
+    place-items: center;
+  }
+  .panel-hit.is-static { pointer-events: none; }
+
+  label.panel-hit { cursor: pointer; }
+  label.panel-hit:focus-within { outline: 2px solid var(--intaglio); outline-offset: 2px; }
+
+  .panel-hit-cue {
+    font-family: var(--narrow);
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--paper);
+    background: var(--intaglio);
+    padding: 3px 7px;
+    opacity: 0;
+    transition: opacity 140ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  label.panel-hit:hover .panel-hit-cue,
+  label.panel-hit:focus-within .panel-hit-cue,
+  label.panel-hit.is-loaded .panel-hit-cue { opacity: 1; }
+  label.panel-hit.is-loaded .panel-hit-cue { background: var(--ink); }
+
+  .panel-shot {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0.42;
+    mix-blend-mode: multiply;
+  }
+  .panel-shot[hidden] { display: none; }
+
+  /* At arm's length on a phone the plot is ~340px wide, so its type is set in
+     user units large enough to survive that scale rather than shrinking with it. */
+  /* On a phone the column is ~340px. Shrinking a 960-unit plot into that makes
+     its type illegible, so the drawing keeps a usable size and pans instead —
+     which also keeps the tap targets big enough to hit at a meet-up. */
+  @media (max-width: 720px) {
+    .plot {
+      overflow-x: auto;
+      overscroll-behavior-x: contain;
+      padding-bottom: calc(var(--u) * 1);
+    }
+    .plot-net { min-width: 560px; }
+    .plot-overlay { min-width: 560px; }
+    .panel-label { font-size: 15px; }
+    .panel-short { font-size: 13px; }
+    .panel-hit-cue { font-size: 9px; padding: 2px 5px; letter-spacing: 0.12em; }
+  }
+</style>

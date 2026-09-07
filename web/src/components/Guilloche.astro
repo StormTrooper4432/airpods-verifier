@@ -1,0 +1,85 @@
+---
+/**
+ * The security border: two interwoven sinusoids and a fine third, drawn to
+ * length so the tile repeats seamlessly. Real engine-turned ornament, not a
+ * decorative rule.
+ */
+const TILE = 120;
+const DEPTH = 22;
+const SAMPLES = 200;
+
+function wave(amp: number, periods: number, phase: number, vertical: boolean) {
+  const mid = DEPTH / 2;
+  const pts: string[] = [];
+  for (let i = 0; i <= SAMPLES; i++) {
+    const t = (TILE * i) / SAMPLES;
+    const off = mid + amp * Math.sin((2 * Math.PI * periods * i) / SAMPLES + phase);
+    const [x, y] = vertical ? [off, t] : [t, off];
+    pts.push(`${i === 0 ? 'M' : 'L'}${x.toFixed(2)} ${y.toFixed(2)}`);
+  }
+  return pts.join(' ');
+}
+
+function strip(vertical: boolean, stroke: string) {
+  const w = vertical ? DEPTH : TILE;
+  const h = vertical ? TILE : DEPTH;
+  const bands = [
+    { d: wave(7.4, 2, 0, vertical), o: 1 },
+    { d: wave(7.4, 2, Math.PI, vertical), o: 1 },
+    { d: wave(3.4, 6, Math.PI / 2, vertical), o: 0.65 },
+    { d: wave(1.2, 12, 0, vertical), o: 0.4 },
+  ];
+  const paths = bands
+    .map((b) => `<path d="${b.d}" opacity="${b.o}"/>`)
+    .join('');
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">` +
+    `<g fill="none" stroke="${stroke}" stroke-width="0.85">${paths}</g></svg>`;
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+}
+
+const INK = '#0b6b4f';
+const horizontal = strip(false, INK);
+const vertical = strip(true, INK);
+---
+
+<div class="guilloche" aria-hidden="true">
+  <span class="g g-top"></span>
+  <span class="g g-bottom"></span>
+  <span class="g g-left"></span>
+  <span class="g g-right"></span>
+</div>
+
+<style define:vars={{ horizontal, vertical, depth: `${DEPTH}px` }}>
+  .guilloche {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 2;
+  }
+  .g { position: absolute; opacity: 0.85; }
+  .g-top,
+  .g-bottom {
+    left: 0;
+    right: 0;
+    height: var(--depth);
+    background-image: var(--horizontal);
+    background-repeat: repeat-x;
+  }
+  .g-top { top: 0; }
+  .g-bottom { bottom: 0; transform: scaleY(-1); }
+  .g-left,
+  .g-right {
+    top: 0;
+    bottom: 0;
+    width: var(--depth);
+    background-image: var(--vertical);
+    background-repeat: repeat-y;
+  }
+  .g-left { left: 0; }
+  .g-right { right: 0; transform: scaleX(-1); }
+
+  @media (max-width: 720px) {
+    .g-left, .g-right { display: none; }
+  }
+</style>

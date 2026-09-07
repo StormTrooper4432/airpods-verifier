@@ -1,0 +1,132 @@
+---
+/** The graded rows. One line per check, its source in fine print beneath it. */
+import Mark from './Mark.astro';
+import { RULE_BY_PARAMETER, type EvidenceItem } from '../data/sheet';
+
+interface Props {
+  items: EvidenceItem[];
+  striking?: boolean;
+  /** Filed records print every check, but only argue the struck ones. */
+  condensed?: boolean;
+}
+const { items, striking = false, condensed = false } = Astro.props;
+
+const rows = items.map((item, i) => {
+  const rule = RULE_BY_PARAMETER[item.parameter];
+  return {
+    n: i + 1,
+    item,
+    weight: rule?.weight ?? 0,
+    informational: Boolean(rule?.informational),
+    disqualifying: Boolean(rule?.disqualifying),
+  };
+});
+---
+
+<ol class:list={['ledger', striking && 'is-striking', condensed && 'is-condensed']}>
+  {rows.map(({ n, item, weight, informational, disqualifying }) => (
+    <li class={`row row-${item.status.toLowerCase()}`} style={`--strike-order:${n}`}>
+      <span class="row-n" aria-hidden="true">{String(n).padStart(2, '0')}</span>
+      <span class="row-mk"><Mark status={item.status} /></span>
+      <div class="row-body">
+        <h3 class="row-param">{item.parameter}</h3>
+        <p class="row-meta caps">
+          Tier {item.tier}
+          <span class="sep" aria-hidden="true">/</span>
+          {informational
+            ? 'informational, does not vote'
+            : `weight ${weight.toFixed(1)}${disqualifying ? ', disqualifying' : ''}`}
+        </p>
+        {(!condensed || item.status === 'FAIL') && (
+          <>
+            <p class="row-detail">{item.detail}</p>
+            <p class="fine row-source"><span class="caps src-key">Source</span>{item.source}</p>
+          </>
+        )}
+      </div>
+    </li>
+  ))}
+</ol>
+
+<style>
+  .ledger {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    counter-reset: row;
+  }
+
+  .row {
+    display: grid;
+    grid-template-columns: calc(var(--u) * 4) calc(var(--u) * 3) 1fr;
+    gap: 0 calc(var(--u) * 1.5);
+    padding: calc(var(--u) * 2) 0 calc(var(--u) * 2.5);
+    /* The printed rule of a ruled record, in the register colour. */
+    border-bottom: 1px solid var(--intaglio-hair);
+  }
+  .row:first-child { padding-top: 0; }
+  .row:last-child { border-bottom: 0; }
+
+  .row-n {
+    font-family: var(--narrow);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--intaglio);
+    line-height: calc(var(--u) * 3);
+  }
+  .row-unknown .row-n { color: var(--ink-soft); }
+
+  .row-mk { padding-top: calc(var(--u) * 0.5); }
+
+  .row-param {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: -0.011em;
+    line-height: calc(var(--u) * 3);
+  }
+  .row-fail .row-param { color: var(--struck); }
+
+  .row-meta {
+    margin: 0 0 calc(var(--u) * 1);
+    font-size: 10.5px;
+    letter-spacing: 0.15em;
+    color: var(--ink-soft);
+  }
+  .sep { padding: 0 0.5em; color: var(--intaglio); }
+
+  .row-detail {
+    margin: 0 0 calc(var(--u) * 1);
+    max-width: 68ch;
+    line-height: calc(var(--u) * 3);
+  }
+
+  .row-source { margin: 0; max-width: 72ch; }
+  .src-key {
+    font-size: 9.5px;
+    color: var(--intaglio);
+    margin-right: 0.7em;
+  }
+
+  /* The one authored moment: marks strike onto the sheet in ledger order. */
+  .is-striking .row-mk,
+  .is-striking .row-n {
+    animation: strike-on 420ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+    animation-delay: calc(var(--strike-order) * 55ms);
+  }
+  @keyframes strike-on {
+    from { opacity: 0; transform: translateY(-3px) scale(1.35); filter: blur(1.5px); }
+    to   { opacity: 1; transform: none; filter: none; }
+  }
+
+  .is-condensed .row { padding: calc(var(--u) * 1.25) 0; }
+  .is-condensed .row-param { font-size: 15px; }
+  .is-condensed .row-meta { margin-bottom: 0; }
+  .is-condensed .row-fail { padding-bottom: calc(var(--u) * 2.5); }
+  .is-condensed .row-fail .row-meta { margin-bottom: calc(var(--u) * 1); }
+
+  @media (max-width: 900px) {
+    .row { grid-template-columns: calc(var(--u) * 3.5) calc(var(--u) * 3) 1fr; }
+    .row-param { font-size: 16px; }
+  }
+</style>
