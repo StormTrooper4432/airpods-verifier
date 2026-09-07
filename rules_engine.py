@@ -186,10 +186,15 @@ class Rule:
     source: str
     #: Observation-only rules never contribute a FAIL and carry no weight.
     informational: bool = False
-    #: Panels that can answer this rule. Empty means "any image might".
+    #: Panels ANY of which can answer this rule. Empty means "any image might".
     #: Used to tell "you did not photograph this" apart from "I looked and it
     #: was not legible" - two UNKNOWNs that need completely different advice.
     answerable_from: tuple[str, ...] = ()
+    #: Panels ALL of which are needed. A cross-check between two surfaces is not
+    #: answerable from either one alone, so without this the advice reads
+    #: "re-shoot what you sent" when the real problem is a surface never
+    #: photographed at all.
+    requires_panels: tuple[str, ...] = ()
 
 
 # --------------------------------------------------------------------------- #
@@ -804,6 +809,12 @@ RULES: tuple[Rule, ...] = (
             "Apple 'Identify your AirPods' (serial is on the underside of the case lid)"
         ),
         answerable_from=("box_bottom_label", "case_lid_underside", "earbud"),
+        # A cross-check needs BOTH surfaces. Holding only the box label cannot
+        # answer it, and saying "re-shoot what you sent" when the case was never
+        # opened is useless advice - the case lid is the single most valuable
+        # photograph a buyer can take, since it is what a cloned serial cannot
+        # survive.
+        requires_panels=("box_bottom_label", "case_lid_underside"),
     ),
     Rule(
         tier=2,
@@ -923,7 +934,10 @@ def evaluate(
             # Two very different UNKNOWNs: the panel that answers this rule was
             # never photographed, or it was and the value still could not be
             # read. Only the first is fixed by taking another photo.
-            if rule.answerable_from and not (shown & set(rule.answerable_from)):
+            missing_required = set(rule.requires_panels) - shown
+            if missing_required:
+                unanswerable.append(rule)
+            elif rule.answerable_from and not (shown & set(rule.answerable_from)):
                 unanswerable.append(rule)
             elif shown:
                 unreadable.append(rule)
@@ -988,7 +1002,7 @@ def _next_steps(
         # Which unshown panel would unblock the most outstanding checks?
         tally: dict[str, list[str]] = {}
         for rule in remaining:
-            for panel in rule.answerable_from:
+            for panel in tuple(rule.requires_panels) + tuple(rule.answerable_from):
                 if panel not in shown and panel in PANEL_REQUESTS:
                     tally.setdefault(panel, []).append(rule.parameter)
         if not tally:
@@ -1005,7 +1019,10 @@ def _next_steps(
         best = max(tally, key=rank)
         resolved = sorted(set(tally[best]))
         steps.append(f"{PANEL_REQUESTS[best]} (resolves: {', '.join(resolved)})")
-        remaining = [rule for rule in remaining if best not in rule.answerable_from]
+        remaining = [
+            rule for rule in remaining
+            if best not in rule.answerable_from and best not in rule.requires_panels
+        ]
 
     for rule in unreadable:
         steps.append(

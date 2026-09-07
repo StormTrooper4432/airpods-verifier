@@ -1227,3 +1227,38 @@ class TestInconclusiveIsNotConfidence:
     def test_a_decided_verdict_still_reports_confidence(self):
         text = cli.render_report(evaluate(make_extraction(), GOOD_FONT), color=False)
         assert "Confidence:" in text
+
+
+class TestRulesNeedingSeveralPanels:
+    """A cross-check between two surfaces is not answerable from either alone.
+    Without that distinction the tool told a buyer who had photographed the box
+    thoroughly to "re-shoot in even light", when the real problem was that the
+    case had never been opened."""
+
+    def test_it_asks_for_the_case_lid_not_a_reshoot(self):
+        report = evaluate(make_extraction(
+            serial_case_lid=None, serial_left_earbud=None, serial_right_earbud=None,
+            visible_panels=["box_front", "box_back", "box_bottom_label"],
+        ))
+        steps = " ".join(report.next_steps)
+        assert "underside of the lid" in steps
+        assert "re-shoot" not in steps
+
+    def test_the_cross_match_rule_declares_both_surfaces(self):
+        rule = next(r for r in RULES if r.parameter == "Serial Cross-Match")
+        assert set(rule.requires_panels) == {"box_bottom_label", "case_lid_underside"}
+
+    def test_a_single_panel_rule_is_unaffected(self):
+        # Serial Label Format needs only the box label, and should still be
+        # treated as unreadable rather than unphotographed when it is present.
+        report = evaluate(make_extraction(
+            serial_label_literal=None, visible_panels=["box_bottom_label"],
+        ))
+        steps = " ".join(report.next_steps)
+        assert "Serial Label Format" in steps and "re-shoot" in steps
+
+    def test_having_every_required_panel_removes_the_request(self):
+        report = evaluate(make_extraction(
+            visible_panels=["box_bottom_label", "case_lid_underside", "box_back"],
+        ))
+        assert not any("underside of the lid" in step for step in report.next_steps)
