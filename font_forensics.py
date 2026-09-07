@@ -568,6 +568,13 @@ def find_text_lines(
         else:
             rows.append([box])
 
+    # Split each row at column gaps. Apple's label sets a multilingual paragraph
+    # beside a part-number block, and grouping purely by vertical overlap puts
+    # unrelated words from both columns on one detected line - 55 components
+    # where the intended text has 34. A column gap is far wider than a word gap,
+    # so the same median-multiple test separates them.
+    rows = [segment for row in rows for segment in _split_at_column_gaps(row)]
+
     lines: list[TextLine] = []
     for row in rows:
         if len(row) < min_glyphs:
@@ -591,6 +598,35 @@ def find_text_lines(
         )
     lines.sort(key=lambda line: line.box[1])
     return lines
+
+
+def _split_at_column_gaps(
+    row: list[tuple[int, int, int, int]], gap_multiple: float = 6.0
+) -> list[list[tuple[int, int, int, int]]]:
+    """Split one detected row wherever a gap is far wider than a word space.
+
+    Word gaps sit around twice the median inter-glyph gap; a column gutter is an
+    order of magnitude wider. The multiple is deliberately high so ordinary word
+    spacing never splits a line.
+    """
+    if len(row) < 2:
+        return [row]
+
+    ordered = sorted(row, key=lambda box: box[0])
+    gaps = [ordered[i + 1][0] - ordered[i][2] for i in range(len(ordered) - 1)]
+    positive = [gap for gap in gaps if gap > 0]
+    if not positive:
+        return [ordered]
+    typical = _median([float(gap) for gap in positive])
+    threshold = max(typical * gap_multiple, 1.0)
+
+    segments: list[list[tuple[int, int, int, int]]] = [[ordered[0]]]
+    for gap, box in zip(gaps, ordered[1:]):
+        if gap > threshold:
+            segments.append([box])
+        else:
+            segments[-1].append(box)
+    return segments
 
 
 def adaptive_ink_mask(image: Image.Image, radius: int = 12, offset: int = 10) -> Image.Image:
@@ -776,6 +812,31 @@ def analyse_label(
     return score_font_match(comparisons, heights)
 
 
+def _split_into_words(
+    boxes: list[tuple[int, int, int, int]], gap_multiple: float = 1.8
+) -> list[list[tuple[int, int, int, int]]]:
+    """Group left-to-right components into words by horizontal gap.
+
+    Inter-word gaps are markedly wider than inter-letter gaps, so the median gap
+    on a line separates the two without needing to know the text.
+    """
+    if len(boxes) < 2:
+        return [boxes] if boxes else []
+
+    gaps = [boxes[i + 1][0] - boxes[i][2] for i in range(len(boxes) - 1)]
+    positive = [gap for gap in gaps if gap > 0]
+    typical = _median([float(g) for g in positive]) if positive else 0.0
+    threshold = max(typical * gap_multiple, 1.0)
+
+    groups: list[list[tuple[int, int, int, int]]] = [[boxes[0]]]
+    for gap, box in zip(gaps, boxes[1:]):
+        if gap > threshold:
+            groups.append([box])
+        else:
+            groups[-1].append(box)
+    return groups
+
+
 def measure_components(
     image: Image.Image, boxes: list[tuple[int, int, int, int]], expected_text: str
 ) -> list[GlyphComparison]:
@@ -788,9 +849,41 @@ def measure_components(
     the filters themselves differed. One segmentation, one component list, one
     count.
     """
-    letters = [c for c in expected_text if not c.isspace() and c not in _SHORT_MARKS]
     ordered = sorted(boxes, key=lambda box: box[0])
-    if len(ordered) != len(letters):
+    if not ordered:
+        return []
+
+    # Pair word by word rather than demanding the whole line match exactly.
+    # Requiring global equality made real print unusable: glyphs touch, glyphs
+    # break, punctuation segments unpredictably, and a two-column label puts
+    # unrelated words on one detected row - any one of which discarded the
+    # entire line. Word-level alignment loses only the word that went wrong.
+    groups = _split_into_words(ordered)
+    expected_words = [
+        "".join(c for c in word if c not in _SHORT_MARKS)
+        for word in expected_text.split()
+    ]
+    expected_words = [word for word in expected_words if word]
+
+    pairs: list[tuple[str, tuple[int, int, int, int]]] = []
+    if len(groups) == len(expected_words):
+        # Word counts agree: pair the words that also agree on length.
+        for group, word in zip(groups, expected_words):
+            if len(group) == len(word):
+                pairs.extend(zip(word, group))
+    else:
+        # Word counts disagree, so position is unreliable. Fall back to matching
+        # each expected word against a group of the same length, in order,
+        # consuming groups as they are used.
+        remaining = list(groups)
+        for word in expected_words:
+            for index, group in enumerate(remaining):
+                if len(group) == len(word):
+                    pairs.extend(zip(word, group))
+                    remaining = remaining[index + 1:]
+                    break
+
+    if not pairs:
         return []
 
     heights = [float(box[3] - box[1]) for box in ordered]
@@ -799,7 +892,7 @@ def measure_components(
     _, image_height = image.size
 
     results: list[GlyphComparison] = []
-    for character, box in zip(letters, ordered):
+    for character, box in pairs:
         if character not in USABLE_GLYPHS:
             continue
         if (box[3] - box[1]) > ceiling:          # merged with a neighbouring mark
