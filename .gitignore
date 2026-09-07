@@ -20,3 +20,7 @@ extraction*.json
 # Scraped corpus: other people's photos. Evaluate against them, don't republish.
 corpus/
 results/
+
+# Genuine reference photographs (owner's own units). Measurements derived from
+# them live in knowledge/*.yaml; the images themselves stay local.
+knowledge/real_*/

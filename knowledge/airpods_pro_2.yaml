@@ -113,6 +113,56 @@ copyright_years:
     max: 2025
     source: apple-identify (introduced 2022); owner (observed ceiling 2025)
 
+# Regional box variants. Packaging CONTENT varies by region - languages,
+# regulatory marks, part-number suffix - so a rule written against one region's
+# box does not transfer. Typography does NOT vary: Apple sets every region in
+# San Francisco, so the font baseline below is region-independent even though
+# the reference photographs are North American.
+#
+# Only NA is characterised. Do not write content rules for other regions
+# without a genuine reference box from that region.
+regions:
+  - code: AM/A
+    name: North America
+    reference_photos: knowledge/real_app2
+    reference_part_number: MTJV3AM/A
+    observed_on_label:
+      - "MTJV3AM/A  AirPods Pro (2nd generation)"
+      - "Designed by Apple in California. Assembled in Vietnam."
+      - "Model A3047 A3048 A2968"
+      - "(S) Serial No. <redacted>"
+    regulatory_marks: [CSA (Energy Verified Only)]
+    languages: [English, French, Japanese, Spanish]
+    source: owner (genuine unit, photographed 2026-09-06)
+  - code: ZP/A
+    name: Hong Kong
+    status: uncharacterised
+    source: community-guide (mentioned only)
+  - code: ZA/A
+    name: Malaysia / Thailand
+    status: uncharacterised
+    source: community-guide (mentioned only)
+
+# Measured against a confirmed-genuine North American label. Seven usable glyphs
+# from "(S) Serial No. <redacted>" sat at 1.68% mean deviation from San
+# Francisco, 3.34% worst case - so genuine print lands well inside the 8%
+# provisional threshold. ONE label is a sanity check, not a calibration; a real
+# threshold needs several genuine boxes and at least one confirmed counterfeit.
+font_baseline:
+  reference_font: San Francisco (/System/Library/Fonts/SFNS.ttf)
+  measured_on: knowledge/real_app2/IMG_6337.JPG
+  region: AM/A
+  line: "(S) Serial No. <redacted>"
+  glyphs_measured: 7
+  mean_absolute_deviation_percent: 1.68
+  max_absolute_deviation_percent: 3.34
+  excluded_glyph: Q
+  excluded_reason: >-
+    Both Q's measured -8.6% and -12.1% on genuine print. SF's Q has a tail
+    crossing the bowl whose survival through printing and segmentation varies.
+    Passed the synthetic screen; failed against reality.
+  source: owner (genuine unit) + measurement
+
 packaging:
   shrinkwrap:
     # Contradicts the common "wrapped = fake" claim, and contradicts the

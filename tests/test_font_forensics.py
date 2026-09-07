@@ -156,3 +156,56 @@ class TestRuledOutApproaches:
         )
         assert metric_gap > 20.0
         assert ink_gap < 6.0
+
+
+class TestGenuineBaseline:
+    """Measured against a confirmed-genuine North American label. These pin the
+    empirical findings that synthetic rendering could not have predicted."""
+
+    def test_q_is_excluded_by_evidence_not_by_the_synthetic_screen(self):
+        # Q clears the signal-to-noise bar on rendered glyphs...
+        result = ff.measure_glyph_signal_to_noise("Q")
+        assert result is not None and result[2] >= 3.0
+        # ...and still must not be used, because genuine print disagrees.
+        assert "Q" in ff.EMPIRICALLY_EXCLUDED_GLYPHS
+        assert "Q" not in ff.USABLE_GLYPHS
+
+    def test_derived_set_subtracts_the_empirical_exclusions(self):
+        assert ff.derive_usable_glyphs() == set(ff.USABLE_GLYPHS)
+        assert not (ff.EMPIRICALLY_EXCLUDED_GLYPHS & ff.USABLE_GLYPHS)
+
+    def test_the_genuine_baseline_sits_well_inside_the_threshold(self):
+        # Recorded in knowledge/airpods_pro_2.yaml: 1.68% mean, 3.34% worst on a
+        # genuine label. If a change pushes genuine print near the threshold,
+        # the threshold is wrong or the measurement drifted.
+        import yaml
+
+        knowledge = yaml.safe_load(open("knowledge/airpods_pro_2.yaml", encoding="utf-8"))
+        baseline = knowledge["font_baseline"]
+        assert baseline["max_absolute_deviation_percent"] < ff.PROVISIONAL_DEVIATION_THRESHOLD
+        assert baseline["excluded_glyph"] == "Q"
+
+
+class TestSegmentation:
+    def test_stacked_components_merge_into_one_glyph(self):
+        # A dotted "i" is two ink-disconnected pieces in the same column.
+        image = Image.new("L", (60, 100), 255)
+        image.paste(0, (20, 10, 32, 22))    # the dot
+        image.paste(0, (20, 35, 32, 90))    # the stem
+        assert len(ff.segment_glyphs(image, min_ink_pixels=10)) == 1
+
+    def test_separate_glyphs_stay_separate(self):
+        image = Image.new("L", (120, 100), 255)
+        image.paste(0, (10, 20, 40, 80))
+        image.paste(0, (70, 20, 100, 80))
+        assert len(ff.segment_glyphs(image, min_ink_pixels=10)) == 2
+
+    def test_otsu_beats_a_fixed_threshold_on_off_white_paper(self):
+        paper = Image.new("L", (100, 60), 205)   # off-white, as photographed
+        paper.paste(60, (20, 15, 50, 45))        # grey ink, not black
+        assert 60 < ff.otsu_threshold(paper) < 205
+
+    def test_a_mismatched_line_is_refused_rather_than_mispaired(self):
+        image = Image.new("L", (120, 100), 255)
+        image.paste(0, (10, 20, 40, 80))
+        assert ff.compare_text_line(image, "AB") == []

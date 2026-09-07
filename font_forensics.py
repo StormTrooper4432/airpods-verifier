@@ -68,7 +68,16 @@ _INK_THRESHOLD = 200
 #: Glyphs whose ink aspect ratio separates SF from substitutes by at least 3x
 #: the drift blur induces. Measured, not chosen: P, N, X, Y, H and W all fall
 #: below that bar and are excluded - their blur drift rivals the font signal.
-USABLE_GLYPHS = frozenset("5ETCR3S4GOZF8KQ1092")
+USABLE_GLYPHS = frozenset("5ETCR3S4GOZF8K1092")
+
+#: Passed the synthetic signal-to-noise screen but failed against real print.
+#: Both Q's on a confirmed-genuine North American label measured -8.6% and
+#: -12.1% against the SF reference - systematic, not noise. SF's Q carries a
+#: tail that crosses the bowl, and how much of it survives printing and
+#: segmentation varies. Synthetic renders cannot surface this; only genuine
+#: photographs can, which is why the empirical baseline matters more than the
+#: theoretical screen.
+EMPIRICALLY_EXCLUDED_GLYPHS = frozenset("Q")
 
 #: A single glyph deviating this far from SF is worth reporting. Set from the
 #: measured blur ceiling (~4%) with headroom, NOT from a labelled corpus - no
@@ -163,13 +172,151 @@ def measure_glyph_signal_to_noise(
 
 
 def derive_usable_glyphs(minimum_ratio: float = 3.0) -> set[str]:
-    """Re-derive USABLE_GLYPHS from measurement. Used by the test suite."""
+    """Re-derive the glyph set from measurement. Used by the test suite.
+
+    Returns the synthetic screen only; glyphs excluded by evidence from real
+    photographs are subtracted separately, since no amount of rendering can
+    predict them.
+    """
     usable = set()
     for character in string.ascii_uppercase + string.digits:
         result = measure_glyph_signal_to_noise(character)
         if result and result[2] >= minimum_ratio:
             usable.add(character)
-    return usable
+    return usable - EMPIRICALLY_EXCLUDED_GLYPHS
+
+
+def segment_glyphs(
+    image: Image.Image,
+    *,
+    threshold: int = _INK_THRESHOLD,
+    min_ink_pixels: int = 12,
+) -> list[tuple[tuple[int, int, int, int], Image.Image]]:
+    """Split a cropped, upright text line into individual glyph images.
+
+    Connected-component labelling over the inked pixels, returned left to right.
+    Pure Python: a text line is a few hundred thousand pixels at most, and
+    avoiding numpy/OpenCV keeps this runnable anywhere the rest of the pipeline
+    runs.
+
+    Note that components are ink-connected, so a dotted or split glyph ("i", or
+    a character broken by print wear) arrives as separate pieces. Callers match
+    components against known text positionally rather than assuming one
+    component per character.
+    """
+    grey = image.convert("L")
+    width, height = grey.size
+    pixels = grey.load()
+
+    visited = bytearray(width * height)
+    components: list[tuple[int, int, int, int]] = []
+
+    for start_y in range(height):
+        for start_x in range(width):
+            index = start_y * width + start_x
+            if visited[index] or pixels[start_x, start_y] >= threshold:
+                continue
+            # Iterative flood fill; recursion would blow the stack on a long line.
+            stack = [(start_x, start_y)]
+            visited[index] = 1
+            min_x = max_x = start_x
+            min_y = max_y = start_y
+            count = 0
+            while stack:
+                x, y = stack.pop()
+                count += 1
+                min_x, max_x = min(min_x, x), max(max_x, x)
+                min_y, max_y = min(min_y, y), max(max_y, y)
+                for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (-1, -1), (1, -1), (-1, 1)):
+                    nx, ny = x + dx, y + dy
+                    if 0 <= nx < width and 0 <= ny < height:
+                        n_index = ny * width + nx
+                        if not visited[n_index] and pixels[nx, ny] < threshold:
+                            visited[n_index] = 1
+                            stack.append((nx, ny))
+            if count >= min_ink_pixels:
+                components.append((min_x, min_y, max_x + 1, max_y + 1))
+
+    components.sort(key=lambda box: box[0])
+    components = _merge_stacked(components)
+    return [(box, image.crop(box)) for box in components]
+
+
+def _merge_stacked(
+    boxes: list[tuple[int, int, int, int]], overlap: float = 0.6
+) -> list[tuple[int, int, int, int]]:
+    """Merge components stacked vertically over the same x-range.
+
+    A dotted glyph ("i", "j") or an accented one arrives as two ink-disconnected
+    pieces occupying the same column. Without this, component count never
+    matches character count and the whole line is rejected.
+    """
+    merged: list[tuple[int, int, int, int]] = []
+    for box in boxes:
+        if merged:
+            previous = merged[-1]
+            span = min(box[2], previous[2]) - max(box[0], previous[0])
+            narrower = min(box[2] - box[0], previous[2] - previous[0])
+            if narrower > 0 and span / narrower >= overlap:
+                merged[-1] = (
+                    min(previous[0], box[0]), min(previous[1], box[1]),
+                    max(previous[2], box[2]), max(previous[3], box[3]),
+                )
+                continue
+        merged.append(box)
+    return merged
+
+
+def otsu_threshold(image: Image.Image) -> int:
+    """Threshold that best separates ink from paper in THIS image.
+
+    A fixed threshold works on synthetic renders and fails on photographs, where
+    paper is off-white and unevenly lit.
+    """
+    histogram = image.convert("L").histogram()
+    total = sum(histogram)
+    total_intensity = sum(index * count for index, count in enumerate(histogram))
+    best_threshold, best_variance = 128, -1.0
+    background_weight = background_intensity = 0
+    for threshold in range(1, 255):
+        background_weight += histogram[threshold - 1]
+        background_intensity += (threshold - 1) * histogram[threshold - 1]
+        foreground_weight = total - background_weight
+        if background_weight == 0 or foreground_weight == 0:
+            continue
+        background_mean = background_intensity / background_weight
+        foreground_mean = (total_intensity - background_intensity) / foreground_weight
+        variance = background_weight * foreground_weight * (background_mean - foreground_mean) ** 2
+        if variance > best_variance:
+            best_variance, best_threshold = variance, threshold
+    return best_threshold
+
+
+def compare_text_line(image: Image.Image, expected_text: str) -> list[GlyphComparison]:
+    """Measure a photographed text line against San Francisco.
+
+    ``expected_text`` is what the line says - supplied by the extractor, since
+    reading text is what an LLM is good at. Only characters in USABLE_GLYPHS are
+    measured; the rest carry too little signal to survive blur.
+    """
+    segments = segment_glyphs(image, threshold=otsu_threshold(image), min_ink_pixels=25)
+    letters = [c for c in expected_text if not c.isspace()]
+    if len(segments) != len(letters):
+        # Component count and character count disagree - split or merged glyphs.
+        # Refuse rather than silently pairing the wrong shapes together.
+        return []
+
+    results: list[GlyphComparison] = []
+    for character, (_, glyph) in zip(letters, segments):
+        # Case must NOT be normalised. USABLE_GLYPHS was derived for uppercase
+        # and digits; comparing a lowercase "e" against an uppercase "E"
+        # reference reads as a 34% deviation on a genuine label.
+        if character not in USABLE_GLYPHS:
+            continue
+        comparison = compare_glyph(character, glyph)
+        if comparison is not None:
+            results.append(comparison)
+    return results
 
 
 def sf_available() -> bool:
