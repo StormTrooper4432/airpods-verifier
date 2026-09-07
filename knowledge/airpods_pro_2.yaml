@@ -600,13 +600,17 @@ pooling_measurements:
 # photographs.
 
 pending_rules:
-  - id: serial_cross_match
-    statement: >-
-      Box serial must match the case-lid serial. Each earbud carries its own
-      serial, longer than and different from the case serial. An earbud serial
-      equal to the case or box serial means counterfeit.
-    blocked_on: Extraction of multiple serials tagged by panel.
-    source: community-guide
+  # IMPLEMENTED as the Serial Cross-Match rule (Tier 1, disqualifying).
+  # The only check here that cannot be defeated by cloning: it asks whether one
+  # item's identifiers agree with each other, not whether a serial exists in
+  # Apple's records. A counterfeiter copying a genuine serial passes
+  # checkcoverage.apple.com but would have to reproduce four consistent serials
+  # across box, case lid and both earbuds to pass this.
+  #
+  # The "longer than the case" clause from the guide is deliberately NOT
+  # implemented. Apple's own serial lengths vary (10 and 12 characters both
+  # appear on the owner's genuine units), and no source states the earbud serial
+  # is always longer, so that would be an invented specification.
   - id: missing_accents
     statement: >-
       Accented characters rendered without their accents (e.g. "inalambricos"

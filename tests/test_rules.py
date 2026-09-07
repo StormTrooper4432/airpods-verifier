@@ -43,6 +43,10 @@ GENUINE_USB_C = {
     "extracted_model_number": "A3047",
     "extracted_serial_number": "H4XQ7K2LMN9P",
     "serial_label_literal": "(S) Serial No. H4XQ7K2LMN9P",
+    # Box and case agree; each earbud carries its own distinct serial.
+    "serial_case_lid": "H4XQ7K2LMN9P",
+    "serial_left_earbud": "GX7RT4PQWZ81",
+    "serial_right_earbud": "KM3PD9TLVN52",
     "label_image_index": None,
     "label_left": None,
     "label_top": None,
@@ -475,18 +479,22 @@ class TestVerdictAggregation:
         assert 0.9 <= report.confidence_score <= 0.95
 
     def test_stacked_disqualifiers_raise_confidence(self):
-        one = evaluate(make_extraction(has_plastic_shrinkwrap=True))
-        two = evaluate(make_extraction(has_plastic_shrinkwrap=True, copyright_year=2019))
+        # Wrap alone is no longer a finding - it needs the missing pull tab,
+        # which is the objective half of that rule.
+        wrapped = dict(has_plastic_shrinkwrap=True, shrinkwrap_has_pull_tab=False)
+        one = evaluate(make_extraction(**wrapped))
+        two = evaluate(make_extraction(**wrapped, copyright_year=2019))
         three = evaluate(
-            make_extraction(
-                has_plastic_shrinkwrap=True, copyright_year=2019, extracted_model_number="B1234"
-            )
+            make_extraction(**wrapped, copyright_year=2019, extracted_model_number="B1234")
         )
         assert one.confidence_score < two.confidence_score < three.confidence_score
         assert three.confidence_score <= 0.99
 
     def test_soft_signals_alone_flag_risk_with_lower_confidence(self):
-        soft = evaluate(make_extraction(extracted_serial_number="TOO-SHORT"))
+        # Serial format is soft; keep the cross-match consistent so only the
+        # format rule fires.
+        soft = evaluate(make_extraction(
+            extracted_serial_number="TOOSHORT", serial_case_lid="TOOSHORT"))
         hard = evaluate(make_extraction(has_plastic_shrinkwrap=True))
         assert soft.summary_verdict is Verdict.HIGH_RISK_SUSPECTED
         assert soft.confidence_score < hard.confidence_score
@@ -992,3 +1000,63 @@ class TestCaseSerialSuffixes:
             e for e in KNOWLEDGE["case_serial_suffixes"]["A2190"] if 1059 in e["suffixes"]
         )
         assert entry["case"] == "MagSafe Charging Case for AirPods Pro 1"
+
+
+class TestSerialCrossMatch:
+    """The strongest check available that needs no reference data: it asks only
+    whether one item's identifiers agree with each other. That makes it immune
+    to the attack this project exists to detect - a serial cloned from a genuine
+    unit, which passes Apple's own coverage lookup."""
+
+    def test_a_consistent_set_passes(self):
+        report = evaluate(make_extraction())
+        assert status_of(report, "Serial Cross-Match") is EvidenceStatus.PASS
+
+    def test_box_and_case_must_agree(self):
+        report = evaluate(make_extraction(serial_case_lid="DIFFERENT99X"))
+        assert status_of(report, "Serial Cross-Match") is EvidenceStatus.FAIL
+        assert "not the case it was sold with" in detail_of(report, "Serial Cross-Match")
+        assert report.summary_verdict is Verdict.HIGH_RISK_SUSPECTED
+
+    def test_an_earbud_repeating_the_case_serial_fails(self):
+        # Apple never repeats a serial across components.
+        report = evaluate(make_extraction(serial_left_earbud="H4XQ7K2LMN9P"))
+        assert status_of(report, "Serial Cross-Match") is EvidenceStatus.FAIL
+        assert report.summary_verdict is Verdict.HIGH_RISK_SUSPECTED
+
+    def test_two_earbuds_sharing_a_serial_fails(self):
+        report = evaluate(
+            make_extraction(serial_left_earbud="AAAA1111BBBB", serial_right_earbud="AAAA1111BBBB")
+        )
+        assert status_of(report, "Serial Cross-Match") is EvidenceStatus.FAIL
+
+    def test_one_serial_alone_cannot_be_cross_checked(self):
+        report = evaluate(
+            make_extraction(serial_case_lid=None, serial_left_earbud=None, serial_right_earbud=None)
+        )
+        assert status_of(report, "Serial Cross-Match") is EvidenceStatus.UNKNOWN
+        assert "case lid" in detail_of(report, "Serial Cross-Match")
+
+    def test_distinct_earbuds_without_the_box_pair_stays_unknown(self):
+        # The pair that must MATCH is unverified, so this cannot pass yet.
+        report = evaluate(
+            make_extraction(extracted_serial_number=None, serial_case_lid=None)
+        )
+        assert status_of(report, "Serial Cross-Match") is EvidenceStatus.UNKNOWN
+        assert "unverified" in detail_of(report, "Serial Cross-Match")
+
+    def test_it_is_tier_1_and_sourced(self):
+        rule = next(r for r in RULES if r.parameter == "Serial Cross-Match")
+        assert rule.tier == 1 and rule.disqualifying
+        assert not rule.source.startswith("UNSOURCED")
+
+    def test_it_survives_a_cloned_serial(self):
+        # A counterfeit carrying a serial cloned from a genuine unit passes
+        # Apple's coverage lookup. It cannot pass this, because the cloner has
+        # to reproduce four consistent serials, not one.
+        cloned = make_extraction(
+            serial_case_lid="H4XQ7K2LMN9P",
+            serial_left_earbud="H4XQ7K2LMN9P",
+            serial_right_earbud="H4XQ7K2LMN9P",
+        )
+        assert evaluate(cloned).summary_verdict is Verdict.HIGH_RISK_SUSPECTED

@@ -97,6 +97,22 @@ class VisionExtraction(BaseModel):
     extracted_serial_number: str | None = Field(
         description="Serial number printed on the box or hardware. Null if not legible."
     )
+    serial_case_lid: str | None = Field(
+        description=(
+            "Serial printed on the UNDERSIDE OF THE CASE LID, if that surface is photographed. "
+            "Null if not visible. Do not copy the box serial here - report only what is printed "
+            "on the lid itself."
+        )
+    )
+    serial_left_earbud: str | None = Field(
+        description=(
+            "Serial printed on the LEFT earbud stem, if photographed. Null if not visible. "
+            "Each earbud carries its own serial, different from the case and from the other bud."
+        )
+    )
+    serial_right_earbud: str | None = Field(
+        description="Serial printed on the RIGHT earbud stem, if photographed. Null if not visible."
+    )
     serial_label_literal: str | None = Field(
         description=(
             "The serial line from the box label copied EXACTLY as printed, including brackets, "
@@ -180,6 +196,30 @@ class VisionExtraction(BaseModel):
         # No match -> hand the raw text through so the engine can fail it loudly
         # rather than silently discarding a suspicious string.
         return match.group(0) if match else value.upper()
+
+    @field_validator("serial_case_lid", mode="before")
+    @classmethod
+    def _normalise_serial_case_lid(cls, value: Any) -> Any:
+        value = _clean_optional_text(value)
+        if not isinstance(value, str):
+            return value
+        return re.sub(r"[\s\-]", "", value).upper()
+
+    @field_validator("serial_left_earbud", mode="before")
+    @classmethod
+    def _normalise_serial_left_earbud(cls, value: Any) -> Any:
+        value = _clean_optional_text(value)
+        if not isinstance(value, str):
+            return value
+        return re.sub(r"[\s\-]", "", value).upper()
+
+    @field_validator("serial_right_earbud", mode="before")
+    @classmethod
+    def _normalise_serial_right_earbud(cls, value: Any) -> Any:
+        value = _clean_optional_text(value)
+        if not isinstance(value, str):
+            return value
+        return re.sub(r"[\s\-]", "", value).upper()
 
     @field_validator("extracted_serial_number", mode="before")
     @classmethod

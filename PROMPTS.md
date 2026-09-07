@@ -31,6 +31,8 @@ Constraints:
 
 - `claimed_model_variant`: read the connector on the case (USB-C vs Lightning port) or the box text. Use "Unknown" unless one of these is unambiguous. Do not infer the variant from the model number.
 - `extracted_model_number`: the Apple A-number ("A" followed by four digits), printed in the fine-print block on the box underside or moulded inside the case lid. Return only that token, e.g. "A3047".
+- `serial_case_lid`: the serial printed on the **underside of the case lid**, if that surface is photographed. Null if not visible. Do not copy the box serial here — report only what is printed on the lid itself.
+- `serial_left_earbud` / `serial_right_earbud`: the serial printed on each earbud stem, if photographed. Null if not visible. Each earbud carries its own, different from the case and from the other bud.
 - `extracted_serial_number`: the alphanumeric serial from the box barcode label or the case. Exclude the UPC/EAN barcode digits and the part number ending in "LL/A" — those are not serials.
 - `copyright_year`: the four-digit year in the "© 20XX Apple Inc." line. If several years appear, return the one attached to the copyright notice.
 - `has_plastic_shrinkwrap`: true only for a full plastic film wrapping the whole box (it reflects light in sheets and creases at the corners). The thin clear tabs over the seams are not shrink wrap. Being wrapped is normal — report it neutrally, do not treat it as suspicious.

@@ -443,6 +443,87 @@ def _rule_serial_format(extraction: VisionExtraction, variant: str) -> RuleOutco
 _SERIAL_LABEL_RE = re.compile(r"\(\s*S\s*\)(?P<gap>\s*)serial", re.IGNORECASE)
 
 
+def _rule_serial_cross_match(extraction: VisionExtraction, variant: str) -> RuleOutcome:
+    """Check the serials against each other.
+
+    The strongest rule available that needs no reference data at all: it asks
+    only whether the identifiers on one item are internally consistent, so it
+    works on any generation, any region, and cannot be defeated by cloning a
+    serial from a genuine unit - the thing that defeats Apple's own coverage
+    lookup.
+
+    Apple prints a serial in four places: the box label, the underside of the
+    case lid, and each earbud stem. The box and case serials identify the same
+    case and must match. Each earbud carries its OWN serial, different from the
+    other bud and from the case. An earbud serial equal to the case or box
+    serial is a counterfeit tell, because a genuine unit never repeats one.
+    """
+    box = extraction.extracted_serial_number
+    case = extraction.serial_case_lid
+    left = extraction.serial_left_earbud
+    right = extraction.serial_right_earbud
+
+    known = {"box label": box, "case lid": case, "left earbud": left, "right earbud": right}
+    present = {name: value for name, value in known.items() if value}
+    if len(present) < 2:
+        missing = [name for name, value in known.items() if not value]
+        return RuleOutcome(
+            EvidenceStatus.UNKNOWN,
+            f"Only {len(present)} of the four serials was legible, so they cannot be cross-checked. "
+            f"Apple prints one on the box label, one under the case lid and one on each earbud "
+            f"stem. Photograph: {', '.join(missing)}.",
+        )
+
+    # Serials that must be DIFFERENT from one another. A repeat means one
+    # component was cloned or the printing is fabricated.
+    duplicates: list[str] = []
+    unique_required = [
+        (name, value) for name, value in present.items() if name != "box label"
+    ]
+    for index, (name, value) in enumerate(unique_required):
+        for other_name, other_value in unique_required[index + 1 :]:
+            if name == "case lid" or other_name == "case lid":
+                continue  # box/case equality is handled separately below
+            if value == other_value:
+                duplicates.append(f"{name} and {other_name} share the serial {value}")
+
+    for name, value in unique_required:
+        if name != "case lid" and case and value == case:
+            duplicates.append(f"the {name} repeats the case serial {value}")
+
+    if duplicates:
+        return RuleOutcome(
+            EvidenceStatus.FAIL,
+            "Serials that must differ are identical: "
+            + "; ".join(duplicates)
+            + ". On a genuine set the case and each earbud carry their own distinct serial, so a "
+            "repeated one indicates fabricated printing or a swapped component.",
+        )
+
+    if box and case and box != case:
+        return RuleOutcome(
+            EvidenceStatus.FAIL,
+            f"The box label serial ({box}) does not match the serial under the case lid ({case}). "
+            f"These identify the same case and always agree on a genuine set - a mismatch means "
+            f"the case in this box is not the case it was sold with.",
+        )
+
+    checked = ", ".join(sorted(present))
+    if box and case:
+        return RuleOutcome(
+            EvidenceStatus.PASS,
+            f"The box label and case lid serials match, and every serial that should be distinct "
+            f"is distinct ({checked}). This is an internal-consistency check, so unlike a coverage "
+            f"lookup it is not defeated by a serial cloned from a genuine unit.",
+        )
+    return RuleOutcome(
+        EvidenceStatus.UNKNOWN,
+        f"The serials read so far are all distinct as expected ({checked}), but the box label and "
+        f"case lid serials could not both be read, so the pair that must MATCH is unverified. "
+        f"Photograph the box underside label and the underside of the case lid.",
+    )
+
+
 def _rule_serial_label_spacing(extraction: VisionExtraction, variant: str) -> RuleOutcome:
     """Check the '(S) Serial' marker on the box label.
 
@@ -705,6 +786,18 @@ RULES: tuple[Rule, ...] = (
         disqualifying=False,
         evaluate=_rule_serial_format,
         source="UNSOURCED - length constraint is unverified; do not promote to Tier 1",
+        answerable_from=("box_bottom_label", "case_lid_underside", "earbud"),
+    ),
+    Rule(
+        tier=1,
+        parameter="Serial Cross-Match",
+        weight=4.0,
+        disqualifying=True,
+        evaluate=_rule_serial_cross_match,
+        source=(
+            "r/AreMyAirpodsAuthentic community guide, Step 2 (four serial locations); "
+            "Apple 'Identify your AirPods' (serial is on the underside of the case lid)"
+        ),
         answerable_from=("box_bottom_label", "case_lid_underside", "earbud"),
     ),
     Rule(
