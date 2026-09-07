@@ -264,6 +264,31 @@ font_baseline:
   # Digits cannot be scored. Most typefaces set tabular figures, so digits
   # deviate uniformly: on a digits-only line SF scatters 0.71% and Helvetica
   # 0.71%. A line needs at least 3 letters.
+  # PHOTOGRAPHED populations, measured through the full production path -
+  # locate lines, split columns, pair by word, exclude merged and clipped
+  # glyphs, pool, score. These supersede the synthetic figures below for any
+  # question about real images.
+  photographed_measurements:
+    genuine:
+      airpods_pro_2: 4.72
+      airpods_4_anc: 2.39
+    counterfeit:
+      airpods_pro_3: 6.78
+    note: >-
+      The synthetic 2.0% threshold would flag BOTH genuine labels. Photographed
+      print carries print texture, optical blur and sensor noise that rendered
+      glyphs do not, so genuine labels scatter several times more than renders
+      of the same typeface. Separation does appear to exist - genuine 2.4-4.7%
+      against counterfeit 6.8% - but on two genuine samples and one counterfeit,
+      with a much narrower margin than synthetic measurement implied. Not enough
+      to set a threshold on.
+    blocked_on: >-
+      More genuine labels measured through this path, and more counterfeits. Two
+      of the owner's four genuine labels did not yield enough glyphs to score -
+      AirPods 4 produced 7 and AirPods Pro 1 produced 1 - so label crops also
+      need to reliably capture three or more full lines.
+    source: measurement
+
   scatter_statistic:
     genuine_photographed_labels_percent: 0.90
     san_francisco_rendered_percent: 0.42
