@@ -175,7 +175,16 @@ def render_report(
     lines.append("")
     lines.append("=" * _RULE_WIDTH)
     lines.append(f"  VERDICT: {_colorize(headline, status_for_color, color)}")
-    lines.append(f"  Confidence: {report.confidence_score:.2f}")
+    # For an inconclusive result the score is coverage - how much of the check
+    # could be run - not confidence in a finding. Labelling it "Confidence"
+    # invites reading 0.74 as "probably fine", which is the opposite of what an
+    # inconclusive verdict means.
+    label = (
+        "Evidence coverage"
+        if report.summary_verdict is Verdict.INCONCLUSIVE
+        else "Confidence"
+    )
+    lines.append(f"  {label}: {report.confidence_score:.2f}")
     lines.append("=" * _RULE_WIDTH)
 
     if report.next_steps:

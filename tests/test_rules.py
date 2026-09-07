@@ -1153,3 +1153,77 @@ class TestProvenanceIsVisible:
             make_extraction(extracted_serial_number="TOOSHORT", serial_case_lid="TOOSHORT"),
         )
         assert "UNSOURCED" in text
+
+
+class TestVerdictScenarioMatrix:
+    """End-to-end behaviour across the situations a buyer actually hits. The
+    aggregation grew to nine rules through many small changes; this pins what
+    each combination should produce so a weight change cannot quietly shift a
+    verdict."""
+
+    def _verdict(self, **overrides):
+        report = evaluate(make_extraction(**overrides), GOOD_FONT)
+        return report.summary_verdict, report.confidence_score
+
+    def test_a_clean_unit_clears_at_the_cap(self):
+        verdict, score = self._verdict()
+        assert verdict is Verdict.GENUINE
+        assert score == 0.95
+
+    def test_a_sealed_box_clears_at_lower_confidence(self):
+        # Case lid and earbud serials are physically unreachable while sealed,
+        # so it clears - but visibly less certainly than an opened one.
+        verdict, score = self._verdict(
+            serial_case_lid=None, serial_left_earbud=None, serial_right_earbud=None,
+            has_plastic_shrinkwrap=True, shrinkwrap_has_pull_tab=True,
+        )
+        assert verdict is Verdict.GENUINE
+        assert 0.6 < score < 0.95
+
+    def test_hardware_only_photos_cannot_clear_anything(self):
+        verdict, score = self._verdict(
+            extracted_model_number=None, extracted_serial_number=None,
+            serial_label_literal=None, copyright_year=None, has_paper_pull_tabs=False,
+            visible_panels=["case_exterior", "earbud"],
+        )
+        assert verdict is Verdict.INCONCLUSIVE
+        assert score < MIN_COVERAGE_FOR_VERDICT
+
+    @pytest.mark.parametrize(
+        "name, overrides",
+        [
+            ("cross-variant model", dict(extracted_model_number="A2700")),
+            ("repeated serial", dict(serial_left_earbud="H4XQ7K2LMN9P")),
+            ("(S)Serial no space", dict(serial_label_literal="(S)Serial No. H4XQ7K2LMN9P")),
+            ("wrap without pull tab",
+             dict(has_plastic_shrinkwrap=True, shrinkwrap_has_pull_tab=False)),
+        ],
+    )
+    def test_each_disqualifier_condemns_alone(self, name, overrides):
+        verdict, score = self._verdict(**overrides)
+        assert verdict is Verdict.HIGH_RISK_SUSPECTED, name
+        assert score >= 0.85, name
+
+    def test_a_soft_signal_flags_at_lower_confidence(self):
+        verdict, score = self._verdict(visible_spelling_errors=["MagSate"])
+        assert verdict is Verdict.HIGH_RISK_SUSPECTED
+        assert score < 0.85
+
+    def test_an_out_of_scope_product_is_never_accused(self):
+        verdict, _ = self._verdict(extracted_model_number="A3063")
+        assert verdict is Verdict.INCONCLUSIVE
+
+
+class TestInconclusiveIsNotConfidence:
+    def test_an_inconclusive_verdict_reports_coverage_not_confidence(self):
+        # 0.74 next to "Confidence" reads as "probably fine", which is the
+        # opposite of what an inconclusive result means.
+        report = evaluate(make_extraction(extracted_model_number="A3063"), GOOD_FONT)
+        text = cli.render_report(report, color=False)
+        assert report.summary_verdict is Verdict.INCONCLUSIVE
+        assert "Evidence coverage:" in text
+        assert "Confidence:" not in text
+
+    def test_a_decided_verdict_still_reports_confidence(self):
+        text = cli.render_report(evaluate(make_extraction(), GOOD_FONT), color=False)
+        assert "Confidence:" in text
