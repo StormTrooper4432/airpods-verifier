@@ -126,11 +126,14 @@ regions:
     name: North America
     reference_photos: knowledge/real_app2
     reference_part_number: MTJV3AM/A
+    # NEVER record a genuine serial here. A real, valid serial is precisely what
+    # a counterfeiter wants: cloning one produces a fake that passes Apple's own
+    # coverage lookup, which is the failure this project exists to detect.
     observed_on_label:
       - "MTJV3AM/A  AirPods Pro (2nd generation)"
       - "Designed by Apple in California. Assembled in Vietnam."
       - "Model A3047 A3048 A2968"
-      - "(S) Serial No. <redacted>"
+      - "(S) Serial No. <redacted - genuine serial, never record one>"
     regulatory_marks: [CSA (Energy Verified Only)]
     languages: [English, French, Japanese, Spanish]
     source: owner (genuine unit, photographed 2026-09-06)
@@ -144,7 +147,7 @@ regions:
     source: community-guide (mentioned only)
 
 # Measured against a confirmed-genuine North American label. Seven usable glyphs
-# from "(S) Serial No. <redacted>" sat at 1.68% mean deviation from San
+# from the "(S) Serial No." line sat at 1.68% mean deviation from San
 # Francisco, 3.34% worst case - so genuine print lands well inside the 8%
 # provisional threshold. ONE label is a sanity check, not a calibration; a real
 # threshold needs several genuine boxes and at least one confirmed counterfeit.
