@@ -6,6 +6,8 @@
  * ran, and how strongly the finding is held. There is no authenticity
  * percentage on this sheet, because the pipeline does not produce one.
  */
+import GraderMark from './GraderMark.astro';
+import { rosette } from '../lib/guilloche';
 import {
   RULE_BY_PARAMETER,
   RULES,
@@ -59,10 +61,13 @@ const scoreLabel =
 /** The second figure restates coverage on a blank or inconclusive record. */
 const showFinding = verdict !== null && verdict !== 'INCONCLUSIVE' && score !== null;
 const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
+
+/* The lathe again, this time as a ground beneath the grade rather than trim. */
+const underprint = rosette(300);
 ---
 
 <header class:list={['grade', `grade-${kind}`, striking && 'is-striking']}>
-  <p class="caps grade-key">Grade</p>
+  <div class="grade-ground" aria-hidden="true"></div>
   {verdict ? (
     <p class="grade-word">{word}</p>
   ) : (
@@ -83,7 +88,8 @@ const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
     ))}
   </div>
 
-  <dl class="readout">
+  <div class="grade-foot">
+    <dl class="readout">
     <div>
       <dt class="caps">Examination coverage</dt>
       <dd>
@@ -98,18 +104,35 @@ const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
         <dt class="caps">{scoreLabel}</dt>
         <dd><b>{(score ?? 0).toFixed(2)}</b></dd>
       </div>
-    )}
-  </dl>
+      )}
+    </dl>
+    {verdict && <GraderMark checks={RULES.length} weight={`${fmt(TOTAL_WEIGHT)} weight`} />}
+  </div>
 </header>
 
-<style>
-  .grade { margin: 0 0 calc(var(--u) * 4); }
-
-  .grade-key {
-    margin: 0 0 calc(var(--u) * 1);
-    font-size: 10.5px;
-    color: var(--intaglio);
+<style define:vars={{ underprint }}>
+  .grade {
+    margin: 0 0 calc(var(--u) * 4);
+    position: relative;
   }
+
+  /* Security stock carries the lathe work under the field, not only at the
+     edge. Faint enough that it never competes with the grade sitting on it. */
+  .grade-ground {
+    position: absolute;
+    top: calc(var(--u) * -5);
+    right: calc(var(--u) * -4);
+    width: 236px;
+    max-width: 46%;
+    aspect-ratio: 1;
+    background-image: var(--underprint);
+    background-size: contain;
+    background-repeat: no-repeat;
+    opacity: 0.1;
+    pointer-events: none;
+  }
+  @media (max-width: 560px) { .grade-ground { display: none; } }
+  .grade > *:not(.grade-ground) { position: relative; }
 
   .grade-word {
     font-family: var(--narrow);
@@ -166,6 +189,12 @@ const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
     );
   }
 
+  .grade-foot {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: calc(var(--u) * 3);
+  }
   .readout {
     display: flex;
     flex-wrap: wrap;

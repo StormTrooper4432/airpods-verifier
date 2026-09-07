@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -159,3 +161,87 @@ def test_no_authenticity_percentage_reaches_the_page() -> None:
     page = (WEB / "src" / "pages" / "index.astro").read_text(encoding="utf-8")
     for banned in ("% authentic", "authenticity score", "% genuine", "% real"):
         assert banned.lower() not in page.lower(), f"page implies a {banned!r} figure"
+
+
+# --------------------------------------------------------------------------- #
+# The live record
+# --------------------------------------------------------------------------- #
+
+REDACT_TS = WEB / "src" / "lib" / "redact.ts"
+EXAMINE_TS = WEB / "src" / "lib" / "examine.ts"
+
+
+def test_live_reports_are_masked_at_the_boundary() -> None:
+    """A serial belongs to whoever owns the box, not to whoever photographed it.
+
+    The filed records were masked when their JSON was authored. That left the
+    live record - a stranger's box, by the surface's own framing - printing the
+    serial in full on the same page. Masking has to sit where every report
+    crosses, so a rule added later cannot leak one by wording its detail
+    differently.
+    """
+    source = EXAMINE_TS.read_text(encoding="utf-8")
+    assert "redactReport" in source, "examine() does not mask the report it returns"
+    parse_line = next(
+        line for line in source.splitlines() if "JSON.parse(stdout)" in line
+    )
+    assert "redactReport" in parse_line, (
+        "the parsed report reaches a caller before it is masked: "
+        f"{parse_line.strip()!r}"
+    )
+
+
+def test_the_shipped_masking_pattern_hits_serials_and_nothing_else() -> None:
+    """Exercise the real regex out of redact.ts, not a copy of it."""
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node not available")
+
+    pattern = re.search(r"^const SERIAL = (/.+/g);$", REDACT_TS.read_text(encoding="utf-8"), re.M)
+    assert pattern is not None, "redact.ts no longer declares SERIAL as a literal"
+
+    cases = {
+        # masked: Apple serials, 10 characters and the Pro 1's 12
+        "Serial KY2622QC6F is well-formed": True,
+        "'(S) Serial No. DKM4QF3FPT'": True,
+        "Serial GX2K9L0PQRST here": True,
+        # untouched: everything else the ledger prints
+        "Extracted model A2698 matches Pro 2 Lightning part.": False,
+        "Part number MTJV3AM/A": False,
+        "Copyright year 2024 is consistent with Pro 2 USB-C": False,
+        "UPC 194253340003 on the label": False,
+        "HIGH_RISK_SUSPECTED and INCONCLUSIVE": False,
+        "Assembled in Vietnam": False,
+    }
+    script = (
+        f"const SERIAL = {pattern.group(1)};\n"
+        "const mask = t => t.slice(0,4) + '.'.repeat(t.length-6) + t.slice(-2);\n"
+        "const cases = JSON.parse(process.argv[1]);\n"
+        "console.log(JSON.stringify(cases.map(c => c.replace(SERIAL, mask) !== c)));\n"
+    )
+    proc = subprocess.run(
+        [node, "--input-type=module", "-e", script, json.dumps(list(cases))],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    changed = json.loads(proc.stdout)
+    for (text, should_mask), was_masked in zip(cases.items(), changed):
+        assert was_masked is should_mask, (
+            f"{text!r} was {'masked' if was_masked else 'left alone'}, "
+            f"but should have been {'masked' if should_mask else 'left alone'}"
+        )
+
+
+def test_nothing_the_sheet_can_print_carries_a_whole_serial() -> None:
+    """Both halves of the page held to one standard, not two."""
+    for path in (SPECIMENS, WEB / "src" / "pages" / "index.astro"):
+        if not path.exists():
+            continue
+        blob = path.read_text(encoding="utf-8")
+        leaked = [
+            token
+            for token in SERIAL_SHAPED.findall(blob)
+            if any(ch.isdigit() for ch in token) and any(ch.isalpha() for ch in token)
+        ]
+        assert not leaked, f"{path.name} carries serial-shaped tokens: {leaked}"

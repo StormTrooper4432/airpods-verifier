@@ -8,6 +8,7 @@ import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { PanelId, Report } from '../data/sheet';
+import { redactReport } from './redact';
 
 export class ExamineError extends Error {
   constructor(
@@ -190,7 +191,8 @@ export async function examine(shots: Shot[]): Promise<Examination> {
       );
     }
 
-    const report = JSON.parse(stdout) as Report;
+    // Masked here, at the one boundary every report crosses.
+    const report = redactReport(JSON.parse(stdout) as Report);
     let panels: PanelId[] = [];
     let variant: string | null = null;
     try {

@@ -1,0 +1,76 @@
+---
+/**
+ * The grader's mark. A graded certificate is signed by whoever graded it, and
+ * on this sheet the grader is a rules engine — so the mark says exactly that,
+ * and says what it is not.
+ */
+import { sealRing } from '../lib/guilloche';
+
+interface Props {
+  checks: number;
+  weight: string;
+}
+const { checks, weight } = Astro.props;
+const ring = sealRing(132);
+---
+
+<figure class="seal" role="img"
+        aria-label={`Graded by the rules engine: ${checks} checks, ${weight} evidence weight. No language model returned this verdict.`}>
+  <div class="seal-ring" aria-hidden="true"></div>
+  <figcaption class="seal-face" aria-hidden="true">
+    <span class="seal-top">Graded by</span>
+    <span class="seal-name">Rules<br />engine</span>
+    <span class="seal-foot">{checks} checks</span>
+  </figcaption>
+</figure>
+
+<style define:vars={{ ring }}>
+  .seal {
+    position: relative;
+    width: 132px;
+    height: 132px;
+    margin: 0;
+    flex: none;
+    display: grid;
+    place-items: center;
+  }
+  .seal-ring {
+    position: absolute;
+    inset: 0;
+    background-image: var(--ring);
+    background-size: contain;
+    background-repeat: no-repeat;
+    opacity: 0.55;
+  }
+  .seal-face {
+    position: relative;
+    text-align: center;
+    font-family: var(--narrow);
+    color: var(--intaglio);
+    line-height: 1.15;
+  }
+  .seal-top,
+  .seal-foot {
+    display: block;
+    font-size: 7px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    white-space: nowrap;
+  }
+  .seal-name {
+    display: block;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    line-height: 1.05;
+    margin: 4px 0 5px;
+  }
+
+  @media (max-width: 560px) {
+    .seal { width: 108px; height: 108px; }
+    .seal-name { font-size: 11px; }
+    .seal-top, .seal-foot { font-size: 6.5px; }
+  }
+</style>

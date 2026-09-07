@@ -169,7 +169,8 @@ const markGlyph = (s: Status) => (s === 'FAIL' ? 'fail' : s === 'PASS' ? 'pass' 
       if (!interactive) return <div class="panel-hit is-static" style={style}></div>;
       const id = `shot-${panel.id}`;
       return (
-        <label class="panel-hit" style={style} for={id} data-panel={panel.id}>
+        <label class:list={['panel-hit', exposed && 'is-exposed']}
+               style={style} for={id} data-panel={panel.id}>
           <input class="sr-only panel-file" type="file" id={id}
                  name={`panel_${panel.id}`} accept="image/jpeg,image/png,image/webp,image/heic" />
           <span class="sr-only">
@@ -291,7 +292,10 @@ const markGlyph = (s: Status) => (s === 'FAIL' ? 'fail' : s === 'PASS' ? 'pass' 
   .panel-hit.is-static { pointer-events: none; }
 
   label.panel-hit { cursor: pointer; }
-  label.panel-hit:focus-within { outline: 2px solid var(--intaglio); outline-offset: 2px; }
+  label.panel-hit:has(.panel-file:focus-visible) {
+    outline: 2px solid var(--intaglio);
+    outline-offset: 2px;
+  }
 
   .panel-hit-cue {
     font-family: var(--narrow);
@@ -305,11 +309,18 @@ const markGlyph = (s: Status) => (s === 'FAIL' ? 'fail' : s === 'PASS' ? 'pass' 
     opacity: 0;
     transition: opacity 140ms cubic-bezier(0.16, 1, 0.3, 1);
   }
-  /* The photograph is its own "loaded" indicator; a permanent badge over it
-     is noise. The cue returns on hover and focus, where it names the action. */
+  /* An unexposed panel wears its verb at rest. Hover does not exist on the
+     phone the meet-up buyer is holding, so a cue revealed only on hover is a
+     primary action that half the audience never sees. */
+  label.panel-hit:not(.is-loaded):not(.is-exposed) .panel-hit-cue { opacity: 1; }
+
+  /* Once a panel holds a photograph the photograph is the indicator, and a
+     permanent badge just covers it. :focus-visible rather than :focus-within,
+     or the badge returns and sticks on the last input the pointer touched. */
   label.panel-hit:hover .panel-hit-cue,
-  label.panel-hit:focus-within .panel-hit-cue { opacity: 1; }
-  label.panel-hit.is-loaded .panel-hit-cue { background: var(--ink); }
+  label.panel-hit:has(.panel-file:focus-visible) .panel-hit-cue { opacity: 1; }
+  label.panel-hit.is-loaded .panel-hit-cue,
+  label.panel-hit.is-exposed .panel-hit-cue { background: var(--ink); }
 
   /* Created by script when a photograph is picked; never shipped empty. */
   :global(.panel-shot) {

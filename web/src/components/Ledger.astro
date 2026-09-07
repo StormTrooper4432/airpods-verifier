@@ -8,10 +8,17 @@ interface Props {
   striking?: boolean;
   /** Filed records print every check, but only argue the struck ones. */
   condensed?: boolean;
+  /**
+   * Filed records list only the checks that ran and name the rest on one line.
+   * Nothing is hidden - the same nine appear in full in the live ledger and
+   * again in the register - but printing all nine three more times is where
+   * the page flattens into one texture.
+   */
+  resolvedOnly?: boolean;
 }
-const { items, striking = false, condensed = false } = Astro.props;
+const { items, striking = false, condensed = false, resolvedOnly = false } = Astro.props;
 
-const rows = items.map((item, i) => {
+const allRows = items.map((item, i) => {
   const rule = RULE_BY_PARAMETER[item.parameter];
   return {
     n: i + 1,
@@ -21,6 +28,9 @@ const rows = items.map((item, i) => {
     disqualifying: Boolean(rule?.disqualifying),
   };
 });
+
+const rows = resolvedOnly ? allRows.filter((r) => r.item.status !== 'UNKNOWN') : allRows;
+const unrun = allRows.filter((r) => r.item.status === 'UNKNOWN');
 ---
 
 <ol class:list={['ledger', striking && 'is-striking', condensed && 'is-condensed']}>
@@ -47,6 +57,13 @@ const rows = items.map((item, i) => {
     </li>
   ))}
 </ol>
+
+{resolvedOnly && unrun.length > 0 && (
+  <p class="fine unrun">
+    <span class="caps unrun-key">Could not run</span>
+    {unrun.map((r) => r.item.parameter).join('  ·  ')}
+  </p>
+)}
 
 <style>
   .ledger {
@@ -117,6 +134,16 @@ const rows = items.map((item, i) => {
   @keyframes strike-on {
     from { opacity: 0; transform: translateY(-3px) scale(1.35); filter: blur(1.5px); }
     to   { opacity: 1; transform: none; filter: none; }
+  }
+
+  .unrun {
+    margin: calc(var(--u) * 2) 0 0;
+    max-width: 72ch;
+  }
+  .unrun-key {
+    font-size: 9.5px;
+    color: var(--intaglio);
+    margin-right: 0.7em;
   }
 
   .is-condensed .row { padding: calc(var(--u) * 1.25) 0; }

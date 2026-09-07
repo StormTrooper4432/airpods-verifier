@@ -44,11 +44,27 @@ for (const vp of VIEWPORTS) {
 
   const started = Date.now();
   await page.click('.run');
+  // Resolve on either outcome. Waiting only for a grade means a failed
+  // examination hangs the harness for the full timeout and reports nothing,
+  // when the page is right there saying what went wrong.
   await page.waitForFunction(
-    () => !document.querySelector('.grade')?.className.includes('grade-blank'),
-    { timeout: 180000, polling: 400 },
+    () =>
+      !document.querySelector('.grade')?.className.includes('grade-blank') ||
+      Boolean(document.querySelector('#notice-slot .notice')),
+    { timeout: 200000, polling: 400 },
   );
   const seconds = Math.round((Date.now() - started) / 1000);
+
+  const notice = await page.evaluate(() => {
+    const el = document.querySelector('#notice-slot .notice');
+    return el ? el.textContent.replace(/\s+/g, ' ').trim() : null;
+  });
+  if (notice) {
+    console.log(`${vp.name}  ${vp.width}px  FAILED after ${seconds}s\n   ${notice}`);
+    await page.screenshot({ path: path.join(OUT, `${vp.name}-error.png`) });
+    await page.close();
+    continue;
+  }
 
   await page.evaluate(() => document.fonts.ready);
   await new Promise((r) => setTimeout(r, 1400));
@@ -76,6 +92,10 @@ for (const vp of VIEWPORTS) {
   );
   state.steps.forEach((s) => console.log(`   step: ${s}`));
 
+  // Park the pointer off-canvas: left where it clicked, it hovers whatever
+  // lands under it after the scroll and photographs a hover state as if it
+  // were the resting one.
+  await page.mouse.move(vp.width - 2, 2);
   // The struck record's own first viewport, from the top of the document.
   await page.evaluate(() => window.scrollTo(0, 0));
   await new Promise((r) => setTimeout(r, 350));

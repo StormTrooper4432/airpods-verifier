@@ -58,6 +58,36 @@ const examinedAt = result
   ? new Date().toISOString().slice(0, 16).replace('T', ' ')
   : null;
 
+/**
+ * A record number, so the sheet is a citable document rather than a view.
+ * Derived from the findings themselves, so re-examining the same photographs
+ * to the same result reproduces it. It is a local reference and nothing more:
+ * no registry issues it, and the colophon says so.
+ */
+function recordNumber(report: NonNullable<typeof result>['report'], at: string): string {
+  const basis =
+    report.summary_verdict +
+    report.confidence_score +
+    report.evidence_ledger.map((i) => i.status[0]).join('') +
+    at;
+  let hash = 0x811c9dc5;
+  for (const ch of basis) {
+    hash ^= ch.charCodeAt(0);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  // Crockford-ish: no 0/O or 1/I, so a number read off a screen is unambiguous.
+  const alphabet = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+  let out = '';
+  let n = hash;
+  for (let i = 0; i < 6; i += 1) {
+    out += alphabet[n % 32];
+    n = Math.floor(n / 32);
+  }
+  return `AP2-${out.slice(0, 3)}-${out.slice(3)}`;
+}
+
+const record = result && examinedAt ? recordNumber(result.report, examinedAt) : null;
+
 const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 
 const specimenFindings = (s: Specimen): Finding[] =>
@@ -87,6 +117,7 @@ const specimenFindings = (s: Specimen): Finding[] =>
     </div>
 
     <dl class="record" id="record-fields">
+      <div><dt class="caps">Record no.</dt><dd>{record ?? '——'}</dd></div>
       <div><dt class="caps">Examined</dt><dd>{examinedAt ?? '——'}</dd></div>
       <div><dt class="caps">Variant</dt><dd>{result?.variant ?? '——'}</dd></div>
       <div>
@@ -218,7 +249,7 @@ const specimenFindings = (s: Specimen): Finding[] =>
             score={s.report.confidence_score}
             items={s.report.evidence_ledger}
           />
-          <Ledger items={s.report.evidence_ledger} condensed={true} />
+          <Ledger items={s.report.evidence_ledger} condensed={true} resolvedOnly={true} />
         </div>
       </article>
     ))}
@@ -331,7 +362,11 @@ const specimenFindings = (s: Specimen): Finding[] =>
     <p class="fine">
       Evidence ledger produced by a deterministic rules engine over a schema-constrained
       vision extraction. Grades, weights and sources on this page are read from the same
-      rule table the command line uses.
+      rule table the command line uses. Record numbers are derived from the findings so a
+      repeat examination reproduces them; no registry issues one, and neither Apple nor
+      any other body stands behind this sheet. Serial numbers are masked wherever the
+      record prints them &mdash; the box is in your hand, and Apple&rsquo;s coverage lookup
+      wants the number off the box, not off this page.
     </p>
   </footer>
 </Sheet>
@@ -484,8 +519,8 @@ const specimenFindings = (s: Specimen): Finding[] =>
 
   .record {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, auto));
-    gap: calc(var(--u) * 2) calc(var(--u) * 5);
+    grid-template-columns: repeat(3, minmax(0, auto));
+    gap: calc(var(--u) * 2) calc(var(--u) * 4);
     margin: 0;
     text-align: right;
   }
@@ -591,12 +626,14 @@ const specimenFindings = (s: Specimen): Finding[] =>
 
   .specimen {
     display: grid;
-    grid-template-columns: minmax(0, 22ch) minmax(0, 1fr) minmax(0, 1.25fr);
+    grid-template-columns: minmax(0, 20ch) minmax(0, 0.8fr) minmax(0, 1.35fr);
     gap: calc(var(--u) * 5);
     align-items: start;
-    padding: calc(var(--u) * 6) 0;
-    border-top: 1px solid var(--intaglio-hair);
+    /* Split by a void, per the world's own rule: mass and gap divide these,
+       not a rule across the page. */
+    padding: calc(var(--u) * 9) 0 0;
   }
+  .specimen:first-of-type { padding-top: calc(var(--u) * 4); }
   .specimen h3 {
     margin: 0 0 calc(var(--u) * 1.5);
     font-size: 19px;
