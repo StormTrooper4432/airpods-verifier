@@ -240,3 +240,81 @@ class TestNoiseFiltering:
         image = Image.new("L", (120, 100), 255)
         image.paste(0, (10, 40, 30, 60))
         assert len(ff.segment_glyphs(image, min_ink_pixels=10)) == 1
+
+
+def _render_line(font_path: str, text: str, size: int = 120) -> Image.Image:
+    from PIL import ImageDraw, ImageFont
+
+    font = ImageFont.truetype(font_path, size)
+    width = int(ImageDraw.Draw(Image.new("L", (10, 10))).textlength(text, font=font)) + size
+    canvas = Image.new("L", (width, size * 2), 255)
+    ImageDraw.Draw(canvas).text((size // 2, size // 4), text, font=font, fill=0)
+    return canvas
+
+
+class TestFontScore:
+    """Scatter, not offset, is the font signal.
+
+    Offset moves with imaging conditions: two genuine labels measured +2.4% and
+    -6.0%, and -6.0% is indistinguishable from Arial's -5.9%. Typefaces differ
+    from each other non-uniformly, so a wrong font makes per-glyph deviations
+    disagree - that disagreement is what survives a camera.
+    """
+
+    LETTERS = "KC2WVC6R36 GTZE5"
+
+    def test_san_francisco_matches_itself(self):
+        score = ff.score_font_match(ff.compare_text_line(
+            _render_line(ff.SF_FONT_PATH, self.LETTERS), self.LETTERS))
+        assert score is not None and score.is_scoreable
+        assert score.consistent_with_san_francisco
+        assert score.scatter_percent < 1.0
+
+    @pytest.mark.parametrize("name", list(ff.SUBSTITUTE_FONT_PATHS))
+    def test_every_substitute_is_rejected(self, name):
+        path = ff.SUBSTITUTE_FONT_PATHS[name]
+        if not ff.Path(path).is_file():
+            pytest.skip(f"{name} not installed")
+        score = ff.score_font_match(ff.compare_text_line(
+            _render_line(path, self.LETTERS), self.LETTERS))
+        assert score is not None
+        assert not score.consistent_with_san_francisco, f"{name} passed as SF"
+
+    def test_the_threshold_sits_between_the_populations(self):
+        # Not at either edge: genuine photos 0.90%, SF synthetic 0.42%,
+        # substitutes 3.3-7.9%.
+        assert 1.0 < ff.FONT_SCATTER_THRESHOLD < 3.0
+
+    def test_offset_is_not_used_as_evidence(self):
+        # A large offset with tight scatter must still pass - that is exactly a
+        # genuine label photographed at a different scale.
+        comparisons = [
+            ff.GlyphComparison(c, ref * 0.94, ref)
+            for c, ref in ((ch, ff.reference_aspect(ch)) for ch in "CERTSKG")
+            if ref
+        ]
+        score = ff.score_font_match(comparisons)
+        assert score.offset_percent < -5.0
+        assert score.consistent_with_san_francisco
+
+    def test_digit_only_lines_are_not_scoreable(self):
+        # Tabular figures deviate uniformly, so digits carry no per-glyph signal:
+        # SF and Helvetica both scatter 0.71% on a digits-only line.
+        digits = "3056 3059 3055"
+        score = ff.score_font_match(ff.compare_text_line(
+            _render_line(ff.SF_FONT_PATH, digits), digits))
+        assert score is not None
+        assert score.letters_measured < ff.MINIMUM_LETTERS_TO_SCORE
+        assert not score.is_scoreable
+
+    def test_a_clipped_edge_glyph_does_not_drag_the_score(self):
+        # Median absolute deviation, so one wild outlier is ignored. A crop that
+        # clips its final character produced a -30% glyph on a genuine label.
+        good = [ff.GlyphComparison(c, r * 1.01, r)
+                for c, r in ((ch, ff.reference_aspect(ch)) for ch in "CERTSKG") if r]
+        clipped = good + [ff.GlyphComparison("O", ff.reference_aspect("O") * 0.6,
+                                             ff.reference_aspect("O"))]
+        assert ff.score_font_match(clipped).consistent_with_san_francisco
+
+    def test_empty_input_scores_nothing(self):
+        assert ff.score_font_match([]) is None

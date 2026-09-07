@@ -166,6 +166,33 @@ font_baseline:
     Passed the synthetic screen; failed against reality.
   source: owner (genuine unit) + measurement
 
+  # The offset above is NOT the signal. Measured on two genuine labels it was
+  # +2.4% (AirPods Pro 2) and -6.0% (AirPods 4 ANC) - a difference caused by
+  # image scale and ink spread, not typeface. -6.0% is indistinguishable from
+  # Arial's synthetic -5.9%, so an absolute-deviation threshold would flag a
+  # genuine box.
+  #
+  # Scatter is the signal. Typefaces differ from one another non-uniformly (SF
+  # vs Helvetica: 22% on R, 8% on S), so a wrong font makes per-glyph deviations
+  # disagree while genuine print makes them agree. Measured populations:
+  #
+  #   genuine photographed labels   0.90%   (both boxes, independently)
+  #   San Francisco rendered        0.42%
+  #   Helvetica / Arial / Verdana / Tahoma   3.3% - 7.9%
+  #
+  # Threshold set at 2.0%, between the populations rather than at either edge.
+  #
+  # Digits cannot be scored. Most typefaces set tabular figures, so digits
+  # deviate uniformly: on a digits-only line SF scatters 0.71% and Helvetica
+  # 0.71%. A line needs at least 3 letters.
+  scatter_statistic:
+    genuine_photographed_labels_percent: 0.90
+    san_francisco_rendered_percent: 0.42
+    substitute_fonts_percent_range: [3.3, 7.9]
+    threshold_percent: 2.0
+    minimum_letters: 3
+    source: measurement (2 genuine boxes, 4 substitute typefaces)
+
 packaging:
   shrinkwrap:
     # Contradicts the common "wrapped = fake" claim, and contradicts the

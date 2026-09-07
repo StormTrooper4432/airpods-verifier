@@ -320,6 +320,77 @@ def otsu_threshold(image: Image.Image) -> int:
     return best_threshold
 
 
+@dataclass(frozen=True)
+class FontScore:
+    """How far a photographed line departs from San Francisco.
+
+    ``offset_percent`` is the median per-glyph deviation and is DISCARDED as
+    evidence: it moves with resolution, ink spread and camera distance. Two
+    genuine labels measured +2.4% and -6.0% purely from imaging differences, and
+    -6.0% is indistinguishable from Arial's synthetic -5.9%.
+
+    ``scatter_percent`` is the signal. Typefaces differ from one another
+    NON-UNIFORMLY - SF against Helvetica is 22% on R but 8% on S - so a wrong
+    font produces per-glyph deviations that disagree with each other, while
+    genuine print produces deviations that agree whatever the imaging
+    conditions. Median absolute deviation about the median, so one clipped edge
+    glyph shifts nothing.
+    """
+
+    glyphs: int
+    offset_percent: float
+    scatter_percent: float
+    letters_measured: int
+
+    @property
+    def is_scoreable(self) -> bool:
+        """Digits alone cannot be scored.
+
+        Most typefaces set tabular figures - every digit the same advance width -
+        so digits deviate uniformly and carry no per-glyph signal. Measured: on a
+        digits-only line SF scatters 0.71% and Helvetica 0.71%, indistinguishable.
+        Add letters and SF scatters 0.41% against 3.3-5.3% for substitutes.
+        """
+        return self.letters_measured >= MINIMUM_LETTERS_TO_SCORE and self.glyphs >= 5
+
+    @property
+    def consistent_with_san_francisco(self) -> bool:
+        return self.scatter_percent < FONT_SCATTER_THRESHOLD
+
+
+#: Below this, per-glyph deviations agree and the line is consistent with San
+#: Francisco. Genuine photographed labels measured 0.90%; SF rendered
+#: synthetically 0.41-0.71%; substitute typefaces 3.3-7.9%. The cut sits between
+#: those populations rather than at either edge.
+FONT_SCATTER_THRESHOLD = 2.0
+
+#: Digits are tabular and carry no signal, so a line needs real letters.
+MINIMUM_LETTERS_TO_SCORE = 3
+
+
+def _median(values: list[float]) -> float:
+    ordered = sorted(values)
+    middle = len(ordered) // 2
+    if len(ordered) % 2:
+        return ordered[middle]
+    return (ordered[middle - 1] + ordered[middle]) / 2
+
+
+def score_font_match(comparisons: list[GlyphComparison]) -> FontScore | None:
+    """Reduce per-glyph deviations to a scale-invariant font score."""
+    if not comparisons:
+        return None
+    deviations = [c.deviation_percent for c in comparisons]
+    offset = _median(deviations)
+    scatter = _median([abs(d - offset) for d in deviations])
+    return FontScore(
+        glyphs=len(comparisons),
+        offset_percent=round(offset, 2),
+        scatter_percent=round(scatter, 2),
+        letters_measured=sum(1 for c in comparisons if c.character.isalpha()),
+    )
+
+
 def compare_text_line(image: Image.Image, expected_text: str) -> list[GlyphComparison]:
     """Measure a photographed text line against San Francisco.
 
