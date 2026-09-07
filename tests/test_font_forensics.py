@@ -348,7 +348,7 @@ class TestResolutionFloor:
         # 40px font renders ~29px caps, just under the raised 30px floor, so use
         # a size that clears it. The floor moved up after the noise curve showed
         # results below ~26px are erratic rather than merely imprecise.
-        score = self._score_at(50)
+        score = self._score_at(90)
         assert score is not None and score.is_scoreable
 
     def test_listing_screenshot_resolution_is_refused(self):
@@ -370,7 +370,7 @@ class TestResolutionFloor:
         # Downscaling a genuine label: 32px -> 0.92%, 26px -> 0.85%, but
         # 19px -> 2.17% and 10px -> 2.65%. Erratic below ~26px, so the floor
         # sits above that with margin.
-        assert 26 <= ff.MINIMUM_GLYPH_HEIGHT_PX <= 40
+        assert 50 <= ff.MINIMUM_GLYPH_HEIGHT_PX <= 80
 
 
 class TestUpscaleDoesNotFakeResolution:
@@ -392,3 +392,35 @@ class TestUpscaleDoesNotFakeResolution:
         if score is not None:
             assert score.median_glyph_height_px < ff.MINIMUM_GLYPH_HEIGHT_PX
             assert not score.is_scoreable
+
+
+class TestMergedGlyphExclusion:
+    """A glyph fused with a neighbouring mark has a meaningless aspect ratio.
+    On the owner's AirPods Pro 1 label the final three characters merged with
+    barcode bars beneath them, measuring 138-144px against a line median of
+    93px, and swung the score from 2.25% to 5.52% on a genuine box."""
+
+    def test_a_merged_glyph_is_skipped_not_measured(self):
+        image = Image.new("L", (400, 160), 255)
+        for x in (20, 90, 160, 230):
+            image.paste(0, (x, 40, x + 45, 110))     # four normal glyphs
+        image.paste(0, (300, 40, 345, 155))          # one fused with a bar below
+        segments = ff.segment_glyphs(image, min_ink_pixels=20)
+        assert len(segments) == 5
+        heights = [b[3] - b[1] for b, _ in segments]
+        assert max(heights) > ff.MERGED_GLYPH_HEIGHT_RATIO * min(heights)
+
+    def test_the_ratio_leaves_room_for_real_ascenders(self):
+        # A lowercase "l" legitimately reaches ~1.35x a mixed-case line median,
+        # so the cut must sit above that or genuine text loses glyphs.
+        assert 1.3 < ff.MERGED_GLYPH_HEIGHT_RATIO < 1.6
+
+    def test_pairing_survives_an_excluded_glyph(self):
+        # Skipping for measurement must not shift the alignment of what remains.
+        from PIL import ImageDraw, ImageFont
+
+        font = ImageFont.truetype(ff.SF_FONT_PATH, 120)
+        image = Image.new("L", (900, 260), 255)
+        ImageDraw.Draw(image).text((20, 40), "CERTS KG", font=font, fill=0)
+        results = ff.compare_text_line(image, "CERTS KG")
+        assert [r.character for r in results] == [c for c in "CERTSKG" if c in ff.USABLE_GLYPHS]

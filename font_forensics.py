@@ -388,6 +388,12 @@ FONT_SCATTER_THRESHOLD = 2.0
 #: Digits are tabular and carry no signal, so a line needs real letters.
 MINIMUM_LETTERS_TO_SCORE = 3
 
+#: A component taller than this multiple of the line's median height has merged
+#: with a neighbouring mark. Ascenders and capitals legitimately reach about
+#: 1.35x the median on a mixed-case line, so the cut sits above that; the
+#: barcode-merged glyphs that motivated it measured 1.48x and higher.
+MERGED_GLYPH_HEIGHT_RATIO = 1.4
+
 #: Minimum glyph height, in pixels, for the score to mean anything.
 #:
 #: Measured by rendering the same string at decreasing sizes: at a cap height of
@@ -395,6 +401,19 @@ MINIMUM_LETTERS_TO_SCORE = 3
 #: separation. At 22px SF rises to 1.70% - still under the 2.0% threshold but
 #: with almost no margin. Below 18px segmentation fails outright: strokes merge
 #: and neighbouring glyphs join, so there is nothing to measure.
+#:
+#: PROVISIONAL, and known to be under-evidenced. Two genuine labels measured
+#: natively: AirPods Pro 2 at ~130px glyphs scored 0.90%, AirPods Pro 1 at ~30px
+#: scored 2.0-3.0% - overlapping the 3.3% where substitute typefaces begin. At
+#: 30px native capture there is effectively no separation, so the floor sits at
+#: 60px. Nothing has been measured between 30 and 130, and the true floor could
+#: be anywhere in that gap.
+#:
+#: METHODOLOGICAL WARNING: downscaling a sharp image is NOT equivalent to a
+#: natively low-resolution capture. Downscaling the 130px label to 32px scored
+#: 0.92%, while a real 30px capture scored 2.0-3.0%. The downscaled version
+#: keeps stroke structure a small sensor never recorded, so the noise curve
+#: below flatters low resolutions and must not be used to set this floor.
 #:
 #: Raised from 25 to 30 after measuring the noise curve on a genuine label
 #: downscaled step by step - the typeface never changes, so every rise is
@@ -408,7 +427,7 @@ MINIMUM_LETTERS_TO_SCORE = 3
 #: glyphs were 7px tall - far below the floor. Font forensics works for someone
 #: photographing a box in front of them, and does not work for screening posted
 #: listing photos.
-MINIMUM_GLYPH_HEIGHT_PX = 30
+MINIMUM_GLYPH_HEIGHT_PX = 60
 
 
 def _median(values: list[float]) -> float:
@@ -439,6 +458,42 @@ def score_font_match(
     )
 
 
+def isolate_dominant_line(
+    segments: list[tuple[tuple[int, int, int, int], Image.Image]],
+) -> list[tuple[tuple[int, int, int, int], Image.Image]]:
+    """Keep only the largest horizontal band of components.
+
+    A crop rarely contains exactly one line. On the owner's AirPods Pro 1 label
+    the barcode sat a few pixels under the serial text, and its bars were counted
+    as glyphs - which shifted every pairing and swung the font score from 2.25%
+    to 5.52% depending on nothing but where the crop edge fell. That is a false
+    accusation waiting to happen on a genuine box.
+
+    Components are grouped into rows by vertical overlap and the most populous
+    row wins. Text sits on a shared baseline; a barcode underneath it does not
+    share that band.
+    """
+    if len(segments) < 3:
+        return segments
+
+    rows: list[list[tuple[tuple[int, int, int, int], Image.Image]]] = []
+    for item in sorted(segments, key=lambda s: s[0][1]):
+        box = item[0]
+        for row in rows:
+            top = min(b[0][1] for b in row)
+            bottom = max(b[0][3] for b in row)
+            overlap = min(box[3], bottom) - max(box[1], top)
+            shorter = min(box[3] - box[1], bottom - top)
+            if shorter > 0 and overlap / shorter >= 0.5:
+                row.append(item)
+                break
+        else:
+            rows.append([item])
+
+    dominant = max(rows, key=len)
+    return sorted(dominant, key=lambda s: s[0][0])
+
+
 def compare_text_line(image: Image.Image, expected_text: str) -> list[GlyphComparison]:
     """Measure a photographed text line against San Francisco.
 
@@ -447,6 +502,7 @@ def compare_text_line(image: Image.Image, expected_text: str) -> list[GlyphCompa
     measured; the rest carry too little signal to survive blur.
     """
     segments = segment_glyphs(image, threshold=otsu_threshold(image), min_ink_pixels=25)
+    segments = isolate_dominant_line(segments)
     # Punctuation is dropped by the height filter, so compare against the
     # characters that survive it too.
     # Only marks the height filter actually removes. Brackets and quotes are
@@ -460,8 +516,20 @@ def compare_text_line(image: Image.Image, expected_text: str) -> list[GlyphCompa
         # counterfeit verdict out of a segmentation bug.
         return []
 
+    # A glyph markedly taller than the rest of its line has merged with
+    # something - on the owner's AirPods Pro 1 label the final three characters
+    # fused with barcode bars beneath them and measured 138-144px against a line
+    # median of 93px. Their aspect ratios are meaningless, and including them
+    # swung the font score from 2.25% to 5.52% on a genuine box. They are
+    # skipped for MEASUREMENT but kept in the pairing, so alignment survives.
+    heights = [box[3] - box[1] for box, _ in segments]
+    line_height = _median([float(h) for h in heights]) if heights else 0.0
+    ceiling = line_height * MERGED_GLYPH_HEIGHT_RATIO if line_height else float("inf")
+
     results: list[GlyphComparison] = []
-    for character, (_, glyph) in zip(letters, segments):
+    for character, (box, glyph) in zip(letters, segments):
+        if (box[3] - box[1]) > ceiling:
+            continue
         # Case must NOT be normalised. USABLE_GLYPHS was derived for uppercase
         # and digits; comparing a lowercase "e" against an uppercase "E"
         # reference reads as a 34% deviation on a genuine label.

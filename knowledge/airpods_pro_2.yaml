@@ -293,7 +293,18 @@ font_baseline:
   # tool for posted listing photos. Claiming otherwise would produce confident
   # nonsense on the images real users actually paste.
   resolution_floor:
-    minimum_glyph_height_px: 30
+    minimum_glyph_height_px: 60
+    # PROVISIONAL and under-evidenced. Native measurements: AirPods Pro 2 at
+    # ~130px glyphs scored 0.90%; AirPods Pro 1 at ~30px scored 2.0-3.0%, which
+    # overlaps the 3.3% where substitute typefaces begin. At 30px there is
+    # effectively no separation. Nothing measured between 30 and 130px.
+    #
+    # METHODOLOGICAL WARNING: downscaling a sharp image is NOT equivalent to a
+    # natively low-resolution capture. The 130px label downscaled to 32px scored
+    # 0.92%; a real 30px capture scored 2.0-3.0%. Downscaling preserves stroke
+    # structure a small sensor never recorded, so the noise curve below flatters
+    # low resolutions and must not be used to set this floor.
+    native_measurements: {130: 0.90, 30: 2.5}
     # Raised from 25 after downscaling a genuine label step by step. The
     # typeface never changes, so every rise is measurement noise - and it is
     # erratic rather than gradual: 32px 0.92%, 26px 0.85%, 19px 2.17%, 16px
