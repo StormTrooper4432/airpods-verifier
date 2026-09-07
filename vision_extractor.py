@@ -79,6 +79,34 @@ _EXTENSION_MEDIA_TYPES = {
 class VisionExtractionError(RuntimeError):
     """Raised when photographs could not be turned into a valid extraction."""
 
+
+class ReferencePhotoError(VisionExtractionError):
+    """Raised when a protected reference photograph would be sent to an API."""
+
+
+#: Directories holding the owner's own genuine units. These photographs carry
+#: real serial numbers, and the Gemini free tier states that submitted content is
+#: used to improve Google's products - so sending one would hand a valid Apple
+#: serial to a third party for retention. A cloned valid serial passes Apple's
+#: coverage lookup, which is the exact fraud this project detects.
+#:
+#: Everything the font baseline needs is measured locally with Pillow, so these
+#: never need to leave the machine. This is a hard block rather than a
+#: convention: conventions get forgotten during a refactor.
+PROTECTED_PATH_MARKERS = ("knowledge/real_", "knowledge\\real_")
+
+
+def assert_not_reference_photo(image_path: Path | str) -> None:
+    """Refuse to transmit a protected reference photograph."""
+    resolved = str(Path(image_path).resolve()).replace("\\", "/")
+    if any(marker.replace("\\", "/") in resolved for marker in PROTECTED_PATH_MARKERS):
+        raise ReferencePhotoError(
+            f"Refusing to send {Path(image_path).name} to a vision API: it is a genuine "
+            f"reference photograph under knowledge/real_*, which carries a real serial number. "
+            f"Reference photographs are measured locally (font_forensics, image_quality) and "
+            f"never transmitted."
+        )
+
 # Provider failures are re-raised as VisionExtractionError below, so callers of
 # this module only ever need to catch one exception type.
 
@@ -169,6 +197,7 @@ def prepare_images(image_paths: list[Path | str]) -> list[PreparedImage]:
 
     prepared: list[PreparedImage] = []
     for index, image_path in enumerate(image_paths, start=1):
+        assert_not_reference_photo(image_path)
         media_type, data = encode_image(image_path)
         prepared.append(
             PreparedImage(
@@ -300,6 +329,8 @@ __all__ = [
     "ProviderResult",
     "VisionExtractionError",
     "build_instruction",
+    "ReferencePhotoError",
+    "assert_not_reference_photo",
     "encode_image",
     "extract",
     "load_system_prompt",

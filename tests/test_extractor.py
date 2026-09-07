@@ -569,3 +569,48 @@ class TestLiteOnlyChain:
         provider = pv.get_provider("gemini")
         assert set(provider.lite_only_chain) <= pv.GEMINI_FREE_TIER_MODELS
         assert not pv.GEMINI_RETIRED_MODELS & set(provider.lite_only_chain)
+
+
+class TestReferencePhotoProtection:
+    """Genuine reference photographs carry real serial numbers. The Gemini free
+    tier states submitted content is used to improve Google's products, so a
+    valid Apple serial would be retained by a third party - and a cloned valid
+    serial passes Apple's own coverage lookup, which is the fraud this project
+    exists to detect. Everything the baseline needs is measured locally."""
+
+    def test_reference_photos_are_refused(self, tmp_path):
+        protected = tmp_path / "knowledge" / "real_app2"
+        protected.mkdir(parents=True)
+        photo = protected / "IMG_0001.JPG"
+        PIL_Image.new("RGB", (100, 100), "white").save(photo)
+        with pytest.raises(ve.ReferencePhotoError, match="Refusing to send"):
+            ve.prepare_images([photo])
+
+    def test_the_refusal_explains_why(self, tmp_path):
+        protected = tmp_path / "knowledge" / "real_ap4"
+        protected.mkdir(parents=True)
+        photo = protected / "x.jpg"
+        PIL_Image.new("RGB", (50, 50), "white").save(photo)
+        with pytest.raises(ve.ReferencePhotoError, match="measured locally"):
+            ve.assert_not_reference_photo(photo)
+
+    def test_ordinary_corpus_photos_are_unaffected(self, photo):
+        assert ve.prepare_images([photo])
+
+    @pytest.mark.parametrize("folder", ["real_app2", "real_ap1", "real_ap4w_anc", "real_app1"])
+    def test_every_reference_directory_is_covered(self, tmp_path, folder):
+        target = tmp_path / "knowledge" / folder
+        target.mkdir(parents=True)
+        photo = target / "img.jpg"
+        PIL_Image.new("RGB", (40, 40), "white").save(photo)
+        with pytest.raises(ve.ReferencePhotoError):
+            ve.assert_not_reference_photo(photo)
+
+    def test_the_block_survives_a_relative_path(self, tmp_path, monkeypatch):
+        target = tmp_path / "knowledge" / "real_app2"
+        target.mkdir(parents=True)
+        photo = target / "img.jpg"
+        PIL_Image.new("RGB", (40, 40), "white").save(photo)
+        monkeypatch.chdir(tmp_path)
+        with pytest.raises(ve.ReferencePhotoError):
+            ve.assert_not_reference_photo("knowledge/real_app2/img.jpg")
