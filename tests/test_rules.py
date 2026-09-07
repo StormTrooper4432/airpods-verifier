@@ -1262,3 +1262,46 @@ class TestRulesNeedingSeveralPanels:
             visible_panels=["box_bottom_label", "case_lid_underside", "box_back"],
         ))
         assert not any("underside of the lid" in step for step in report.next_steps)
+
+
+class TestNextStepRanking:
+    """Photo requests are ranked by the evidence weight they unlock, not by how
+    many checks they happen to touch."""
+
+    def _steps(self, panels):
+        return evaluate(make_extraction(
+            extracted_model_number=None, extracted_serial_number=None,
+            serial_label_literal=None, copyright_year=None, serial_case_lid=None,
+            serial_left_earbud=None, serial_right_earbud=None,
+            has_paper_pull_tabs=False, visible_panels=panels,
+        )).next_steps
+
+    def test_the_case_lid_is_requested_when_nothing_was_photographed(self):
+        # It unblocks only one rule, so counting checks buried it - but that
+        # rule is the serial cross-match, the only check a cloned serial cannot
+        # survive.
+        steps = self._steps([])
+        assert any("underside of the lid" in step for step in steps)
+
+    def test_the_box_label_still_comes_first(self):
+        # Highest total weight: model number, copyright, cross-match, label
+        # format and serial format all depend on it.
+        assert "underside of the box" in self._steps([])[0]
+
+    def test_the_case_lid_leads_once_the_box_is_covered(self):
+        assert "underside of the lid" in self._steps(
+            ["box_front", "box_back", "box_bottom_label"])[0]
+
+    def test_it_terminates_and_does_not_repeat_a_request(self):
+        # A rule needing several panels stays queued until all are covered, so
+        # the loop must exclude panels already asked for or it never ends.
+        steps = self._steps([])
+        requests = [s for s in steps if "resolves:" in s]
+        assert len(requests) == len(set(requests))
+        assert len(steps) < 12
+
+    def test_a_fully_photographed_item_asks_for_nothing(self):
+        report = evaluate(make_extraction(
+            visible_panels=["box_bottom_label", "case_lid_underside", "box_back", "earbud"],
+        ), GOOD_FONT)
+        assert report.next_steps == []

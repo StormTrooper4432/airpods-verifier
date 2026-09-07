@@ -980,6 +980,21 @@ def evaluate(
     )
 
 
+def _still_blocked(rule: Rule, covered: set[str]) -> bool:
+    """True while a rule is still missing a photograph it needs.
+
+    A rule requiring SEVERAL panels stays queued until every one is covered -
+    dropping it after the first meant the case lid was never requested, because
+    the box label alone was treated as resolving a cross-check that needs both
+    surfaces.
+    """
+    if set(rule.requires_panels) - covered:
+        return True
+    if rule.requires_panels:
+        return False
+    return bool(rule.answerable_from) and not (covered & set(rule.answerable_from))
+
+
 def _next_steps(
     unanswerable: list[Rule], unreadable: list[Rule], shown: set[str]
 ) -> list[str]:
@@ -997,32 +1012,43 @@ def _next_steps(
     """
     steps: list[str] = []
     remaining = list(unanswerable)
+    covered: set[str] = set(shown)
 
     while remaining:
         # Which unshown panel would unblock the most outstanding checks?
-        tally: dict[str, list[str]] = {}
+        tally: dict[str, list[Rule]] = {}
         for rule in remaining:
             for panel in tuple(rule.requires_panels) + tuple(rule.answerable_from):
-                if panel not in shown and panel in PANEL_REQUESTS:
-                    tally.setdefault(panel, []).append(rule.parameter)
+                if panel not in covered and panel in PANEL_REQUESTS:
+                    tally.setdefault(panel, []).append(rule)
         if not tally:
             break
 
-        def rank(panel: str) -> tuple[int, int]:
+        def rank(panel: str) -> tuple[float, int]:
+            """Rank by how much EVIDENCE a photograph unlocks, not how many
+            checks it happens to touch.
+
+            Counting checks undervalues the case lid: it unblocks one rule, but
+            that rule is the serial cross-match, the only check a cloned serial
+            cannot survive. Weight is the engine's own statement of how much
+            each check is worth, so the advice should use it.
+            """
             preference = (
                 len(PANEL_PRIORITY) - PANEL_PRIORITY.index(panel)
                 if panel in PANEL_PRIORITY
                 else 0
             )
-            return (len(tally[panel]), preference)
+            return (sum(rule.weight for rule in tally[panel]), preference)
 
         best = max(tally, key=rank)
-        resolved = sorted(set(tally[best]))
+        resolved = sorted({rule.parameter for rule in tally[best]})
         steps.append(f"{PANEL_REQUESTS[best]} (resolves: {', '.join(resolved)})")
-        remaining = [
-            rule for rule in remaining
-            if best not in rule.answerable_from and best not in rule.requires_panels
-        ]
+        covered.add(best)
+        # A rule needing SEVERAL panels stays in the queue until every one is
+        # covered. Dropping it after the first satisfied panel meant the case
+        # lid was never requested - the box label alone was treated as having
+        # resolved a cross-check that needs both surfaces.
+        remaining = [rule for rule in remaining if _still_blocked(rule, covered)]
 
     for rule in unreadable:
         steps.append(
