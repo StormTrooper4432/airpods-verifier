@@ -21,9 +21,10 @@ extraction*.json
 corpus/
 results/
 
-# Genuine reference photographs (owner's own units). Measurements derived from
-# them live in knowledge/*.yaml; the images themselves stay local.
+# Reference photographs - genuine units and counterfeits alike. Measurements
+# derived from them live in knowledge/*.yaml; the images themselves stay local.
 knowledge/real_*/
+knowledge/fake/
 
 # macOS
 .DS_Store

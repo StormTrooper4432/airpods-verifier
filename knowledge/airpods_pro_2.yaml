@@ -464,6 +464,53 @@ owner_indicator_catalogue:
       status: pending
       note: Panel-dependent; needs reliable panel identification first.
 
+# Observations from a confirmed counterfeit AirPods Pro 3 (knowledge/fake).
+# Recorded, not implemented - n=1 counterfeit against n=3 genuine labels is not
+# enough to write a rule on, and under-evidenced rules have produced a false
+# positive every time this project has tried one.
+counterfeit_observations:
+  source: owner (confirmed counterfeit AirPods Pro 3, photographed)
+  label_reads: "MFHP4ZM/A  AirPods Pro 3  Model A3063 A3064 A3122"
+  observations:
+    - id: serial_label_spacing
+      detail: >-
+        Prints "(S)Serial No." with no space after the (S) marker. Independent
+        confirmation of the owner's most reliable single label tell, on a
+        different counterfeit from the one that first showed it.
+      status: already_implemented
+    - id: product_of_vietnam
+      detail: >-
+        Reads "Product of Vietnam". The three genuine labels read "Assembled in
+        Vietnam" (AirPods Pro 2, AirPods 4 ANC) or "Made in Vietnam" (AirPods
+        Pro 1) - genuine phrasing varies, and "Product of" appears on neither.
+      status: candidate
+      blocked_on: >-
+        One counterfeit against three genuine labels. Apple's phrasing already
+        varies between genuine products, so a rule here needs enough genuine
+        samples to know the full set of legitimate wordings.
+    - id: shared_misspelling_family
+      detail: >-
+        Carries the same Spanish errors as corpus post 4 - inallimbricos,
+        tanafios, cargaoores, Appie Watch, Chemical Bums, swalliwed - plus
+        missing spaces in "Embalajedepapel" and "apple. com". Suggests a single
+        counterfeit source reused across listings, which would make the
+        misspelling rule sharper than a generic spell-check.
+      status: partly_implemented
+    - id: model_numbers_are_genuine
+      detail: >-
+        Model A3063 A3064 A3122 are Apple's real AirPods Pro 3 numbers. The
+        model-number check cannot catch this counterfeit, which is exactly why
+        it must not be the only Tier 1 rule.
+      status: informative
+
+# Font calibration status against this counterfeit: NOT ACHIEVED. Its serial
+# line is digit-heavy (only S, S, G are usable letters, and clipping removed
+# them), and digits are tabular so they carry no per-glyph signal. Its back
+# panel has ample text but locating a specific line by hand hits a different
+# failure each attempt - wrong row selected, glyphs clipped, letters too few.
+# Automatic text-line location is the blocker, not the absence of counterfeit
+# photographs.
+
 pending_rules:
   - id: serial_cross_match
     statement: >-

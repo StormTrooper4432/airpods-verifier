@@ -449,6 +449,7 @@ def score_font_match(
 
 def isolate_dominant_line(
     segments: list[tuple[tuple[int, int, int, int], Image.Image]],
+    expected_count: int | None = None,
 ) -> list[tuple[tuple[int, int, int, int], Image.Image]]:
     """Keep only the largest horizontal band of components.
 
@@ -458,9 +459,15 @@ def isolate_dominant_line(
     to 5.52% depending on nothing but where the crop edge fell. That is a false
     accusation waiting to happen on a genuine box.
 
-    Components are grouped into rows by vertical overlap and the most populous
-    row wins. Text sits on a shared baseline; a barcode underneath it does not
-    share that band.
+    Components are grouped into rows by vertical overlap. When the expected
+    character count is known the closest-matching row wins; otherwise the most
+    populous does.
+
+    That distinction matters: a barcode has far more bars than the text above it
+    has letters, so "most populous" picks the barcode every time on a label crop
+    that includes both. Measuring barcode bars as glyphs is how a counterfeit
+    label produced a component count that matched the text exactly while
+    describing something else entirely.
     """
     if len(segments) < 3:
         return segments
@@ -479,7 +486,10 @@ def isolate_dominant_line(
         else:
             rows.append([item])
 
-    dominant = max(rows, key=len)
+    if expected_count is not None:
+        dominant = min(rows, key=lambda row: (abs(len(row) - expected_count), -len(row)))
+    else:
+        dominant = max(rows, key=len)
     return sorted(dominant, key=lambda s: s[0][0])
 
 
@@ -490,8 +500,11 @@ def compare_text_line(image: Image.Image, expected_text: str) -> list[GlyphCompa
     reading text is what an LLM is good at. Only characters in USABLE_GLYPHS are
     measured; the rest carry too little signal to survive blur.
     """
+    letters_expected = len(
+        [c for c in expected_text if not c.isspace() and c not in _SHORT_MARKS]
+    )
     segments = segment_glyphs(image, threshold=otsu_threshold(image), min_ink_pixels=25)
-    segments = isolate_dominant_line(segments)
+    segments = isolate_dominant_line(segments, letters_expected)
     # Punctuation is dropped by the height filter, so compare against the
     # characters that survive it too.
     # Only marks the height filter actually removes. Brackets and quotes are
@@ -517,9 +530,14 @@ def compare_text_line(image: Image.Image, expected_text: str) -> list[GlyphCompa
     # glyph height from 30px to 66px - all of it clipping, none of it typeface.
     # Reject the whole line rather than score a truncated one: a crop that
     # clips is a crop we cannot trust anywhere along it.
-    width, height = image.size
-    if any(box[1] <= 0 or box[3] >= height for box, _ in segments):
-        return []
+    # A glyph cut by the crop boundary has a truncated bounding box, so its
+    # aspect ratio is meaningless: sliding a crop 36px down a genuine AirPods 4
+    # label moved the score from 0.69% to 4.15% and the apparent glyph height
+    # from 30px to 66px, all of it clipping. Clipped glyphs are skipped for
+    # measurement and kept in the pairing, so one bad glyph does not discard
+    # nineteen good ones - but if the whole line is clipped, nothing survives
+    # and no score is produced, which is the correct outcome.
+    _, height = image.size
 
     heights = [box[3] - box[1] for box, _ in segments]
     line_height = _median([float(h) for h in heights]) if heights else 0.0
@@ -528,6 +546,8 @@ def compare_text_line(image: Image.Image, expected_text: str) -> list[GlyphCompa
     results: list[GlyphComparison] = []
     for character, (box, glyph) in zip(letters, segments):
         if (box[3] - box[1]) > ceiling:
+            continue
+        if box[1] <= 0 or box[3] >= height:
             continue
         # Case must NOT be normalised. USABLE_GLYPHS was derived for uppercase
         # and digits; comparing a lowercase "e" against an uppercase "E"
