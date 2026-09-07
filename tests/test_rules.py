@@ -1047,10 +1047,24 @@ class TestSerialCrossMatch:
         assert status_of(report, "Serial Cross-Match") is EvidenceStatus.UNKNOWN
         assert "unverified" in detail_of(report, "Serial Cross-Match")
 
-    def test_it_is_tier_1_and_sourced(self):
+    def test_it_disqualifies_but_does_not_block(self):
+        # Tier 2 on purpose. A Tier 1 rule left unresolved blocks GENUINE
+        # outright, and on a sealed box the case-lid and earbud serials cannot
+        # be photographed at all - so at Tier 1 this would make every sealed
+        # unit permanently unverifiable. A FAIL still disqualifies.
         rule = next(r for r in RULES if r.parameter == "Serial Cross-Match")
-        assert rule.tier == 1 and rule.disqualifying
+        assert rule.tier == 2 and rule.disqualifying
         assert not rule.source.startswith("UNSOURCED")
+
+    def test_a_sealed_box_can_still_be_cleared(self):
+        # Only the box label serial is visible on a sealed unit.
+        sealed = make_extraction(
+            serial_case_lid=None, serial_left_earbud=None, serial_right_earbud=None,
+            has_plastic_shrinkwrap=True, shrinkwrap_has_pull_tab=True,
+        )
+        report = evaluate(sealed, GOOD_FONT)
+        assert status_of(report, "Serial Cross-Match") is EvidenceStatus.UNKNOWN
+        assert report.summary_verdict is Verdict.GENUINE
 
     def test_it_survives_a_cloned_serial(self):
         # A counterfeit carrying a serial cloned from a genuine unit passes

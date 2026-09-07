@@ -789,7 +789,12 @@ RULES: tuple[Rule, ...] = (
         answerable_from=("box_bottom_label", "case_lid_underside", "earbud"),
     ),
     Rule(
-        tier=1,
+        # Tier 2, not Tier 1, despite being the strongest check here. An
+        # unresolved Tier 1 rule blocks a GENUINE verdict outright, and on a
+        # SEALED box the case lid and earbud serials are physically unreachable
+        # - so at Tier 1 this rule would make every sealed unit permanently
+        # unverifiable. A FAIL still disqualifies; only the absence is tolerated.
+        tier=2,
         parameter="Serial Cross-Match",
         weight=4.0,
         disqualifying=True,
