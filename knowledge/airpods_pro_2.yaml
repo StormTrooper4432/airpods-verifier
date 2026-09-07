@@ -76,8 +76,11 @@ other_generations:
     source: apple-identify
   - name: AirPods Pro (1st generation)
     introduced: 2019
-    numbers: [A2084, A2083]
-    source: apple-identify
+    numbers: [A2084, A2083, A2190]
+    source: >-
+      apple-identify (A2084, A2083); owner genuine label, MLWK3AM/A, reads
+      "Model A2083 A2084 A2190" - A2190 is the charging case and is absent from
+      Apple's identify page
   - name: AirPods 4 with Active Noise Cancellation
     introduced: 2024
     numbers: [A3056, A3055, A3057, A3059]
@@ -191,6 +194,13 @@ font_baseline:
     substitute_fonts_percent_range: [3.3, 7.9]
     threshold_percent: 2.0
     minimum_letters: 3
+    # WARNING: this threshold is not yet safe to convict on. A genuine AirPods
+    # Pro 1 label measured 2.25% to 5.52% depending only on where the crop edge
+    # fell - barcode fragments intruding on the line corrupt segmentation, and
+    # the score with it. The Label Typography rule is therefore non-
+    # disqualifying until the baseline is wider and crop contamination is
+    # detected.
+    caveat: two genuine labels only; crop-sensitive; rule cannot convict alone
     source: measurement (2 genuine boxes, 4 substitute typefaces)
 
   # Resolution floor - the constraint that decides what this feature is FOR.
@@ -207,7 +217,12 @@ font_baseline:
   # tool for posted listing photos. Claiming otherwise would produce confident
   # nonsense on the images real users actually paste.
   resolution_floor:
-    minimum_glyph_height_px: 25
+    minimum_glyph_height_px: 30
+    # Raised from 25 after downscaling a genuine label step by step. The
+    # typeface never changes, so every rise is measurement noise - and it is
+    # erratic rather than gradual: 32px 0.92%, 26px 0.85%, 19px 2.17%, 16px
+    # 0.67%, 13px 0.31%, 10px 2.65%. Below ~26px the result is a coin flip.
+    noise_curve_genuine_label: {32: 0.92, 26: 0.85, 19: 2.17, 16: 0.67, 13: 0.31, 10: 2.65}
     measured_separation_at_29px: {san_francisco: 0.94, helvetica: 6.32}
     marginal_at_22px: {san_francisco: 1.70}
     segmentation_fails_below_px: 18

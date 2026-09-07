@@ -707,7 +707,14 @@ RULES: tuple[Rule, ...] = (
         tier=2,
         parameter="Label Typography",
         weight=3.0,
-        disqualifying=True,
+        # NOT disqualifying yet. A genuine AirPods Pro 1 label measured 2.25% to
+        # 5.52% depending only on where the crop edge fell, well past the 2.0%
+        # threshold - so on today's evidence a disqualifying font rule would
+        # accuse real boxes. The baseline is two genuine labels; it needs more,
+        # and it needs crop contamination detected, before this can convict on
+        # its own. Same discipline that demoted kerning and shoddy-wrap after
+        # each produced a false positive on first contact with real data.
+        disqualifying=False,
         evaluate=_rule_label_typography,
         source=(
             "Measured against San Francisco (Apple's packaging typeface, shipped with macOS); "

@@ -396,12 +396,19 @@ MINIMUM_LETTERS_TO_SCORE = 3
 #: with almost no margin. Below 18px segmentation fails outright: strokes merge
 #: and neighbouring glyphs join, so there is nothing to measure.
 #:
+#: Raised from 25 to 30 after measuring the noise curve on a genuine label
+#: downscaled step by step - the typeface never changes, so every rise is
+#: measurement noise. It is ERRATIC rather than gradual: 32px scored 0.92%, 26px
+#: 0.85%, but 19px scored 2.17%, 16px 0.67%, 13px 0.31%, 10px 2.65%. Below
+#: roughly 26px the result is a coin flip, so a threshold applied there would
+#: accuse genuine boxes at random.
+#:
 #: This is the constraint that decides what the feature is FOR. Across 20 real
 #: listing screenshots, exactly one contained a detectable text line, and its
-#: glyphs were 7px tall - four times below the floor. Font forensics works for
-#: someone photographing a box in front of them, and does not work for screening
-#: posted listing photos.
-MINIMUM_GLYPH_HEIGHT_PX = 25
+#: glyphs were 7px tall - far below the floor. Font forensics works for someone
+#: photographing a box in front of them, and does not work for screening posted
+#: listing photos.
+MINIMUM_GLYPH_HEIGHT_PX = 30
 
 
 def _median(values: list[float]) -> float:
@@ -413,7 +420,7 @@ def _median(values: list[float]) -> float:
 
 
 def score_font_match(
-    comparisons: list[GlyphComparison], glyph_heights: list[int] | None = None
+    comparisons: list[GlyphComparison], glyph_heights: list[float] | None = None
 ) -> FontScore | None:
     """Reduce per-glyph deviations to a scale-invariant font score."""
     if not comparisons:
@@ -481,13 +488,20 @@ def analyse_label(
 
     if crop.width < 4 or crop.height < 4:
         return None
+
+    # Upscaling helps segmentation - thin strokes stop vanishing into single
+    # pixels, which is what makes neighbouring glyphs merge - but it adds NO
+    # information. Glyph heights must therefore be reported in original pixels,
+    # or a 7px line upscaled 8x would claim 56px and sail past the resolution
+    # floor the floor exists to enforce.
+    upscale = 1
     if crop.height < 120:
-        factor = max(2, int(120 / max(1, crop.height)))
-        crop = crop.resize((crop.width * factor, crop.height * factor), Image.LANCZOS)
+        upscale = max(2, int(120 / max(1, crop.height)))
+        crop = crop.resize((crop.width * upscale, crop.height * upscale), Image.LANCZOS)
 
     threshold = otsu_threshold(crop)
     segments = segment_glyphs(crop, threshold=threshold, min_ink_pixels=25)
-    heights = [box_[3] - box_[1] for box_, _ in segments]
+    heights = [(box_[3] - box_[1]) / upscale for box_, _ in segments]
     comparisons = compare_text_line(crop, expected_text)
     if not comparisons:
         # Segmentation disagreed with the text. Report the size we could see, so
@@ -495,7 +509,7 @@ def analyse_label(
         if heights:
             return FontScore(
                 glyphs=0, offset_percent=0.0, scatter_percent=0.0,
-                letters_measured=0, median_glyph_height_px=_median([float(h) for h in heights]),
+                letters_measured=0, median_glyph_height_px=_median(heights),
             )
         return None
     return score_font_match(comparisons, heights)

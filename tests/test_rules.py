@@ -910,4 +910,13 @@ class TestLabelTypographyRule:
     def test_the_rule_only_answers_from_the_label_panel(self):
         rule = next(r for r in RULES if r.parameter == "Label Typography")
         assert rule.answerable_from == ("box_bottom_label",)
-        assert rule.disqualifying and not rule.source.startswith("UNSOURCED")
+        assert not rule.source.startswith("UNSOURCED")
+
+    def test_it_cannot_convict_on_its_own_yet(self):
+        # A genuine Pro 1 label measured 2.25-5.52% depending only on crop edge.
+        # Until the baseline is wider and crop contamination is detected, a font
+        # mismatch is corroborating evidence, not a verdict.
+        rule = next(r for r in RULES if r.parameter == "Label Typography")
+        assert not rule.disqualifying
+        report = evaluate(make_extraction(), WRONG_FONT)
+        assert report.confidence_score <= 0.75

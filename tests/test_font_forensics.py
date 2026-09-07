@@ -345,7 +345,10 @@ class TestResolutionFloor:
         assert score.median_glyph_height_px >= ff.MINIMUM_GLYPH_HEIGHT_PX
 
     def test_a_close_up_is_scoreable(self):
-        score = self._score_at(40)
+        # 40px font renders ~29px caps, just under the raised 30px floor, so use
+        # a size that clears it. The floor moved up after the noise curve showed
+        # results below ~26px are erratic rather than merely imprecise.
+        score = self._score_at(50)
         assert score is not None and score.is_scoreable
 
     def test_listing_screenshot_resolution_is_refused(self):
@@ -364,6 +367,28 @@ class TestResolutionFloor:
         assert not score.is_scoreable
 
     def test_the_floor_matches_what_was_measured(self):
-        # 29px separates cleanly (SF 0.94% vs Helvetica 6.32%); 22px is marginal
-        # (SF 1.70% against a 2.0% threshold); below 18px segmentation fails.
-        assert 20 <= ff.MINIMUM_GLYPH_HEIGHT_PX <= 30
+        # Downscaling a genuine label: 32px -> 0.92%, 26px -> 0.85%, but
+        # 19px -> 2.17% and 10px -> 2.65%. Erratic below ~26px, so the floor
+        # sits above that with margin.
+        assert 26 <= ff.MINIMUM_GLYPH_HEIGHT_PX <= 40
+
+
+class TestUpscaleDoesNotFakeResolution:
+    """Upscaling aids segmentation but adds no information. If glyph heights
+    were reported post-upscale, a 7px listing screenshot enlarged 8x would claim
+    56px and sail straight past the resolution floor."""
+
+    def test_heights_are_reported_in_original_pixels(self, tmp_path):
+        from PIL import ImageDraw, ImageFont
+
+        # A genuinely tiny line, well under the floor.
+        font = ImageFont.truetype(ff.SF_FONT_PATH, 14)
+        image = Image.new("L", (300, 30), 255)
+        ImageDraw.Draw(image).text((5, 5), "CERTS KGZ", font=font, fill=0)
+        path = tmp_path / "tiny.png"
+        image.save(path)
+
+        score = ff.analyse_label(path, (0, 0, 300, 30), "CERTS KGZ")
+        if score is not None:
+            assert score.median_glyph_height_px < ff.MINIMUM_GLYPH_HEIGHT_PX
+            assert not score.is_scoreable
