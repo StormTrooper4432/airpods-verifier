@@ -126,9 +126,13 @@ def is_accent_loss(word: str) -> bool:
 #: permissive bound, so an unidentified box is never failed on a technicality.
 _PERMISSIVE_MINIMUM_YEAR = min(MINIMUM_COPYRIGHT_YEAR.values())
 
-#: Apple serial numbers are uppercase alphanumeric. Legacy units use 12
-#: characters; devices from the randomised-serial era use 10.
-#: NOTE: this length constraint has no external source - see RULE_SOURCES.
+#: Observed across the owner's four genuine units, seven corpus listings and two
+#: confirmed counterfeits: every serial is 10 uppercase alphanumeric characters,
+#: except the AirPods Pro 1 (2019) at 12.
+#:
+#: This does NOT discriminate counterfeits - both confirmed fakes use 10
+#: characters, exactly like genuine units. It catches a fabricated or misread
+#: identifier, which is why the rule is non-disqualifying.
 _VALID_SERIAL_LENGTHS = (10, 12)
 _SERIAL_CHARSET_RE = re.compile(r"^[A-Z0-9]+$")
 
@@ -823,7 +827,11 @@ RULES: tuple[Rule, ...] = (
         weight=1.5,
         disqualifying=False,
         evaluate=_rule_serial_format,
-        source="UNSOURCED - length constraint is unverified; do not promote to Tier 1",
+        source=(
+            "Observed on 4 genuine units, 7 corpus listings and 2 counterfeits: 10 characters "
+            "throughout, except AirPods Pro 1 at 12. Well-formedness only - both counterfeits "
+            "used 10 characters too, so length does not discriminate"
+        ),
         answerable_from=("box_bottom_label", "case_lid_underside", "earbud"),
     ),
     Rule(

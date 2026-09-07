@@ -561,12 +561,19 @@ class TestOutputContract:
         for rule in RULES:
             assert rule.source.strip(), f"{rule.parameter} has no source"
 
-    def test_unsourced_rules_are_flagged_and_cannot_disqualify(self):
-        # The serial-length rule is not externally sourced. Until it is, it must
-        # never be able to drive a HIGH_RISK verdict on its own.
-        for rule in RULES:
-            if rule.source.startswith("UNSOURCED"):
-                assert not rule.disqualifying, f"{rule.parameter} is unsourced but disqualifying"
+    def test_no_rule_is_left_unsourced(self):
+        # The serial-length constraint was the last one. It is now grounded in
+        # observed lengths across genuine units, corpus listings and confirmed
+        # counterfeits.
+        unsourced = [r.parameter for r in RULES if r.source.startswith("UNSOURCED")]
+        assert not unsourced, f"unsourced rules: {unsourced}"
+
+    def test_a_rule_that_does_not_discriminate_cannot_disqualify(self):
+        # Serial length is well-formedness, not a tell: both confirmed
+        # counterfeits used 10 characters, exactly like genuine units.
+        rule = next(r for r in RULES if r.parameter == "Serial Number Format")
+        assert not rule.disqualifying
+        assert "does not discriminate" in rule.source
 
     def test_informational_rules_carry_no_weight(self):
         for rule in RULES:
@@ -1145,14 +1152,13 @@ class TestProvenanceIsVisible:
         report = evaluate(make_extraction(extracted_model_number="A2700")).to_dict()
         assert all(item["source"].strip() for item in report["evidence_ledger"])
 
-    def test_the_unsourced_rule_says_so_where_a_buyer_sees_it(self):
-        # The serial-length constraint is not externally sourced. If it ever
-        # produces a FAIL, the ledger must admit that rather than implying
-        # authority it does not have.
+    def test_a_weak_rule_states_its_limits_where_a_buyer_sees_it(self):
+        # Serial length catches a malformed identifier but does not distinguish
+        # a counterfeit, and the ledger must say so rather than implying more.
         text = self._render(
             make_extraction(extracted_serial_number="TOOSHORT", serial_case_lid="TOOSHORT"),
         )
-        assert "UNSOURCED" in text
+        assert "does not discriminate" in text
 
 
 class TestVerdictScenarioMatrix:

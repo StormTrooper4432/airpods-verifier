@@ -420,6 +420,27 @@ rule_scope:
     - Model Number Compatibility  # already names other generations rather than judging them
   source: reasoning from each rule's own source, plus corpus post 5
 
+# Serial format, now grounded in observation rather than assumption.
+#
+# Lengths only - a genuine serial is never recorded here, because a valid one is
+# exactly what a counterfeiter needs.
+#
+# Every serial observed across the owner's four genuine units, seven corpus
+# listings and two confirmed counterfeits is 10 characters, except the AirPods
+# Pro 1 (2019) at 12. Uppercase alphanumeric throughout.
+#
+# NOTE what this does NOT establish: length does not discriminate. Both
+# confirmed counterfeits use 10 characters, the same as genuine units. This is
+# a well-formedness check that catches fabricated or misread identifiers, not a
+# counterfeit tell, and it stays non-disqualifying for that reason.
+serial_format:
+  observed_lengths:
+    10: {genuine: 3, counterfeit: 2, corpus: 7}
+    12: {genuine: 1, note: AirPods Pro 1 (2019)}
+  charset: uppercase alphanumeric
+  discriminates_counterfeits: false
+  source: owner (4 genuine units) + corpus (7 listings) + 2 confirmed counterfeits
+
 packaging:
   shrinkwrap:
     # Contradicts the common "wrapped = fake" claim, and contradicts the
