@@ -94,6 +94,19 @@ class VisionExtraction(BaseModel):
     extracted_model_number: str | None = Field(
         description="Apple A-number printed on the box or hardware, e.g. 'A3047'. Null if not legible."
     )
+    part_number: str | None = Field(
+        description=(
+            "Apple part number printed at the start of the label block, e.g. 'MTJV3AM/A'. The "
+            "two letters before '/A' encode the sales region. Null if not legible."
+        )
+    )
+    origin_line: str | None = Field(
+        description=(
+            "The manufacturing-origin sentence exactly as printed, e.g. 'Assembled in Vietnam' "
+            "or 'Made in China'. Copy the wording verbatim - the phrasing itself matters. Null "
+            "if not legible."
+        )
+    )
     extracted_serial_number: str | None = Field(
         description="Serial number printed on the box or hardware. Null if not legible."
     )
@@ -196,6 +209,22 @@ class VisionExtraction(BaseModel):
         # No match -> hand the raw text through so the engine can fail it loudly
         # rather than silently discarding a suspicious string.
         return match.group(0) if match else value.upper()
+
+    @field_validator("part_number", mode="before")
+    @classmethod
+    def _normalise_part_number(cls, value: Any) -> Any:
+        value = _clean_optional_text(value)
+        if not isinstance(value, str):
+            return value
+        return re.sub(r"\s", "", value).upper()
+
+    @field_validator("origin_line", mode="before")
+    @classmethod
+    def _normalise_origin_line(cls, value: Any) -> Any:
+        value = _clean_optional_text(value)
+        if not isinstance(value, str):
+            return value
+        return re.sub(r"\s+", " ", value).strip()
 
     @field_validator("serial_case_lid", mode="before")
     @classmethod

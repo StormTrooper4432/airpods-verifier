@@ -24,6 +24,8 @@ VALID_EXTRACTION = {
     "extracted_model_number": "A3047",
     "extracted_serial_number": "H4XQ7K2LMN9P",
     "serial_label_literal": "(S) Serial No. H4XQ7K2LMN9P",
+    "part_number": "MTJV3AM/A",
+    "origin_line": "Assembled in Vietnam",
     "serial_case_lid": None,
     "serial_left_earbud": None,
     "serial_right_earbud": None,

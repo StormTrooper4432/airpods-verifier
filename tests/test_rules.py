@@ -44,6 +44,8 @@ GENUINE_USB_C = {
     "extracted_serial_number": "H4XQ7K2LMN9P",
     "serial_label_literal": "(S) Serial No. H4XQ7K2LMN9P",
     # Box and case agree; each earbud carries its own distinct serial.
+    "part_number": "MTJV3AM/A",
+    "origin_line": "Assembled in Vietnam",
     "serial_case_lid": "H4XQ7K2LMN9P",
     "serial_left_earbud": "GX7RT4PQWZ81",
     "serial_right_earbud": "KM3PD9TLVN52",
@@ -1060,3 +1062,45 @@ class TestSerialCrossMatch:
             serial_right_earbud="H4XQ7K2LMN9P",
         )
         assert evaluate(cloned).summary_verdict is Verdict.HIGH_RISK_SUSPECTED
+
+
+class TestEvidenceCollectedNotYetRuled:
+    """Part numbers and origin wording are extracted and recorded, deliberately
+    without a rule attached. Both look like tells and neither is supported yet."""
+
+    def test_origin_wording_does_not_discriminate_on_current_evidence(self):
+        from rules_engine import KNOWLEDGE
+
+        evidence = KNOWLEDGE["origin_line_evidence"]
+        # "Made in Vietnam" appears on a genuine AirPods Pro 1 AND on corpus
+        # post 18, a confirmed counterfeit. It separates nothing.
+        assert evidence["made_in_vietnam"]["genuine"] >= 1
+        assert evidence["made_in_vietnam"]["counterfeit"] >= 1
+        assert evidence["status"] == "insufficient_evidence"
+
+    def test_no_rule_reads_the_origin_line(self):
+        # If this starts failing, a rule was added on evidence that does not
+        # support it - four genuine labels already show two legitimate wordings,
+        # so the full set Apple uses is unknown.
+        import inspect
+
+        import rules_engine
+
+        assert "origin_line" not in inspect.getsource(rules_engine)
+
+    def test_part_numbers_are_recorded_with_their_regions(self):
+        from rules_engine import KNOWLEDGE
+
+        genuine = KNOWLEDGE["observed_part_numbers"]["genuine"]
+        assert {entry["region_suffix"] for entry in genuine} == {"AM/A", "LL/A"}
+        assert all(entry.get("origin_line") for entry in genuine)
+
+    def test_a_counterfeit_shares_a_region_suffix_with_genuine_units(self):
+        # AM/A appears on genuine boxes AND on corpus post 18, so the suffix
+        # alone proves nothing - a region rule needs the printed marks too.
+        from rules_engine import KNOWLEDGE
+
+        observed = KNOWLEDGE["observed_part_numbers"]
+        genuine = {e["region_suffix"] for e in observed["genuine"]}
+        fake = {e["region_suffix"] for e in observed["counterfeit"]}
+        assert genuine & fake

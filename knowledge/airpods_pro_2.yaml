@@ -192,6 +192,46 @@ copyright_years:
     max: 2025
     source: apple-identify (introduced 2022); owner (observed ceiling 2025)
 
+# Part numbers observed on real units, and the regulatory marks beside them.
+# Collected as EVIDENCE, not yet as a rule. A region-consistency check needs a
+# sourced mapping from region suffix to expected marks, and one CSA sighting on
+# one North American box is not that.
+observed_part_numbers:
+  genuine:
+    - {part_number: MTJV3AM/A, product: AirPods Pro 2 USB-C, region_suffix: AM/A,
+       origin_line: "Assembled in Vietnam", marks: [CSA Energy Verified Only]}
+    - {part_number: MXP93LL/A, product: AirPods 4 (ANC), region_suffix: LL/A,
+       origin_line: "Assembled in Vietnam"}
+    - {part_number: MXP63LL/A, product: AirPods 4, region_suffix: LL/A,
+       origin_line: "Assembled in Vietnam"}
+    - {part_number: MLWK3AM/A, product: AirPods Pro 1, region_suffix: AM/A,
+       origin_line: "Made in Vietnam"}
+  counterfeit:
+    - {part_number: MFHP4ZM/A, product: AirPods Pro 3, region_suffix: ZM/A,
+       origin_line: "Product of Vietnam"}
+    - {part_number: MQD83AM/A, product: AirPods Pro 2 Lightning, region_suffix: AM/A,
+       origin_line: "Made in Vietnam", note: corpus post 18}
+  source: owner (photographed units) + corpus
+
+# Why the origin wording is NOT a rule, despite looking like one.
+#
+#   "Assembled in Vietnam"  3 genuine
+#   "Made in Vietnam"       1 genuine (AirPods Pro 1) AND 1 counterfeit (post 18)
+#   "Product of Vietnam"    1 counterfeit
+#
+# "Made in" appears on both a genuine unit and a fake, so it discriminates
+# nothing. "Product of" appears only on a counterfeit, but on ONE sample, and
+# four genuine labels already show two different legitimate wordings - so the
+# full set of wordings Apple uses is unknown. Coding "Product of means fake"
+# would be an invented specification of the kind that has produced a false
+# positive every time this project has tried one.
+origin_line_evidence:
+  assembled_in_vietnam: {genuine: 3, counterfeit: 0}
+  made_in_vietnam: {genuine: 1, counterfeit: 1}
+  product_of_vietnam: {genuine: 0, counterfeit: 1}
+  status: insufficient_evidence
+  source: owner (photographed units) + corpus
+
 # Regional box variants. Packaging CONTENT varies by region - languages,
 # regulatory marks, part-number suffix - so a rule written against one region's
 # box does not transfer. Typography does NOT vary: Apple sets every region in

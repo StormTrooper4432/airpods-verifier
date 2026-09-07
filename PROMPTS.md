@@ -31,6 +31,8 @@ Constraints:
 
 - `claimed_model_variant`: read the connector on the case (USB-C vs Lightning port) or the box text. Use "Unknown" unless one of these is unambiguous. Do not infer the variant from the model number.
 - `extracted_model_number`: the Apple A-number ("A" followed by four digits), printed in the fine-print block on the box underside or moulded inside the case lid. Return only that token, e.g. "A3047".
+- `part_number`: the Apple part number at the start of the label block, e.g. `MTJV3AM/A`. The two letters before `/A` encode the sales region. Null if not legible.
+- `origin_line`: the manufacturing-origin sentence **verbatim**, e.g. `Assembled in Vietnam` or `Made in China`. Copy the wording exactly — the phrasing itself is the data.
 - `serial_case_lid`: the serial printed on the **underside of the case lid**, if that surface is photographed. Null if not visible. Do not copy the box serial here — report only what is printed on the lid itself.
 - `serial_left_earbud` / `serial_right_earbud`: the serial printed on each earbud stem, if photographed. Null if not visible. Each earbud carries its own, different from the case and from the other bud.
 - `extracted_serial_number`: the alphanumeric serial from the box barcode label or the case. Exclude the UPC/EAN barcode digits and the part number ending in "LL/A" — those are not serials.
