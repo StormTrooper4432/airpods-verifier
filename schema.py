@@ -148,6 +148,14 @@ class VisionExtraction(BaseModel):
     label_bottom: float | None = Field(
         description="Bottom edge of that label block, as a fraction of image height (0-1). Null if absent."
     )
+    label_line_texts: list[str] = Field(
+        description=(
+            "The printed lines inside that label block, transcribed EXACTLY as they appear, in "
+            "top-to-bottom order - one string per line, spacing and punctuation preserved. Used "
+            "to compare letterform geometry against Apple's typeface, so accuracy of the "
+            "characters matters more than completeness. Empty list if no label is visible."
+        )
+    )
     visible_panels: list[PanelName] = Field(
         description=(
             "Which surfaces of the product the images actually show. Empty list if none can be "

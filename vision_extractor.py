@@ -30,6 +30,12 @@ import re
 import sys
 from pathlib import Path
 
+from font_forensics import (
+    MINIMUM_GLYPH_HEIGHT_PX,
+    analyse_label_lines,
+    sf_available,
+)
+from image_quality import sharpest
 from providers import (
     DEFAULT_PROVIDER,
     PreparedImage,
@@ -41,6 +47,7 @@ from providers import (
     is_transient_failure,
     mark_rate_limited,
 )
+from schema import LabelRegion, LocalAnalysis, VisionExtraction
 
 try:  # Optional: local downscaling / format normalisation.
     from PIL import Image
@@ -321,6 +328,54 @@ def _first_line(exc: Exception, limit: int = 80) -> str:
     return text[:limit] + ("..." if len(text) > limit else "")
 
 
+def analyse_locally(
+    image_paths: list[Path | str], extraction: VisionExtraction
+) -> LocalAnalysis:
+    """Measurements Python makes for itself, from the pixels the LLM saw.
+
+    The extractor says where the label is and what it says; this measures the
+    letterforms against Apple's typeface. Nothing here calls an API, so it costs
+    nothing and is deterministic - and it keeps the rules engine a pure function
+    of data, since the result arrives there as numbers rather than an image.
+    """
+    analysis = LocalAnalysis()
+
+    try:
+        sharpness = sharpest(list(image_paths))
+        if sharpness is not None:
+            analysis = analysis.model_copy(update={"sharpness_score": sharpness.score})
+    except Exception:
+        pass  # Quality measurement must never break an extraction.
+
+    region = LabelRegion.from_extraction(extraction)
+    if region is None or not extraction.label_line_texts or not sf_available():
+        return analysis
+
+    index = region.image_index - 1
+    if not (0 <= index < len(image_paths)):
+        return analysis
+
+    try:
+        with Image.open(image_paths[index]) as source:
+            grey = source.convert("L")
+            crop = grey.crop(region.pixel_box(grey.width, grey.height))
+        score = analyse_label_lines(crop, extraction.label_line_texts)
+    except Exception:
+        return analysis
+
+    if score is None:
+        return analysis
+
+    return analysis.model_copy(update={
+        "font_scatter_percent": score.scatter_percent if score.is_scoreable else None,
+        "font_glyphs_measured": score.glyphs,
+        "font_letters_measured": score.letters_measured,
+        "median_glyph_height_px": score.median_glyph_height_px,
+        "font_line_text": extraction.label_line_texts[0] if extraction.label_line_texts else None,
+        "font_below_resolution_floor": score.median_glyph_height_px < MINIMUM_GLYPH_HEIGHT_PX,
+    })
+
+
 __all__ = [
     "DEFAULT_EFFORT",
     "DEFAULT_PROVIDER",
@@ -333,6 +388,7 @@ __all__ = [
     "assert_not_reference_photo",
     "encode_image",
     "extract",
+    "analyse_locally",
     "load_system_prompt",
     "prepare_images",
     "resolve_model_chain",

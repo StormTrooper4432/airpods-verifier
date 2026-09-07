@@ -48,6 +48,7 @@ GENUINE_USB_C = {
     "label_top": None,
     "label_right": None,
     "label_bottom": None,
+    "label_line_texts": [],
     "copyright_year": 2023,
     "has_plastic_shrinkwrap": False,
     "has_paper_pull_tabs": True,

@@ -29,6 +29,7 @@ VALID_EXTRACTION = {
     "label_top": None,
     "label_right": None,
     "label_bottom": None,
+    "label_line_texts": [],
     "copyright_year": 2023,
     "has_plastic_shrinkwrap": False,
     "has_paper_pull_tabs": True,
@@ -619,3 +620,72 @@ class TestReferencePhotoProtection:
         monkeypatch.chdir(tmp_path)
         with pytest.raises(ve.ReferencePhotoError):
             ve.assert_not_reference_photo("knowledge/real_app2/img.jpg")
+
+
+class TestLocalAnalysis:
+    """Pixel measurements Python makes for itself. No API call, so they cost
+    nothing and are deterministic - and the rules engine still receives only
+    numbers, never an image."""
+
+    def _extraction(self, **overrides):
+        return VisionExtraction.model_validate({**VALID_EXTRACTION, **overrides})
+
+    def test_sharpness_is_always_measured(self, photo):
+        analysis = ve.analyse_locally([photo], self._extraction())
+        assert analysis.sharpness_score is not None
+
+    def test_no_label_region_means_no_font_measurement(self, photo):
+        analysis = ve.analyse_locally([photo], self._extraction())
+        assert analysis.font_scatter_percent is None
+
+    def test_a_label_region_out_of_range_is_ignored(self, photo):
+        analysis = ve.analyse_locally([photo], self._extraction(
+            label_image_index=9, label_left=0.1, label_top=0.1,
+            label_right=0.9, label_bottom=0.3, label_line_texts=["CERTS KGZ"],
+        ))
+        assert analysis.font_scatter_percent is None
+
+    def test_an_unreadable_image_does_not_break_extraction(self, tmp_path):
+        broken = tmp_path / "broken.jpg"
+        broken.write_text("not an image")
+        analysis = ve.analyse_locally([broken], self._extraction(
+            label_image_index=1, label_left=0.0, label_top=0.0,
+            label_right=1.0, label_bottom=1.0, label_line_texts=["CERTS"],
+        ))
+        assert analysis.font_scatter_percent is None
+
+    def test_a_rendered_label_measures_as_san_francisco(self, tmp_path):
+        from PIL import ImageDraw, ImageFont
+
+        import font_forensics as ff
+
+        if not ff.sf_available():
+            pytest.skip("San Francisco not present")
+        lines = ["Designed by Apple in California", "Assembled in Vietnam",
+                 "MTJV3AM/A AirPods Pro 2nd generation"]
+        font = ImageFont.truetype(ff.SF_FONT_PATH, 90)
+        image = PIL_Image.new("L", (2200, 500), 250)
+        draw = ImageDraw.Draw(image)
+        for index, text in enumerate(lines):
+            draw.text((40, 40 + index * 150), text, font=font, fill=20)
+        path = tmp_path / "label.png"
+        image.convert("RGB").save(path)
+
+        analysis = ve.analyse_locally([path], self._extraction(
+            label_image_index=1, label_left=0.0, label_top=0.0,
+            label_right=1.0, label_bottom=1.0, label_line_texts=lines,
+        ))
+        assert analysis.font_glyphs_measured and analysis.font_glyphs_measured > 10
+        assert analysis.font_scatter_percent is not None
+        assert analysis.font_scatter_percent < ff.FONT_SCATTER_THRESHOLD
+
+    def test_the_rules_engine_still_receives_only_numbers(self):
+        # The architectural boundary: no rule may touch an image.
+        import inspect
+
+        import rules_engine
+
+        source = inspect.getsource(rules_engine)
+        # Check imports, not prose - the ledger legitimately says "Images show:".
+        imports = [line for line in source.splitlines() if line.startswith(("import ", "from "))]
+        assert not any("PIL" in line or "Image" in line for line in imports)

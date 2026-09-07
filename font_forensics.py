@@ -853,6 +853,13 @@ def measure_components(
     if not ordered:
         return []
 
+    # Merge vertically stacked pieces before pairing. Raw components count a
+    # dotted "i" or "j" twice, so "Designed by Apple in California" - which has
+    # four dotted i's - produced 31 components for 27 characters and paired
+    # nothing. Layout analysis must NOT merge (it needs every mark to find
+    # rows), but pairing must.
+    ordered = _merge_stacked(ordered)
+
     # Pair word by word rather than demanding the whole line match exactly.
     # Requiring global equality made real print unusable: glyphs touch, glyphs
     # break, punctuation segments unpredictably, and a two-column label puts
@@ -929,9 +936,16 @@ def analyse_label_lines(
 
     pooled: list[GlyphComparison] = []
     heights: list[float] = []
+    # Each expected text claims a DISTINCT detected line. Choosing independently
+    # let two texts of similar length pick the same line while others went
+    # unused, so a three-line label contributed only one line's glyphs.
+    available = list(lines)
     for text in expected_texts:
+        if not available:
+            break
         wanted = len([c for c in text if not c.isspace() and c not in _SHORT_MARKS])
-        candidate = min(lines, key=lambda line: abs(line.glyph_count - wanted))
+        candidate = min(available, key=lambda line: abs(line.glyph_count - wanted))
+        available.remove(candidate)
         left, top, right, bottom = candidate.box
         # Reuse the components that DEFINED this line - never re-segment.
         inside = [

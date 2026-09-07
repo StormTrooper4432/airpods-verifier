@@ -210,6 +210,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.extraction:
             extraction = load_extraction_file(args.extraction)
             result = None
+            local = None
         else:
             # Imported lazily so --extraction runs (and the tests import main)
             # without needing the anthropic SDK configured.
@@ -231,6 +232,8 @@ def main(argv: list[str] | None = None) -> int:
 
             result = vision_extractor.extract(args.images, **kwargs)
             extraction = result.extraction
+            # Pixel measurements Python makes for itself - no API call, no cost.
+            local = vision_extractor.analyse_locally(args.images, extraction)
 
             if args.save_extraction:
                 args.save_extraction.write_text(
@@ -243,7 +246,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.variant:
         extraction = extraction.model_copy(update={"claimed_model_variant": args.variant})
 
-    report = evaluate(extraction)
+    report = evaluate(extraction, local)
 
     if args.json:
         print(json.dumps(report.to_dict(), indent=2))
