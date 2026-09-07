@@ -741,7 +741,15 @@ class TestPanelAwareNextSteps:
 
     def test_a_photographed_but_unreadable_panel_asks_for_a_reshoot(self):
         steps = self._report(["box_bottom_label"]).next_steps
-        assert any("re-shoot" in step for step in steps)
+        assert any("Re-shoot" in step for step in steps)
+
+    def test_unreadable_checks_are_named_in_one_instruction(self):
+        # The advice is identical for every unreadable check, so repeating it
+        # per rule buries the requests that actually differ.
+        steps = self._report(["box_bottom_label"]).next_steps
+        reshoots = [s for s in steps if "Re-shoot" in s]
+        assert len(reshoots) == 1
+        assert reshoots[0].count("could not") <= 1
 
     def test_no_open_checks_means_no_busywork(self):
         report = evaluate(
@@ -1261,7 +1269,7 @@ class TestRulesNeedingSeveralPanels:
             serial_label_literal=None, visible_panels=["box_bottom_label"],
         ))
         steps = " ".join(report.next_steps)
-        assert "Serial Label Format" in steps and "re-shoot" in steps
+        assert "Serial Label Format" in steps and "Re-shoot" in steps
 
     def test_having_every_required_panel_removes_the_request(self):
         report = evaluate(make_extraction(

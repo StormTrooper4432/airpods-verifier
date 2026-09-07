@@ -1091,10 +1091,14 @@ def _next_steps(
         # resolved a cross-check that needs both surfaces.
         remaining = [rule for rule in remaining if _still_blocked(rule, covered)]
 
-    for rule in unreadable:
+    if unreadable:
+        # One instruction, not one per rule. The advice is identical for every
+        # unreadable check, and repeating it three times buries the requests
+        # that actually differ.
+        names = ", ".join(sorted(rule.parameter for rule in unreadable))
         steps.append(
-            f"{rule.parameter} could not be read from the surfaces you did photograph - "
-            f"re-shoot them in even light, filling the frame with the fine print."
+            f"Re-shoot the surfaces you already photographed in even light, filling the frame "
+            f"with the fine print - the text was not legible enough to check {names}."
         )
 
     return steps
