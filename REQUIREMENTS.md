@@ -48,5 +48,22 @@ The pipeline output must conform to this structure:
       "detail": "Extracted model A3047 matches Pro 2 USB-C part.",
       "source": "Apple, 'Identify your AirPods' (support.apple.com)"
     }
+  ],
+  "next_steps": [
+    "Photograph the sticker on the underside of the box - it carries the part number, the model numbers and the serial. (resolves: Model Number Compatibility, Serial Number Format)"
   ]
 }
+
+`source` is rendered under any FAILING check, so a buyer can trace every
+accusation. `next_steps` is derived from which panels were actually photographed
+and is chosen by greedy set cover, so it asks for the fewest photographs that
+would resolve the open checks.
+
+---
+
+## Note on this document
+
+`knowledge/airpods_pro_2.yaml` is authoritative. This file is a human-readable
+summary and will drift. The YAML carries per-entry sources, the full AirPods
+product family for identification, regional variants, and the measurement
+records behind every threshold.
