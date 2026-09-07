@@ -151,6 +151,7 @@ const specimenFindings = (s: Specimen): Finding[] =>
         shown={shown}
         findings={result ? findings : []}
         showWeights={!result}
+        graded={Boolean(result)}
         interactive={true}
       />
 
@@ -441,6 +442,9 @@ const specimenFindings = (s: Specimen): Finding[] =>
         if (nextPlot && herePlot) herePlot.replaceWith(nextPlot);
 
         document.querySelector('.legend')?.removeAttribute('hidden');
+        /* The overlay is never replaced, so the plot is told here that its job
+           has changed from collecting photographs to reading findings. */
+        document.querySelector('.plot')?.classList.add('is-graded');
         document.getElementById('findings-col')?.scrollIntoView({
           behavior: 'smooth',
           block: 'start',
@@ -519,11 +523,17 @@ const specimenFindings = (s: Specimen): Finding[] =>
 
   .record {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, auto));
+    /* One grid, shared edges: five fields over two rows of three, the sixth
+       cell left empty. Auto columns sized each row to its own content read as
+       a near-miss at alignment, which on the one block that has to look like a
+       ruled form is worse than no alignment at all. */
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: calc(var(--u) * 2) calc(var(--u) * 4);
     margin: 0;
     text-align: right;
+    min-width: 30rem;
   }
+  .record > div { min-width: 0; }
   .record dt { font-size: 9.5px; color: var(--ink-soft); margin-bottom: 2px; }
   .record dd { margin: 0; font-size: 16px; font-weight: 500; white-space: nowrap; }
   .record b { font-weight: 700; }
@@ -752,7 +762,7 @@ const specimenFindings = (s: Specimen): Finding[] =>
       gap: calc(var(--u) * 4);
       align-items: start;
     }
-    .record { text-align: left; justify-content: start; }
+    .record { text-align: left; min-width: 0; }
     .register .src { display: none; }
     .register { min-width: 26rem; }
     .register th, .register td { padding-right: calc(var(--u) * 1.5); }
@@ -760,6 +770,7 @@ const specimenFindings = (s: Specimen): Finding[] =>
 
   @media (max-width: 560px) {
     .record { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: calc(var(--u) * 2); }
+    .record dd { font-size: 15px; }
     .masthead-stand { font-size: 16px; margin-top: calc(var(--u) * 2); }
     .masthead { padding-bottom: calc(var(--u) * 3); margin-bottom: calc(var(--u) * 4); }
     .examination { gap: calc(var(--u) * 5); }

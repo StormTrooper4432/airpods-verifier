@@ -75,6 +75,7 @@ const underprint = rosette(300);
   )}
   <p class="grade-gloss">{gloss}</p>
 
+  <div class="grade-data">
   <div class="rail" role="img"
        aria-label={`Examination coverage: ${fmt(resolvedWeight)} of ${fmt(TOTAL_WEIGHT)} evidence weight resolved.`}>
     {segments.map(({ rule, status, resolved }) => (
@@ -107,6 +108,7 @@ const underprint = rosette(300);
       )}
     </dl>
     {verdict && <GraderMark checks={RULES.length} weight={`${fmt(TOTAL_WEIGHT)} weight`} />}
+  </div>
   </div>
 </header>
 
@@ -164,6 +166,14 @@ const underprint = rosette(300);
     margin: calc(var(--u) * 1.5) 0 calc(var(--u) * 3);
     max-width: 56ch;
     line-height: calc(var(--u) * 3);
+  }
+
+  /* The rail is the only element on the sheet claiming an exact measurement.
+     A one-line grade lets it ride up into the rosette, so the data band carries
+     the paper ground and the ornament stops at its edge. */
+  .grade-data {
+    background: var(--paper);
+    padding-top: calc(var(--u) * 0.75);
   }
 
   .rail {

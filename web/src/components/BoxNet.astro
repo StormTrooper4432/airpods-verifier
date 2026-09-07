@@ -19,11 +19,19 @@ interface Props {
   interactive?: boolean;
   /** On an unstruck record, print what each surface is worth instead of marks. */
   showWeights?: boolean;
+  /** Once a grade exists the marks are the content and the cues step back. */
+  graded?: boolean;
   caption?: string;
 }
 
-const { shown, findings = [], interactive = false, showWeights = false, caption } =
-  Astro.props;
+const {
+  shown,
+  findings = [],
+  interactive = false,
+  showWeights = false,
+  graded = false,
+  caption,
+} = Astro.props;
 
 const [vbx, vby, vbw, vbh] = PLOT_VIEWBOX.split(' ').map(Number);
 const pct = (v: number, span: number, origin: number) => ((v - origin) / span) * 100;
@@ -98,7 +106,7 @@ const placed = PANELS.flatMap((panel) => {
 const markGlyph = (s: Status) => (s === 'FAIL' ? 'fail' : s === 'PASS' ? 'pass' : 'unknown');
 ---
 
-<figure class="plot">
+<figure class:list={['plot', graded && 'is-graded']}>
   <svg viewBox={PLOT_VIEWBOX} class="plot-net" role="img"
        aria-label="The AirPods Pro 2 carton laid flat, with each examined surface marked.">
     <defs>
@@ -295,6 +303,21 @@ const markGlyph = (s: Status) => (s === 'FAIL' ? 'fail' : s === 'PASS' ? 'pass' 
   label.panel-hit:has(.panel-file:focus-visible) {
     outline: 2px solid var(--intaglio);
     outline-offset: 2px;
+  }
+
+  /* Nine solid blocks are right while collecting: they are the whole action.
+     Once findings are marked they out-shout the ticks and the struck mark that
+     are now the content, so they drop to an outline and let the marks lead. */
+  .is-graded .panel-hit-cue {
+    background: none;
+    color: var(--intaglio);
+    box-shadow: inset 0 0 0 1px var(--intaglio);
+  }
+  .is-graded label.panel-hit.is-loaded .panel-hit-cue,
+  .is-graded label.panel-hit.is-exposed .panel-hit-cue {
+    background: var(--ink);
+    color: var(--paper);
+    box-shadow: none;
   }
 
   .panel-hit-cue {
