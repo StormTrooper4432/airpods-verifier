@@ -79,11 +79,20 @@ MAXIMUM_COPYRIGHT_YEAR: int = max(bounds["max"] for bounds in COPYRIGHT_YEARS.va
 
 #: A-number -> generation name, for generations this tool identifies but does
 #: not verify. Naming the product beats reporting "unknown number".
-OTHER_GENERATIONS: dict[str, dict] = {
-    number: generation
-    for generation in KNOWLEDGE.get("other_generations", [])
-    for number in generation["numbers"]
-}
+OTHER_GENERATIONS: dict[str, dict] = {}
+for _entry in KNOWLEDGE.get("other_generations", []) + KNOWLEDGE.get("charging_cases", []):
+    for _number in _entry["numbers"]:
+        # A2190 covers two different cases that differ only by serial suffix.
+        # Keep the first and note the ambiguity rather than silently dropping one.
+        if _number in OTHER_GENERATIONS:
+            existing = OTHER_GENERATIONS[_number]
+            OTHER_GENERATIONS[_number] = {
+                **existing,
+                "name": f"{existing['name']} or {_entry['name']}",
+                "ambiguous": True,
+            }
+        else:
+            OTHER_GENERATIONS[_number] = _entry
 
 SHRINKWRAP_RULES: dict = KNOWLEDGE["packaging"]["shrinkwrap"]
 

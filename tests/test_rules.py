@@ -215,9 +215,9 @@ class TestModelNumberRule:
             ("A3063", "AirPods Pro 3"),
             ("A3064", "AirPods Pro 3"),
             ("A3065", "AirPods Pro 3"),
-            ("A3122", "AirPods Pro 3"),
-            ("A2084", "AirPods Pro (1st generation)"),
-            ("A2083", "AirPods Pro (1st generation)"),
+            ("A3122", "MagSafe Charging Case for AirPods Pro 3"),
+            ("A2084", "AirPods Pro 1"),
+            ("A2083", "AirPods Pro 1"),
         ],
     )
     def test_other_generations_are_named_not_accused(self, number, generation):
@@ -751,10 +751,10 @@ class TestGenerationIdentification:
             ("A3055", "AirPods 4 with Active Noise Cancellation"),  # corpus post 5
             ("A3063", "AirPods Pro 3"),                             # corpus posts 4 and 8
             ("A3053", "AirPods 4"),
-            ("A2565", "AirPods (3rd generation)"),
-            ("A2032", "AirPods (2nd generation)"),
-            ("A1523", "AirPods (1st generation)"),
-            ("A2096", "AirPods Max"),
+            ("A2565", "AirPods 3"),
+            ("A2032", "AirPods 2"),
+            ("A1523", "AirPods 1"),
+            ("A2096", "AirPods Max 1 (Lightning)"),
         ],
     )
     def test_the_product_is_named(self, number, generation):
@@ -920,3 +920,74 @@ class TestLabelTypographyRule:
         assert not rule.disqualifying
         report = evaluate(make_extraction(), WRONG_FONT)
         assert report.confidence_score <= 0.75
+
+
+class TestChargingCaseIdentification:
+    """Apple lists charging cases separately from earbuds, with their own model
+    numbers and years. An earlier version of the knowledge base merged them,
+    which put a 2024 case inside an earbud entry and dated every AirPods Max to
+    2020."""
+
+    @pytest.mark.parametrize(
+        "number, fragment, year",
+        [
+            ("A3059", "AirPods 4", 2024),
+            ("A3058", "AirPods 4", 2024),
+            ("A3122", "AirPods Pro 3", 2025),
+            ("A2897", "AirPods 3", 2022),
+            ("A2566", "AirPods 3", 2021),
+            ("A1938", "AirPods 1 and 2", 2019),
+            ("A1602", "AirPods 1 and 2", 2016),
+        ],
+    )
+    def test_cases_are_identified_with_their_own_year(self, number, fragment, year):
+        from rules_engine import OTHER_GENERATIONS
+
+        entry = OTHER_GENERATIONS[number]
+        assert fragment in entry["name"]
+        assert entry["introduced"] == year
+
+    def test_airpods_max_generations_are_separate(self):
+        from rules_engine import OTHER_GENERATIONS
+
+        assert OTHER_GENERATIONS["A3454"]["introduced"] == 2026   # Max 2
+        assert OTHER_GENERATIONS["A3184"]["introduced"] == 2024   # Max 1 USB-C
+        assert OTHER_GENERATIONS["A2096"]["introduced"] == 2020   # Max 1 Lightning
+
+    def test_a2190_ambiguity_is_preserved_not_silently_resolved(self):
+        # One model number, two different cases, distinguished only by the last
+        # four characters of the serial. Dropping either would make the ledger
+        # state something Apple does not.
+        from rules_engine import OTHER_GENERATIONS
+
+        entry = OTHER_GENERATIONS["A2190"]
+        assert entry.get("ambiguous")
+        assert "or" in entry["name"]
+
+    def test_a_case_number_is_named_not_accused(self):
+        report = evaluate(make_extraction(extracted_model_number="A3122"))
+        assert status_of(report, "Model Number Compatibility") is EvidenceStatus.UNKNOWN
+        assert "AirPods Pro 3" in detail_of(report, "Model Number Compatibility")
+        assert report.summary_verdict is not Verdict.HIGH_RISK_SUSPECTED
+
+
+class TestCaseSerialSuffixes:
+    """Apple states the last four characters of an AirPods Pro 1 case serial
+    outright. Recorded now, usable when Pro 1 verification is added."""
+
+    def test_suffixes_are_recorded_with_their_case(self):
+        from rules_engine import KNOWLEDGE
+
+        suffixes = KNOWLEDGE["case_serial_suffixes"]["A2190"]
+        flat = {s for entry in suffixes for s in entry["suffixes"]}
+        assert flat == {1059, "1NRC", "0C6L", "LKKT"}
+
+    def test_the_owner_genuine_label_matches_a_documented_suffix(self):
+        # The owner's genuine Pro 1 serial ends 1059: the MagSafe Charging Case
+        # for AirPods Pro 1. Apple's own constraint, satisfied by a real unit.
+        from rules_engine import KNOWLEDGE
+
+        entry = next(
+            e for e in KNOWLEDGE["case_serial_suffixes"]["A2190"] if 1059 in e["suffixes"]
+        )
+        assert entry["case"] == "MagSafe Charging Case for AirPods Pro 1"

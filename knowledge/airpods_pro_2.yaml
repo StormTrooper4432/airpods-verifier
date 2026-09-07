@@ -69,42 +69,118 @@ model_numbers:
 # Corpus evidence for why this matters: A3063 appeared on one confirmed
 # counterfeit and one confirmed genuine unit. It is an AirPods Pro 3 number -
 # the posts were a fake Pro 3 and a real one, and the tool could not say so.
+# Other AirPods products, for IDENTIFICATION ONLY - this tool verifies Pro 2 and
+# nothing else. Without them an A-number from another generation is
+# indistinguishable from a fabricated one, and the extractor is forced to
+# mislabel the product as a Pro 2.
+#
+# Earbuds and charging cases are listed SEPARATELY because Apple lists them
+# separately and their years differ. An earlier version of this file merged them,
+# which put A3059 (a 2024 case) inside the AirPods 4 ANC earbud entry and dated
+# every AirPods Max to 2020.
 other_generations:
   - name: AirPods Pro 3
     introduced: 2025
-    numbers: [A3063, A3064, A3065, A3122]
+    numbers: [A3063, A3064, A3065]
     source: apple-identify
-  - name: AirPods Pro (1st generation)
+  - name: AirPods Pro 1
     introduced: 2019
-    numbers: [A2084, A2083, A2190]
-    source: >-
-      apple-identify (A2084, A2083); owner genuine label, MLWK3AM/A, reads
-      "Model A2083 A2084 A2190" - A2190 is the charging case and is absent from
-      Apple's identify page
+    numbers: [A2084, A2083]
+    source: apple-identify
   - name: AirPods 4 with Active Noise Cancellation
     introduced: 2024
-    numbers: [A3056, A3055, A3057, A3059]
+    numbers: [A3056, A3055, A3057]
     source: apple-identify
   - name: AirPods 4
     introduced: 2024
-    numbers: [A3053, A3050, A3054, A3058]
+    numbers: [A3053, A3050, A3054]
     source: apple-identify
-  - name: AirPods (3rd generation)
+  - name: AirPods 3
     introduced: 2021
-    numbers: [A2565, A2564, A2897, A2566]
+    numbers: [A2565, A2564]
     source: apple-identify
-  - name: AirPods (2nd generation)
+  - name: AirPods 2
     introduced: 2019
-    numbers: [A2032, A2031, A1938]
+    numbers: [A2032, A2031]
     source: apple-identify
-  - name: AirPods (1st generation)
+  - name: AirPods 1
     introduced: 2016
-    numbers: [A1523, A1722, A1602]
+    numbers: [A1523, A1722]
     source: apple-identify
-  - name: AirPods Max
+  - name: AirPods Max 2
+    introduced: 2026
+    numbers: [A3454]
+    source: apple-identify
+  - name: AirPods Max 1 (USB-C)
+    introduced: 2024
+    numbers: [A3184]
+    source: apple-identify
+  - name: AirPods Max 1 (Lightning)
     introduced: 2020
-    numbers: [A2096, A3184, A3454]
+    numbers: [A2096]
     source: apple-identify
+
+# Charging cases, which carry their own model numbers and years.
+charging_cases:
+  - name: Wireless Charging Case for AirPods 4 (ANC)
+    introduced: 2024
+    numbers: [A3059]
+    source: apple-identify
+  - name: Charging Case for AirPods 4
+    introduced: 2024
+    numbers: [A3058]
+    source: apple-identify
+  - name: MagSafe Charging Case for AirPods Pro 3
+    introduced: 2025
+    numbers: [A3122]
+    source: apple-identify
+  - name: Lightning Charging Case for AirPods 3
+    introduced: 2022
+    numbers: [A2897]
+    source: apple-identify
+  - name: MagSafe Charging Case for AirPods 3
+    introduced: 2021
+    numbers: [A2566]
+    source: apple-identify
+  # A2190 covers TWO different cases distinguished only by serial suffix.
+  - name: MagSafe Charging Case for AirPods Pro 1
+    introduced: 2021
+    numbers: [A2190]
+    serial_last_four: [1059, 1NRC]
+    source: apple-identify
+  - name: AirPods Pro 1 Charging Case
+    introduced: 2019
+    numbers: [A2190]
+    serial_last_four: [0C6L, LKKT]
+    source: apple-identify
+  - name: Wireless Charging Case (AirPods 1 and 2)
+    introduced: 2019
+    numbers: [A1938]
+    source: apple-identify
+  - name: Lightning Charging Case (AirPods 1 and 2)
+    introduced: 2016
+    numbers: [A1602]
+    source: apple-identify
+
+# A checkable constraint Apple states outright: the last four characters of an
+# AirPods Pro 1 case serial are drawn from a fixed set. Anything else on an
+# A2190 case is not a genuine Apple serial for that case.
+#
+# Validated against the owner's genuine Pro 1 label, whose serial ends 1059 -
+# the MagSafe Charging Case for AirPods Pro 1.
+#
+# Not implemented as a rule yet: this tool verifies Pro 2, and Apple publishes no
+# equivalent suffix constraint for the Pro 2 cases. Recorded so it is ready when
+# Pro 1 verification is added.
+case_serial_suffixes:
+  A2190:
+    - suffixes: [1059, 1NRC]
+      case: MagSafe Charging Case for AirPods Pro 1
+      introduced: 2021
+    - suffixes: [0C6L, LKKT]
+      case: AirPods Pro 1 Charging Case
+      introduced: 2019
+  source: apple-identify
 
 copyright_years:
   Pro 2 USB-C:
@@ -329,7 +405,9 @@ owner_indicator_catalogue:
       status: implemented
       note: >-
         A 2026 copyright is invalid on any AirPods product except AirPods Max 2.
-        Pro 2 is bounded at 2025 by copyright_years.
+        Corroborated independently by apple-identify, which dates AirPods Max 2
+        to 2026 and every other AirPods product to 2025 or earlier. Pro 2 is
+        bounded at 2025 by copyright_years.
     - id: distinct_model_numbers_per_bud
       cited: 3
       verdict_when_present: real
