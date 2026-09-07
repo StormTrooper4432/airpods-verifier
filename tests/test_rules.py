@@ -1305,3 +1305,54 @@ class TestNextStepRanking:
             visible_panels=["box_bottom_label", "case_lid_underside", "box_back", "earbud"],
         ), GOOD_FONT)
         assert report.next_steps == []
+
+
+class TestProductScopedRules:
+    """Packaging ground truth here is AirPods Pro 2 specific. The pull-tab seal
+    comes from a Pro 2 guide and the copyright range from Pro 2 release dates,
+    so applying either to another generation is an unsourced extrapolation - and
+    it produced a false accusation on a genuine AirPods 4 ANC whose packaging
+    simply differs."""
+
+    OTHER_PRODUCT = "A3055"   # AirPods 4 with Active Noise Cancellation
+
+    def test_seal_rule_declines_on_another_generation(self):
+        report = evaluate(make_extraction(
+            extracted_model_number=self.OTHER_PRODUCT,
+            has_plastic_shrinkwrap=True, shrinkwrap_has_pull_tab=False,
+        ))
+        assert status_of(report, "Packaging Seal Type") is EvidenceStatus.UNKNOWN
+        assert "AirPods 4" in detail_of(report, "Packaging Seal Type")
+        assert report.summary_verdict is not Verdict.HIGH_RISK_SUSPECTED
+
+    def test_copyright_rule_declines_on_another_generation(self):
+        report = evaluate(make_extraction(
+            extracted_model_number=self.OTHER_PRODUCT, copyright_year=2019,
+        ))
+        assert status_of(report, "Copyright Year Constraint") is EvidenceStatus.UNKNOWN
+
+    def test_universal_rules_still_apply_to_other_products(self):
+        # Cross-matched serials and printed misspellings are not Pro 2 specific:
+        # Apple never repeats a serial, and proofreads every region's packaging.
+        report = evaluate(make_extraction(
+            extracted_model_number=self.OTHER_PRODUCT,
+            serial_left_earbud="H4XQ7K2LMN9P",
+            visible_spelling_errors=["MagSate"],
+        ))
+        assert status_of(report, "Serial Cross-Match") is EvidenceStatus.FAIL
+        assert status_of(report, "Typography & Print Quality") is EvidenceStatus.FAIL
+
+    def test_a_pro_2_item_is_unaffected(self):
+        report = evaluate(make_extraction(
+            has_plastic_shrinkwrap=True, shrinkwrap_has_pull_tab=False,
+        ))
+        assert status_of(report, "Packaging Seal Type") is EvidenceStatus.FAIL
+
+    def test_an_unrecognised_number_does_not_disable_the_rules(self):
+        # Only a number that IDENTIFIES another product scopes them out. A
+        # malformed one is still a Pro 2 claim and must be judged as one.
+        report = evaluate(make_extraction(
+            extracted_model_number="B1234",
+            has_plastic_shrinkwrap=True, shrinkwrap_has_pull_tab=False,
+        ))
+        assert status_of(report, "Packaging Seal Type") is EvidenceStatus.FAIL

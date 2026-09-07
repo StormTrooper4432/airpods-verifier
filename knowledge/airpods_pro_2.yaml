@@ -403,6 +403,23 @@ font_baseline:
     typical_corpus_glyph_height_px: 7
     source: measurement
 
+# Which rules are AirPods Pro 2 SPECIFIC, and which are universal.
+#
+# Getting this wrong produced a false accusation on a genuine AirPods 4 ANC: the
+# pull-tab seal expectation is sourced from a Pro 2 guide, and it was applied to
+# a product whose packaging simply differs. When the model number identifies
+# another generation, the Pro 2 specific rules decline instead of guessing.
+rule_scope:
+  pro_2_specific:
+    - Packaging Seal Type      # pull-tab seal, sourced from a Pro 2 guide
+    - Copyright Year Constraint # 2022-2025, derived from Pro 2 release dates
+  universal:
+    - Serial Cross-Match       # Apple never repeats a serial on any product
+    - Serial Label Format      # "(S) Serial" spacing seen on every genuine label here
+    - Typography & Print Quality  # Apple proofreads every region's packaging
+    - Model Number Compatibility  # already names other generations rather than judging them
+  source: reasoning from each rule's own source, plus corpus post 5
+
 packaging:
   shrinkwrap:
     # Contradicts the common "wrapped = fake" claim, and contradicts the

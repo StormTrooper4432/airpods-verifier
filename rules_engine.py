@@ -232,6 +232,22 @@ def resolve_variant(extraction: VisionExtraction) -> str:
     return VARIANT_UNKNOWN
 
 
+def identifies_another_product(extraction: VisionExtraction) -> str | None:
+    """Name the product when the model number says this is NOT an AirPods Pro 2.
+
+    Packaging ground truth in this project is Pro 2 specific - the pull-tab
+    seal comes from a Pro 2 guide and the copyright range from Pro 2 release
+    dates. Applying either to a different generation is an unsourced
+    extrapolation, and it produced a false accusation on a genuine AirPods 4
+    ANC whose packaging simply differs.
+    """
+    number = extraction.extracted_model_number
+    if not number:
+        return None
+    entry = OTHER_GENERATIONS.get(number)
+    return entry["name"] if entry else None
+
+
 def _describe_components(hits: Iterable[tuple[str, str]]) -> str:
     return ", ".join(f"{variant} {component}" for variant, component in hits)
 
@@ -325,6 +341,15 @@ def _rule_packaging_seal(extraction: VisionExtraction, variant: str) -> RuleOutc
     tab and is tight with minimal seams. The blanket "wrapped means fake" claim
     is common online and wrong, and coding it would accuse genuine sealed units.
     """
+    other = identifies_another_product(extraction)
+    if other is not None:
+        return RuleOutcome(
+            EvidenceStatus.UNKNOWN,
+            f"This item's model number identifies it as {other}, and the seal expectations here "
+            f"are sourced for AirPods Pro 2 packaging specifically. Applying them to a different "
+            f"generation would be a guess, so no finding is made.",
+        )
+
     if extraction.has_plastic_shrinkwrap:
         # "Looks shoddy" is a subjective quality judgement, and those have now
         # produced a false positive twice: kerning on posts 3 and 7, and this
@@ -375,6 +400,14 @@ def _rule_packaging_seal(extraction: VisionExtraction, variant: str) -> RuleOutc
 
 
 def _rule_copyright_year(extraction: VisionExtraction, variant: str) -> RuleOutcome:
+    other = identifies_another_product(extraction)
+    if other is not None:
+        return RuleOutcome(
+            EvidenceStatus.UNKNOWN,
+            f"This item's model number identifies it as {other}. The copyright range here is "
+            f"derived from AirPods Pro 2 release dates and does not apply to another generation.",
+        )
+
     year = extraction.copyright_year
     if year is None:
         return RuleOutcome(
