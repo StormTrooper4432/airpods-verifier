@@ -37,10 +37,23 @@ airpods-verifier/
 │   ├── run_corpus.py      batch scoring + blind-label confusion matrix
 │   ├── check_models.py    probe which provider models actually serve requests
 │   └── fetch_reddit.py    corpus collection (needs Reddit OAuth approval)
+├── web/                   Astro front end - the examination record
+│   ├── src/pages/index.astro       the surface; POST runs the real pipeline
+│   ├── src/lib/examine.ts          shells out to main.py, never decides
+│   ├── src/lib/redact.ts           serial masking, at the report boundary
+│   ├── src/lib/guilloche.ts        generated engine-turned ornament
+│   ├── src/data/sheet.ts           rule table mirrored for the browser
+│   └── src/data/specimens.json     three real corpus records, serials masked
 └── tests/
     ├── test_rules.py, test_extractor.py, test_font_forensics.py, test_packaging.py
+    ├── test_web_contract.py        fails when the web copy drifts from Python
     └── sample_data/       synthetic fixtures + the labelled photo corpus
 ```
+
+The web layer is a **renderer, not a second engine**. It shells out to
+`main.py` and prints what comes back; the browser never evaluates a rule. See
+`DESIGN.md` for the visual system and `.impeccable/surfaces/` for the surface
+brief.
 
 ---
 
@@ -72,7 +85,20 @@ These were paid for with false positives on real units. Read before adding a rul
    genuine units exceeds the gap to a counterfeit. The rule ships informational
    with zero weight.
 
-6. **Reference photographs never leave the machine.** `knowledge/real_*` and
+6. **Anything the sheet prints is masked, not trusted to be clean.** The web
+   sheet once printed a stranger's whole serial in a finding while the filed
+   records 400px below it were masked - two opposite standards on one page,
+   caught in review, not by a test. Masking now happens at the one
+   boundary every report crosses (`web/src/lib/redact.ts`), so a rule added later
+   cannot leak one by wording its detail differently. A per-rule fix would
+   have rotted on the next rule.
+
+7. **A test that checks a copy of the rule proves nothing.**
+   `test_web_contract.py` extracts the shipped regex out of `redact.ts` and
+   runs cases through node, rather than re-implementing the pattern in Python
+   where the two could drift apart silently.
+
+8. **Reference photographs never leave the machine.** `knowledge/real_*` and
    `knowledge/fake` are blocked from every vision API in code, not by
    convention - they carry real serials, and free-tier terms allow providers to
    retain submitted content.
