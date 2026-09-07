@@ -263,9 +263,14 @@ class TestFontScore:
 
     LETTERS = "KC2WVC6R36 GTZE5"
 
+    def _score(self, font_path, text):
+        image = _render_line(font_path, text)
+        heights = [b[3] - b[1] for b, _ in ff.segment_glyphs(
+            image, threshold=ff.otsu_threshold(image), min_ink_pixels=25)]
+        return ff.score_font_match(ff.compare_text_line(image, text), heights)
+
     def test_san_francisco_matches_itself(self):
-        score = ff.score_font_match(ff.compare_text_line(
-            _render_line(ff.SF_FONT_PATH, self.LETTERS), self.LETTERS))
+        score = self._score(ff.SF_FONT_PATH, self.LETTERS)
         assert score is not None and score.is_scoreable
         assert score.consistent_with_san_francisco
         assert score.scatter_percent < 1.0
@@ -275,8 +280,7 @@ class TestFontScore:
         path = ff.SUBSTITUTE_FONT_PATHS[name]
         if not ff.Path(path).is_file():
             pytest.skip(f"{name} not installed")
-        score = ff.score_font_match(ff.compare_text_line(
-            _render_line(path, self.LETTERS), self.LETTERS))
+        score = self._score(path, self.LETTERS)
         assert score is not None
         assert not score.consistent_with_san_francisco, f"{name} passed as SF"
 
@@ -301,8 +305,7 @@ class TestFontScore:
         # Tabular figures deviate uniformly, so digits carry no per-glyph signal:
         # SF and Helvetica both scatter 0.71% on a digits-only line.
         digits = "3056 3059 3055"
-        score = ff.score_font_match(ff.compare_text_line(
-            _render_line(ff.SF_FONT_PATH, digits), digits))
+        score = self._score(ff.SF_FONT_PATH, digits)
         assert score is not None
         assert score.letters_measured < ff.MINIMUM_LETTERS_TO_SCORE
         assert not score.is_scoreable
@@ -318,3 +321,49 @@ class TestFontScore:
 
     def test_empty_input_scores_nothing(self):
         assert ff.score_font_match([]) is None
+
+
+class TestResolutionFloor:
+    """The constraint that decides what this feature is for.
+
+    Across 20 real listing screenshots exactly one contained a detectable text
+    line, and its glyphs were 7px tall. Font forensics works for someone
+    photographing a box in front of them; it does not work for screening posted
+    listing photos, and pretending otherwise would produce confident nonsense.
+    """
+
+    def _score_at(self, size: int):
+        text = "KC2WVC6R36 GTZE5"
+        image = _render_line(ff.SF_FONT_PATH, text, size)
+        heights = [b[3] - b[1] for b, _ in ff.segment_glyphs(
+            image, threshold=ff.otsu_threshold(image), min_ink_pixels=25)]
+        return ff.score_font_match(ff.compare_text_line(image, text), heights)
+
+    def test_reference_quality_is_scoreable(self):
+        score = self._score_at(120)
+        assert score is not None and score.is_scoreable
+        assert score.median_glyph_height_px >= ff.MINIMUM_GLYPH_HEIGHT_PX
+
+    def test_a_close_up_is_scoreable(self):
+        score = self._score_at(40)
+        assert score is not None and score.is_scoreable
+
+    def test_listing_screenshot_resolution_is_refused(self):
+        # Either segmentation fails outright, or the score declares itself
+        # unusable. Both are acceptable; silently returning a number is not.
+        score = self._score_at(14)
+        assert score is None or not score.is_scoreable
+
+    def test_a_small_but_segmentable_line_is_flagged_too_small(self):
+        score = ff.score_font_match(
+            [ff.GlyphComparison(c, r, r) for c, r in
+             ((ch, ff.reference_aspect(ch)) for ch in "CERTSKG") if r],
+            glyph_heights=[9] * 7,
+        )
+        assert score.too_small_to_score
+        assert not score.is_scoreable
+
+    def test_the_floor_matches_what_was_measured(self):
+        # 29px separates cleanly (SF 0.94% vs Helvetica 6.32%); 22px is marginal
+        # (SF 1.70% against a 2.0% threshold); below 18px segmentation fails.
+        assert 20 <= ff.MINIMUM_GLYPH_HEIGHT_PX <= 30

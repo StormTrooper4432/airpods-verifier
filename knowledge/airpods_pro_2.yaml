@@ -193,6 +193,29 @@ font_baseline:
     minimum_letters: 3
     source: measurement (2 genuine boxes, 4 substitute typefaces)
 
+  # Resolution floor - the constraint that decides what this feature is FOR.
+  #
+  # Rendering the same string at decreasing sizes: at 29px cap height SF
+  # scatters 0.94% against Helvetica's 6.32%, clean separation. At 22px SF
+  # rises to 1.70%, almost touching the 2.0% threshold. Below 18px segmentation
+  # fails outright - strokes merge, neighbouring glyphs join, nothing to
+  # measure.
+  #
+  # Across the 20 labelled listing screenshots, exactly ONE contained a
+  # detectable text line and its glyphs were 7px tall. So font forensics is a
+  # feature for a buyer photographing a box in front of them, not a screening
+  # tool for posted listing photos. Claiming otherwise would produce confident
+  # nonsense on the images real users actually paste.
+  resolution_floor:
+    minimum_glyph_height_px: 25
+    measured_separation_at_29px: {san_francisco: 0.94, helvetica: 6.32}
+    marginal_at_22px: {san_francisco: 1.70}
+    segmentation_fails_below_px: 18
+    corpus_screenshots_with_scoreable_line: 1
+    corpus_screenshots_total: 20
+    typical_corpus_glyph_height_px: 7
+    source: measurement
+
 packaging:
   shrinkwrap:
     # Contradicts the common "wrapped = fake" claim, and contradicts the

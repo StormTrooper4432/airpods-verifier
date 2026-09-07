@@ -341,6 +341,7 @@ class FontScore:
     offset_percent: float
     scatter_percent: float
     letters_measured: int
+    median_glyph_height_px: float
 
     @property
     def is_scoreable(self) -> bool:
@@ -351,7 +352,15 @@ class FontScore:
         digits-only line SF scatters 0.71% and Helvetica 0.71%, indistinguishable.
         Add letters and SF scatters 0.41% against 3.3-5.3% for substitutes.
         """
-        return self.letters_measured >= MINIMUM_LETTERS_TO_SCORE and self.glyphs >= 5
+        return (
+            self.letters_measured >= MINIMUM_LETTERS_TO_SCORE
+            and self.glyphs >= 5
+            and self.median_glyph_height_px >= MINIMUM_GLYPH_HEIGHT_PX
+        )
+
+    @property
+    def too_small_to_score(self) -> bool:
+        return self.median_glyph_height_px < MINIMUM_GLYPH_HEIGHT_PX
 
     @property
     def consistent_with_san_francisco(self) -> bool:
@@ -367,6 +376,21 @@ FONT_SCATTER_THRESHOLD = 2.0
 #: Digits are tabular and carry no signal, so a line needs real letters.
 MINIMUM_LETTERS_TO_SCORE = 3
 
+#: Minimum glyph height, in pixels, for the score to mean anything.
+#:
+#: Measured by rendering the same string at decreasing sizes: at a cap height of
+#: 29px San Francisco scatters 0.94% against Helvetica's 6.32%, clean
+#: separation. At 22px SF rises to 1.70% - still under the 2.0% threshold but
+#: with almost no margin. Below 18px segmentation fails outright: strokes merge
+#: and neighbouring glyphs join, so there is nothing to measure.
+#:
+#: This is the constraint that decides what the feature is FOR. Across 20 real
+#: listing screenshots, exactly one contained a detectable text line, and its
+#: glyphs were 7px tall - four times below the floor. Font forensics works for
+#: someone photographing a box in front of them, and does not work for screening
+#: posted listing photos.
+MINIMUM_GLYPH_HEIGHT_PX = 25
+
 
 def _median(values: list[float]) -> float:
     ordered = sorted(values)
@@ -376,7 +400,9 @@ def _median(values: list[float]) -> float:
     return (ordered[middle - 1] + ordered[middle]) / 2
 
 
-def score_font_match(comparisons: list[GlyphComparison]) -> FontScore | None:
+def score_font_match(
+    comparisons: list[GlyphComparison], glyph_heights: list[int] | None = None
+) -> FontScore | None:
     """Reduce per-glyph deviations to a scale-invariant font score."""
     if not comparisons:
         return None
@@ -388,6 +414,9 @@ def score_font_match(comparisons: list[GlyphComparison]) -> FontScore | None:
         offset_percent=round(offset, 2),
         scatter_percent=round(scatter, 2),
         letters_measured=sum(1 for c in comparisons if c.character.isalpha()),
+        median_glyph_height_px=_median([float(h) for h in glyph_heights])
+        if glyph_heights
+        else float(MINIMUM_GLYPH_HEIGHT_PX),
     )
 
 
