@@ -503,7 +503,32 @@ counterfeit_observations:
         it must not be the only Tier 1 rule.
       status: informative
 
-# Remaining blocker, now precisely identified: USABLE LETTERS PER LINE.
+# RESOLVED: lowercase characterised, and glyphs pooled across lines.
+#
+# Lowercase adds a, c, f, k, m, r, s, t, z (i, l, h, w excluded - too thin, blur
+# destroys their aspect ratio, S/N 0.3 and 0.1 for i and l). That takes
+# "Designed by Apple in California", present on every Apple box, from one usable
+# glyph to six letters.
+#
+# Six was still not enough. On that single line Arial scored 1.36% - identical
+# to San Francisco - and passed as genuine, because whether a substitute is
+# caught depends on which letters the line happens to contain. Pooling glyphs
+# across lines fixes it:
+#
+#   lines  glyphs      SF   Helvetica   Arial   Verdana   Tahoma   all caught
+#       1       6   1.36%     5.67%    1.36%     6.07%    6.97%       NO
+#       2      12   0.51%     5.11%    6.89%     6.07%    5.86%       yes
+#       4      32   0.62%     5.11%    7.13%     6.68%    6.94%       yes
+#
+# The glyph floor sits at 15, above where it starts working.
+minimum_glyphs_to_score: 15
+pooling_measurements:
+  one_line: {san_francisco: 1.36, arial: 1.36, caught: false}
+  two_lines: {san_francisco: 0.51, arial: 6.89, caught: true}
+  four_lines: {san_francisco: 0.62, arial: 7.13, caught: true}
+  source: measurement
+
+# Superseded note, kept for the reasoning: USABLE LETTERS PER LINE.
 #
 # Automatic line detection works - 7 lines on the counterfeit label, 9 on its
 # back panel, in under a third of a second, with bounds taken from the

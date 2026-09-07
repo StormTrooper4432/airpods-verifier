@@ -54,10 +54,19 @@ class TestGlyphSelection:
         assert ratio >= 4.0
         assert signal > noise
 
-    def test_every_usable_glyph_is_alphanumeric_uppercase(self):
-        # Serial and model numbers are uppercase alphanumerics; that is where
-        # this measurement gets applied.
-        assert all(c.isalnum() and c.isupper() or c.isdigit() for c in ff.USABLE_GLYPHS)
+    def test_every_usable_glyph_is_alphanumeric(self):
+        # Lowercase is now included. Label lines are digit-heavy and digits are
+        # tabular, so an uppercase-only set left "Designed by Apple in
+        # California" - present on every Apple box - with one usable glyph.
+        assert all(c.isalnum() for c in ff.USABLE_GLYPHS)
+
+    def test_lowercase_is_characterised(self):
+        assert set("acfkmrstz") <= set(ff.USABLE_GLYPHS)
+
+    def test_thin_lowercase_is_excluded(self):
+        # i and l score S/N 0.3 and 0.1 - thin enough that blur destroys the
+        # aspect ratio entirely.
+        assert not ({"i", "l", "h", "w"} & set(ff.USABLE_GLYPHS))
 
 
 class TestBlurRobustness:
@@ -263,7 +272,9 @@ class TestFontScore:
     disagree - that disagreement is what survives a camera.
     """
 
-    LETTERS = "KC2WVC6R36 GTZE5"
+    # Long enough to clear MINIMUM_GLYPHS_TO_SCORE. A six-glyph line let Arial
+    # pass as San Francisco, which is why the floor exists.
+    LETTERS = "KC2WVC6R36 GTZE5 castrom ZKFRESTG artmask"
 
     def _score(self, font_path, text):
         image = _render_line(font_path, text)
@@ -296,7 +307,7 @@ class TestFontScore:
         # genuine label photographed at a different scale.
         comparisons = [
             ff.GlyphComparison(c, ref * 0.94, ref)
-            for c, ref in ((ch, ff.reference_aspect(ch)) for ch in "CERTSKG")
+            for c, ref in ((ch, ff.reference_aspect(ch)) for ch in "CERTSKGZOF35actm")
             if ref
         ]
         score = ff.score_font_match(comparisons)
@@ -306,7 +317,7 @@ class TestFontScore:
     def test_digit_only_lines_are_not_scoreable(self):
         # Tabular figures deviate uniformly, so digits carry no per-glyph signal:
         # SF and Helvetica both scatter 0.71% on a digits-only line.
-        digits = "3056 3059 3055"
+        digits = "3056 3059 3055 3057 3058 3050"
         score = self._score(ff.SF_FONT_PATH, digits)
         assert score is not None
         assert score.letters_measured < ff.MINIMUM_LETTERS_TO_SCORE
@@ -316,7 +327,7 @@ class TestFontScore:
         # Median absolute deviation, so one wild outlier is ignored. A crop that
         # clips its final character produced a -30% glyph on a genuine label.
         good = [ff.GlyphComparison(c, r * 1.01, r)
-                for c, r in ((ch, ff.reference_aspect(ch)) for ch in "CERTSKG") if r]
+                for c, r in ((ch, ff.reference_aspect(ch)) for ch in "CERTSKGZOF35actm") if r]
         clipped = good + [ff.GlyphComparison("O", ff.reference_aspect("O") * 0.6,
                                              ff.reference_aspect("O"))]
         assert ff.score_font_match(clipped).consistent_with_san_francisco
@@ -335,7 +346,7 @@ class TestResolutionFloor:
     """
 
     def _score_at(self, size: int):
-        text = "KC2WVC6R36 GTZE5"
+        text = "KC2WVC6R36 GTZE5 castrom ZKFRESTG"
         image = _render_line(ff.SF_FONT_PATH, text, size)
         heights = [b[3] - b[1] for b, _ in ff.segment_glyphs(
             image, threshold=ff.otsu_threshold(image), min_ink_pixels=25)]
@@ -362,8 +373,8 @@ class TestResolutionFloor:
     def test_a_small_but_segmentable_line_is_flagged_too_small(self):
         score = ff.score_font_match(
             [ff.GlyphComparison(c, r, r) for c, r in
-             ((ch, ff.reference_aspect(ch)) for ch in "CERTSKG") if r],
-            glyph_heights=[9] * 7,
+             ((ch, ff.reference_aspect(ch)) for ch in "CERTSKGZOF35actm") if r],
+            glyph_heights=[9] * 16,
         )
         assert score.too_small_to_score
         assert not score.is_scoreable
@@ -486,3 +497,50 @@ class TestUnfilteredComponents:
         source = pathlib.Path("font_forensics.py").read_text()
         measurement = source[source.index("def compare_text_line"):]
         assert "adaptive_ink_mask" in measurement.split("def ")[1]
+
+
+class TestMultiLinePooling:
+    """One line is not enough. On a six-glyph line Arial scored 1.36% -
+    identical to San Francisco - and passed as genuine, because whether a
+    substitute is caught depends on which letters that line happens to hold."""
+
+    LINES = [
+        "Designed by Apple in California",
+        "Assembled in Vietnam",
+        "MTJV3AM/A AirPods Pro 2nd generation",
+        "Compatible with iOS device and Mac",
+    ]
+
+    def _pool(self, font_path, lines):
+        pooled, heights = [], []
+        for text in lines:
+            image = _render_line(font_path, text, 90)
+            pooled += ff.compare_text_line(image, text)
+            heights += [b[3] - b[1] for b, _ in ff.segment_glyphs(
+                image, threshold=ff.otsu_threshold(image), min_ink_pixels=25)]
+        return ff.score_font_match(pooled, heights)
+
+    def test_pooling_catches_a_substitute_a_single_line_missed(self):
+        arial = ff.SUBSTITUTE_FONT_PATHS["Arial"]
+        if not ff.Path(arial).is_file():
+            pytest.skip("Arial not installed")
+        single = self._pool(arial, self.LINES[:1])
+        pooled = self._pool(arial, self.LINES)
+        assert not single.is_scoreable            # too few glyphs to trust
+        assert pooled.differs_from_san_francisco  # caught once pooled
+
+    @pytest.mark.parametrize("name", list(ff.SUBSTITUTE_FONT_PATHS))
+    def test_every_substitute_is_caught_when_pooled(self, name):
+        path = ff.SUBSTITUTE_FONT_PATHS[name]
+        if not ff.Path(path).is_file():
+            pytest.skip(f"{name} not installed")
+        assert self._pool(path, self.LINES).differs_from_san_francisco
+
+    def test_san_francisco_still_passes_when_pooled(self):
+        score = self._pool(ff.SF_FONT_PATH, self.LINES)
+        assert score.consistent_with_san_francisco
+        assert score.glyphs >= ff.MINIMUM_GLYPHS_TO_SCORE
+
+    def test_the_glyph_floor_sits_above_where_it_starts_working(self):
+        # Six glyphs let Arial through; twelve caught every substitute.
+        assert 12 < ff.MINIMUM_GLYPHS_TO_SCORE <= 25

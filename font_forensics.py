@@ -71,9 +71,17 @@ _INK_THRESHOLD = 200
 _SHORT_MARKS = ".,;:·"
 
 #: Glyphs whose ink aspect ratio separates SF from substitutes by at least 3x
-#: the drift blur induces. Measured, not chosen: P, N, X, Y, H and W all fall
-#: below that bar and are excluded - their blur drift rivals the font signal.
-USABLE_GLYPHS = frozenset("5ETCR3S4GOZF8K1092")
+#: the drift blur induces. Measured, not chosen: uppercase P, N, X, Y, H and W
+#: fall below that bar, as do lowercase i, l, h and w - all excluded because
+#: their blur drift rivals the font signal. Lowercase i and l are the worst in
+#: the set (S/N 0.3 and 0.1): they are thin enough that blur destroys the aspect
+#: ratio entirely.
+#:
+#: Lowercase matters because label lines are digit-heavy and digits are tabular.
+#: "Designed by Apple in California" appears on every Apple box and offered a
+#: single usable glyph while this set was uppercase-only; with lowercase it
+#: offers six letters, clearing the three-letter minimum.
+USABLE_GLYPHS = frozenset("5ETCR3S4GOZF8K1092" + "acfkmrstz")
 
 #: Passed the synthetic signal-to-noise screen but failed against real print.
 #: Both Q's on a confirmed-genuine North American label measured -8.6% and
@@ -184,7 +192,7 @@ def derive_usable_glyphs(minimum_ratio: float = 3.0) -> set[str]:
     predict them.
     """
     usable = set()
-    for character in string.ascii_uppercase + string.digits:
+    for character in string.ascii_uppercase + string.ascii_lowercase + string.digits:
         result = measure_glyph_signal_to_noise(character)
         if result and result[2] >= minimum_ratio:
             usable.add(character)
@@ -399,7 +407,7 @@ class FontScore:
         """
         return (
             self.letters_measured >= MINIMUM_LETTERS_TO_SCORE
-            and self.glyphs >= 5
+            and self.glyphs >= MINIMUM_GLYPHS_TO_SCORE
             and self.median_glyph_height_px >= MINIMUM_GLYPH_HEIGHT_PX
         )
 
@@ -432,6 +440,15 @@ FONT_SCATTER_THRESHOLD = 2.0
 
 #: Digits are tabular and carry no signal, so a line needs real letters.
 MINIMUM_LETTERS_TO_SCORE = 3
+
+#: Minimum glyphs before a score may be trusted, measured rather than assumed.
+#: On a SINGLE line of six usable glyphs, Arial scored 1.36% - identical to San
+#: Francisco - and passed as genuine. Whether a substitute is caught depends on
+#: which letters that line happens to contain, and six is too few for that to
+#: average out. Pooling a second line takes it to twelve glyphs and every
+#: substitute is caught: SF 0.51% against 5.1%-6.9%. Twelve is where it starts
+#: working, so the floor sits above it.
+MINIMUM_GLYPHS_TO_SCORE = 15
 
 #: A component taller than this multiple of the line's median height has merged
 #: with a neighbouring mark. Ascenders and capitals legitimately reach about
@@ -757,6 +774,43 @@ def analyse_label(
             )
         return None
     return score_font_match(comparisons, heights)
+
+
+def analyse_label_lines(
+    image: "Image.Image", expected_texts: list[str]
+) -> "FontScore | None":
+    """Score a whole label by pooling glyphs from every line it can read.
+
+    Measuring one line is not enough. On a single six-glyph line Arial scored
+    1.36%, identical to San Francisco, and passed as genuine - whether a
+    substitute is caught depends on which letters that line happens to contain.
+    Pooling a second line catches every substitute tested, and pooling four
+    gives San Francisco 0.62% against 5.1%-7.1%.
+
+    ``expected_texts`` is what the lines say, supplied by the extractor. Lines
+    whose components disagree with their text are skipped rather than guessed
+    at, so a partially readable label still scores on the lines that worked.
+    """
+    lines = find_text_lines(image)
+    if not lines:
+        return None
+
+    pooled: list[GlyphComparison] = []
+    heights: list[float] = []
+    for text in expected_texts:
+        wanted = len([c for c in text if not c.isspace() and c not in _SHORT_MARKS])
+        candidate = min(lines, key=lambda line: abs(line.glyph_count - wanted))
+        crop = image.crop(candidate.box)
+        comparisons = compare_text_line(crop, text)
+        if not comparisons:
+            continue
+        pooled.extend(comparisons)
+        heights.extend(
+            float(box[3] - box[1])
+            for box in raw_components(adaptive_ink_mask(crop), threshold=128, min_ink_pixels=15)
+        )
+
+    return score_font_match(pooled, heights) if pooled else None
 
 
 def sf_available() -> bool:
