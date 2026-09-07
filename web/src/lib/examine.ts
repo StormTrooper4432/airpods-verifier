@@ -9,6 +9,15 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { PanelId, Report } from '../data/sheet';
 
+export class ExamineError extends Error {
+  constructor(
+    message: string,
+    readonly recovery: string,
+  ) {
+    super(message);
+  }
+}
+
 /**
  * Find the pipeline. `import.meta.url` is useless here: the bundler moves this
  * module into dist/server/chunks/, so a path relative to it points at the wrong
@@ -17,21 +26,35 @@ import type { PanelId, Report } from '../data/sheet';
  * override when the two are deployed apart.
  */
 function findRoot(): string {
-  if (process.env.VERIFIER_ROOT) return path.resolve(process.env.VERIFIER_ROOT);
+  const holdsPipeline = (dir: string) =>
+    existsSync(path.join(dir, 'main.py')) && existsSync(path.join(dir, 'rules_engine.py'));
+
+  if (process.env.VERIFIER_ROOT) {
+    const named = path.resolve(process.env.VERIFIER_ROOT);
+    if (holdsPipeline(named)) return named;
+    throw new ExamineError(
+      'The verifier is not where this server was told to look.',
+      `VERIFIER_ROOT is ${named}, which holds no main.py. Point it at the ` +
+        'pipeline checkout and restart.',
+    );
+  }
+
   const seen: string[] = [];
   let dir = process.cwd();
   for (let up = 0; up < 6; up += 1) {
     seen.push(dir);
-    if (existsSync(path.join(dir, 'main.py')) && existsSync(path.join(dir, 'rules_engine.py'))) {
-      return dir;
-    }
+    if (holdsPipeline(dir)) return dir;
     const parent = path.dirname(dir);
     if (parent === dir) break;
     dir = parent;
   }
-  throw new Error(
-    `main.py not found above the working directory (looked in ${seen.join(', ')}). ` +
-      'Set VERIFIER_ROOT to the pipeline checkout.',
+  // A deployment that shipped the web app without the pipeline beside it. The
+  // buyer gets a plain notice rather than a generic failure, and the operator
+  // gets the fix.
+  throw new ExamineError(
+    'The verifier is not installed beside this server.',
+    `main.py was not found above ${process.cwd()}. Set VERIFIER_ROOT to the ` +
+      'pipeline checkout and restart.',
   );
 }
 
@@ -63,15 +86,6 @@ export interface Examination {
   report: Report;
   panels: PanelId[];
   variant: string | null;
-}
-
-export class ExamineError extends Error {
-  constructor(
-    message: string,
-    readonly recovery: string,
-  ) {
-    super(message);
-  }
 }
 
 function run(args: string[]): Promise<{ code: number; stdout: string; stderr: string }> {
