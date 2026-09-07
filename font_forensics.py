@@ -776,6 +776,42 @@ def analyse_label(
     return score_font_match(comparisons, heights)
 
 
+def measure_components(
+    image: Image.Image, boxes: list[tuple[int, int, int, int]], expected_text: str
+) -> list[GlyphComparison]:
+    """Pair ALREADY-SEGMENTED components against text and measure them.
+
+    Segmenting twice is what kept breaking this. Line detection and measurement
+    each ran their own segmentation with slightly different filters, so a line
+    located with exactly the right glyph count - 40 found, 40 expected - would
+    then be refused, and no amount of aligning the thresholds fixed it because
+    the filters themselves differed. One segmentation, one component list, one
+    count.
+    """
+    letters = [c for c in expected_text if not c.isspace() and c not in _SHORT_MARKS]
+    ordered = sorted(boxes, key=lambda box: box[0])
+    if len(ordered) != len(letters):
+        return []
+
+    heights = [float(box[3] - box[1]) for box in ordered]
+    line_height = _median(heights)
+    ceiling = line_height * MERGED_GLYPH_HEIGHT_RATIO
+    _, image_height = image.size
+
+    results: list[GlyphComparison] = []
+    for character, box in zip(letters, ordered):
+        if character not in USABLE_GLYPHS:
+            continue
+        if (box[3] - box[1]) > ceiling:          # merged with a neighbouring mark
+            continue
+        if box[1] <= 0 or box[3] >= image_height:  # clipped by the crop edge
+            continue
+        comparison = compare_glyph(character, image.crop(box))
+        if comparison is not None:
+            results.append(comparison)
+    return results
+
+
 def analyse_label_lines(
     image: "Image.Image", expected_texts: list[str]
 ) -> "FontScore | None":
@@ -795,20 +831,25 @@ def analyse_label_lines(
     if not lines:
         return None
 
+    mask = adaptive_ink_mask(image)
+    components = raw_components(mask, threshold=128, min_ink_pixels=15)
+
     pooled: list[GlyphComparison] = []
     heights: list[float] = []
     for text in expected_texts:
         wanted = len([c for c in text if not c.isspace() and c not in _SHORT_MARKS])
         candidate = min(lines, key=lambda line: abs(line.glyph_count - wanted))
-        crop = image.crop(candidate.box)
-        comparisons = compare_text_line(crop, text)
+        left, top, right, bottom = candidate.box
+        # Reuse the components that DEFINED this line - never re-segment.
+        inside = [
+            box for box in components
+            if box[0] >= left and box[2] <= right and box[1] >= top and box[3] <= bottom
+        ]
+        comparisons = measure_components(image, inside, text)
         if not comparisons:
             continue
         pooled.extend(comparisons)
-        heights.extend(
-            float(box[3] - box[1])
-            for box in raw_components(adaptive_ink_mask(crop), threshold=128, min_ink_pixels=15)
-        )
+        heights.extend(float(box[3] - box[1]) for box in inside)
 
     return score_font_match(pooled, heights) if pooled else None
 

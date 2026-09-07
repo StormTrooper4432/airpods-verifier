@@ -544,6 +544,28 @@ pooling_measurements:
 # but it is mixed case, and lowercase letterforms have never been characterised.
 # Doing that is the highest-value next step for the font path.
 #
+# STATUS ON REAL PHOTOGRAPHS: still not calibrated, and the reason has moved
+# again. The mechanism is sound on synthetic renders - pooled across four lines,
+# San Francisco scores 0.62% against 5.1%-7.1% for every substitute tested. On
+# photographs the failure is now PAIRING, not detection or resolution.
+#
+# compare/measure requires the component count to equal the character count
+# exactly. Real print breaks that constantly: glyphs touch, glyphs break,
+# punctuation segments unpredictably, and a label with two text columns puts
+# unrelated words on one detected row. Measured on real labels:
+#
+#   counterfeit Pro 3, pooled over 3 lines -> 17 glyphs, scatter 6.78%, differs
+#   genuine AirPods Pro 2, same path       -> 10 glyphs, scatter 31.06%, garbage
+#
+# The counterfeit figure must NOT be read as a result. Until a genuine label
+# measures cleanly through the same path, one number in isolation shows nothing;
+# the genuine run producing 31% proves the path is unreliable rather than that
+# the box is fake.
+#
+# Next piece: pairing that tolerates insertions and deletions - sequence
+# alignment on horizontal position, scoring only confidently matched glyphs -
+# instead of demanding exact count equality.
+#
 # Font calibration status against this counterfeit: NOT ACHIEVED. Its serial
 # line is digit-heavy (only S, S, G are usable letters, and clipping removed
 # them), and digits are tabular so they carry no per-glyph signal. Its back
