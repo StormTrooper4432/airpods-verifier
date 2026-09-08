@@ -180,6 +180,39 @@ The sheet warns before an examination that cannot reach a verdict. That feature
 was built on corpus data and has never been tested on a person — this measures
 whether it changes what anyone photographs.
 
+### Labelling what came back
+
+A record says what the tool decided, not whether it was right. `POST
+/api/record`, behind the same token, attaches the answer afterwards:
+
+```bash
+curl -X POST https://airpods-verifier.onrender.com/api/record \
+     -H "Authorization: Bearer $RECORD_TOKEN" \
+     -H 'Content-Type: application/json' \
+     -d '{"id":"v8wxec","truth":"COUNTERFEIT"}'
+```
+
+`GET` then reports the live confusion matrix, led by the two numbers that have
+governed every decision in this project:
+
+```
+"agreement": { "labelled": 12, "counterfeitPassedAsGenuine": 0,
+               "genuineAccused": 0, "counterfeitCaught": 3,
+               "genuineCleared": 5, "inconclusive": 4 }
+```
+
+The live matrix is computed from the in-memory buffer, which the free tier
+discards after fifteen minutes idle — so label an examination while the session
+is still warm. Nothing is actually lost if you don't: both the `examination`
+and `examination-label` lines reach stdout, and `tools/read_record.py` joins
+them by id from a downloaded log, which is the durable path.
+
+**A labelled record cannot be re-scored.** The record keeps no photographs, by
+design, so unlike the offline corpus it can never be replayed against a rule
+written later — it measures the rules as they stood when the examination ran,
+and nothing else. It exists because eBay's rejection closed the last automated
+collection route, leaving the deployed tool as the only corpus still growing.
+
 ---
 
 ## What it checks
@@ -323,9 +356,15 @@ python tools/run_corpus.py --score results/           # re-score after any rule 
 
 Corpus from eBay listings, through eBay's own API — not a scraper. eBay's
 robots.txt prohibits automated access and names LLM-driven bots specifically,
-directing integrations to the Browse API. Register once at
-[developer.ebay.com](https://developer.ebay.com/) (free, keys issued
-immediately), then:
+directing integrations to the Browse API.
+
+**This route is currently closed to this project.** The developer registration
+was rejected — "your account registration was rejected due to problems with the
+data provided or other irregularities", with no specific reason given and no
+appeal offered. The client below is complete and tested against eBay's
+published schema, so it works for anyone whose registration is accepted, but
+nothing here can be collected without that. Register at
+[developer.ebay.com](https://developer.ebay.com/), then:
 
 ```bash
 export EBAY_CLIENT_ID=... EBAY_CLIENT_SECRET=...

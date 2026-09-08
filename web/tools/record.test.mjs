@@ -3,7 +3,8 @@
  * endpoint must refuse when unconfigured. Both are asserted here rather than
  * trusted, because a leak would be silent.
  */
-import { record, all, summary, sessionOf, nextAttempt, forecastAccuracy } from '../src/lib/record.ts';
+import { record, all, summary, sessionOf, nextAttempt, forecastAccuracy, label, agreement }
+  from '../src/lib/record.ts';
 
 let pass = 0, fail = 0;
 const ok = (c, n) => { c ? pass++ : (fail++, console.log('  FAIL:', n)); };
@@ -36,8 +37,8 @@ for (const banned of FORBIDDEN) {
 }
 
 // Only the fields the type declares, nothing picked up along the way.
-const allowed = new Set(['at','session','attempt','outcome','offered','read','forecast',
-  'warned','reached','verdict','score','unresolved','failed','seconds']);
+const allowed = new Set(['id','at','session','attempt','outcome','offered','read','forecast',
+  'warned','reached','verdict','score','unresolved','failed','seconds','truth']);
 for (const key of Object.keys(all()[0])) ok(allowed.has(key), `unexpected field: ${key}`);
 
 // A session id is an opaque token or nothing; never a header echoed back.
@@ -87,6 +88,33 @@ ok(f.undershot >= 1 && f.overshot >= 1, `under ${f.undershot}, over ${f.overshot
 ok(f.exact + f.undershot + f.overshot === f.runs, 'every run lands in exactly one bucket');
 ok(f.worstUnder === 6, `worst undershoot: ${f.worstUnder}`);
 ok(f.worstOver === -4.5, `worst overshoot: ${f.worstOver}`);
+
+// Labelling: the expert's answer attached after the fact, owner-only.
+record({ session: 'l1', attempt: 1, outcome: 'examined', offered: ['box_front'],
+         verdict: 'HIGH_RISK_SUSPECTED' });
+const target = all().at(-1);
+ok(typeof target.id === 'string' && target.id.length >= 4, 'every record carries a handle');
+ok(label(target.id, 'COUNTERFEIT') !== null, 'a held record can be labelled');
+ok(label('nosuchid', 'GENUINE') === null, 'an unknown id labels nothing');
+ok(all().at(-1).truth === 'COUNTERFEIT', 'the label sticks to the record');
+
+record({ session: 'l2', attempt: 1, outcome: 'examined', offered: ['box_front'],
+         verdict: 'GENUINE' });
+label(all().at(-1).id, 'COUNTERFEIT');          // the worst case: a fake cleared
+record({ session: 'l3', attempt: 1, outcome: 'examined', offered: ['box_front'],
+         verdict: 'HIGH_RISK_SUSPECTED' });
+label(all().at(-1).id, 'GENUINE');              // the other bad case: accused
+
+const a = agreement();
+ok(a.counterfeitPassedAsGenuine === 1, `counterfeit passed: ${a.counterfeitPassedAsGenuine}`);
+ok(a.genuineAccused === 1, `genuine accused: ${a.genuineAccused}`);
+ok(a.counterfeitCaught === 1, `counterfeit caught: ${a.counterfeitCaught}`);
+ok(a.labelled === 3, `labelled: ${a.labelled}`);
+
+// A label is only ever the expert's; nothing a visitor sends can set one.
+const visitorFields = new Set(['session','attempt','outcome','offered','read','forecast',
+  'warned','reached','verdict','score','unresolved','failed','seconds']);
+ok(!visitorFields.has('truth'), 'truth is never written by the examination path');
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

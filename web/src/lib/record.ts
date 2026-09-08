@@ -38,6 +38,8 @@ export type Outcome =
   | 'failed';
 
 export interface Record {
+  /** Short handle so an examination can be labelled afterwards. */
+  id: string;
   at: string;
   session: string;
   attempt: number;
@@ -63,6 +65,16 @@ export interface Record {
    */
   failed?: string[];
   seconds?: number;
+  /**
+   * What it actually was, supplied by the owner after the fact.
+   *
+   * The record deliberately keeps no photographs, so a labelled entry cannot
+   * be re-scored against a future rule the way the offline corpus can. What it
+   * does give is a live confusion matrix for the rules as they stand - and the
+   * two numbers that have governed every decision here are exactly the ones it
+   * answers: did a counterfeit pass, and was a genuine unit accused.
+   */
+  truth?: 'GENUINE' | 'COUNTERFEIT';
 }
 
 const buffer: Record[] = [];
@@ -81,9 +93,13 @@ export function nextAttempt(session: string): number {
   return n;
 }
 
-export function record(entry: Omit<Record, 'at'>) {
+export function record(entry: Omit<Record, 'at' | 'id'>) {
   if (!ENABLED) return;
-  const full: Record = { at: new Date().toISOString(), ...entry };
+  const full: Record = {
+    id: Math.random().toString(36).slice(2, 8),
+    at: new Date().toISOString(),
+    ...entry,
+  };
   buffer.push(full);
   if (buffer.length > KEEP) buffer.shift();
   // One line, so a log viewer keeps it and `grep examination` finds it.
@@ -92,6 +108,34 @@ export function record(entry: Omit<Record, 'at'>) {
 
 export function all(): Record[] {
   return [...buffer];
+}
+
+/** Attach the real answer to one recorded examination. */
+export function label(id: string, truth: 'GENUINE' | 'COUNTERFEIT'): Record | null {
+  const entry = buffer.find((candidate) => candidate.id === id);
+  if (!entry) return null;
+  entry.truth = truth;
+  console.log(`examination-label ${JSON.stringify({ id, truth })}`);
+  return entry;
+}
+
+/**
+ * The two numbers that have governed every decision in this project, measured
+ * on whatever has actually been labelled.
+ */
+export function agreement() {
+  const labelled = buffer.filter((entry) => entry.truth && entry.verdict);
+  if (!labelled.length) return { labelled: 0 };
+  const count = (truth: string, verdict: string) =>
+    labelled.filter((e) => e.truth === truth && e.verdict === verdict).length;
+  return {
+    labelled: labelled.length,
+    counterfeitPassedAsGenuine: count('COUNTERFEIT', 'GENUINE'),
+    genuineAccused: count('GENUINE', 'HIGH_RISK_SUSPECTED'),
+    counterfeitCaught: count('COUNTERFEIT', 'HIGH_RISK_SUSPECTED'),
+    genuineCleared: count('GENUINE', 'GENUINE'),
+    inconclusive: labelled.filter((e) => e.verdict === 'INCONCLUSIVE').length,
+  };
 }
 
 /**
@@ -204,6 +248,7 @@ export function summary() {
     rulesThatFailed: failures,
     meanWeightReached: examined ? Number((reached / examined).toFixed(2)) : null,
     forecast: forecastAccuracy(),
+    agreement: agreement(),
     warning: warningEffect(),
   };
 }
