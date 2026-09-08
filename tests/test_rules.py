@@ -1168,6 +1168,29 @@ class TestEvidenceCollectedNotYetRuled:
         assert evidence["made_in_vietnam"]["counterfeit"] >= 1
         assert evidence["status"] == "insufficient_evidence"
 
+    def test_product_of_vietnam_is_refuted_not_merely_unproven(self):
+        """It sat at genuine 0 / counterfeit 1 and looked like the best tell here.
+
+        The owner's own genuine AirPods Pro 3 reads "Product of Vietnam"
+        verbatim, so it is now 1 and 1. This is not "not enough evidence yet" —
+        it is evidence that the phrase separates nothing, and a rule built on it
+        would have accused a genuine unit. Kept as a test so the promising-looking
+        version cannot be reintroduced by someone reading only the counterfeit.
+        """
+        from rules_engine import KNOWLEDGE
+
+        counts = KNOWLEDGE["origin_line_evidence"]["product_of_vietnam"]
+        assert counts["genuine"] >= 1 and counts["counterfeit"] >= 1, (
+            "Product of Vietnam appears on a genuine AirPods Pro 3 and on a confirmed "
+            "counterfeit; it cannot be a tell in either direction"
+        )
+
+        observation = next(
+            o for o in KNOWLEDGE["counterfeit_observations"]["observations"]
+            if o["id"] == "product_of_vietnam"
+        )
+        assert observation["status"] == "refuted"
+
     def test_no_rule_reads_the_origin_line(self):
         # If this starts failing, a rule was added on evidence that does not
         # support it - four genuine labels already show two legitimate wordings,
