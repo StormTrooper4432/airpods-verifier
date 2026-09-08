@@ -550,6 +550,51 @@ serial_format:
 # shown, so a highlight cannot manufacture a cross-match failure.
 # source: measurement against the expert-labelled corpus, 2026-09-08
 
+# OWNER CLAIM, 2026-09-08: "If the text reflects light that instantly shows
+# that it is real, because the text is high quality."
+#
+# Recorded because the owner is the domain expert and this is the best-sourced
+# kind of material in this file. NOT implemented as a rule, for three reasons,
+# in order of weight:
+#
+# 1. It would be the first rule that CLEARS a unit on a visual quality
+#    judgement. Every visual judgement trusted so far - kerning, shoddy wrap,
+#    typeface scatter - produced a false positive on first contact with a
+#    photograph. A clearing rule fails in the expensive direction: it tells a
+#    buyer to hand over money.
+#
+# 2. Two operationalisations were measured and neither separates.
+#
+#    Specular highlight inside the ink (bright pixels within a stroke):
+#      genuine post 21 (the reflective box)   median 42  spread 26.5  p95 108
+#      genuine owner Pro 2 label                     101         34.1      138
+#      genuine owner AP1 label                        72         71.1      197
+#      genuine owner AP4 label                        17          7.0       30
+#      counterfeit label                              35         29.0       96
+#      counterfeit back panel                         38         30.3       97
+#    The counterfeits sit inside the genuine range on every column.
+#
+#    Stroke weight relative to glyph height, after the counterfeit's print
+#    looked visibly fatter side by side:
+#      genuine post 21   0.1495     genuine Pro 2 label  0.1786
+#      genuine AP1       0.0493     counterfeit label    0.1714
+#                                   counterfeit back     0.0519
+#    The counterfeit label falls between two genuine labels.
+#
+# 3. Both measures are dominated by exposure and white balance rather than by
+#    print. The claim is probably true of the physical box under a light the
+#    holder controls; a single photograph under unknown lighting is a channel
+#    that destroys it, which is the same finding as the typeface scatter above.
+#
+# WHAT WOULD MAKE IT MEASURABLE: two photographs of the same panel from
+# different angles. A specular highlight MOVES between them and printed ink
+# does not, which isolates the reflection from the print without needing to
+# model either. That also addresses the reflective-print misreading above,
+# since a word washed out at one angle is usually legible at the other. Not
+# built: it needs a capture flow that asks for two angles and a comparison
+# step, and no data exists yet to calibrate it.
+# source: project owner (domain expert); measurement against the reference set
+
 packaging:
   shrinkwrap:
     # Contradicts the common "wrapped = fake" claim, and contradicts the
