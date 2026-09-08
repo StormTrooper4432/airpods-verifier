@@ -340,10 +340,19 @@ def _rule_model_number(extraction: VisionExtraction, variant: str) -> RuleOutcom
 #: Panels that can actually show the tear-strip. The tab runs along a side
 #: edge, so the front face cannot establish its absence however sharp the
 #: photograph is. Measured on the corpus: of four items failed for a missing
-#: tab, three were photographed from a side or top and one - post 13 - from the
-#: front alone, and that one is the only item where this rule out-claimed the
-#: domain expert.
-_PANELS_SHOWING_AN_EDGE = frozenset({"box_side", "box_top"})
+#: tab, three were photographed from a side and one - post 13 - from the front
+#: alone, and that one is the only item where this rule out-claimed the domain
+#: expert.
+#:
+#: box_top was in this set and has been removed. Two failure modes needed to
+#: turn it into a false accusation have both been seen in this extractor: it
+#: has reported shrink-wrap on an already-opened box (post 6), and it has
+#: labelled the interior tray of an opened box "box_top" (post 10). Together
+#: those manufacture an edge view that does not exist. box_side is unambiguous
+#: - an interior tray is never mistaken for it - and dropping box_top costs
+#: nothing measurable: every corpus item failed for a missing tab also carries
+#: box_side, so no verdict changes.
+_PANELS_SHOWING_AN_EDGE = frozenset({"box_side"})
 
 
 def _rule_packaging_seal(extraction: VisionExtraction, variant: str) -> RuleOutcome:
@@ -392,9 +401,9 @@ def _rule_packaging_seal(extraction: VisionExtraction, variant: str) -> RuleOutc
                 return RuleOutcome(
                     EvidenceStatus.UNKNOWN,
                     "The box is shrink-wrapped and no pull tab is visible, but no photograph "
-                    "shows a side or top edge - which is where the tear-strip runs. Absence "
-                    "from a view that could not show it is not a finding. Photograph the box "
-                    "edges and this resolves either way." + shoddy_note,
+                    "shows a side edge - which is where the tear-strip runs. Absence from a "
+                    "view that could not show it is not a finding. Photograph the side of the "
+                    "box and this resolves either way." + shoddy_note,
                 )
             return RuleOutcome(
                 EvidenceStatus.FAIL,
@@ -725,6 +734,13 @@ def _rule_visible_panels(extraction: VisionExtraction, variant: str) -> RuleOutc
     and a wrong panel ID feeding a rule would manufacture false positives. Its
     accuracy is being measured against a labelled corpus first; only then do the
     panel-dependent rules in the knowledge base get promoted.
+
+    Two rules DO now consult the panel list, but only to withhold a conclusion:
+    a missing pull tab needs an edge view, and a clean spelling reading needs a
+    printed surface. A wrong panel there costs a finding, never invents one.
+    Measured on the nine posts where those guards decide something, the list was
+    right eight times; the ninth called an opened box's interior tray box_top.
+    See the panel-accuracy note in knowledge/airpods_pro_2.yaml.
     """
     panels = extraction.visible_panels
     if not panels:

@@ -1431,22 +1431,32 @@ class TestTheTabMustBeVisibleToBeMissing:
         report = evaluate(self._wrapped(["box_front", "case_exterior"]))
         assert status_of(report, "Packaging Seal Type") is EvidenceStatus.UNKNOWN
         detail = detail_of(report, "Packaging Seal Type")
-        assert "side or top edge" in detail
+        assert "side edge" in detail
         assert report.summary_verdict is not Verdict.HIGH_RISK_SUSPECTED
 
     def test_it_says_which_photograph_would_settle_it(self):
         detail = detail_of(
             evaluate(self._wrapped(["box_front"])), "Packaging Seal Type"
         )
-        assert "Photograph the box edges" in detail
+        assert "Photograph the side of the box" in detail
 
     def test_a_side_view_still_convicts(self):
         report = evaluate(self._wrapped(["box_front", "box_side"]))
         assert status_of(report, "Packaging Seal Type") is EvidenceStatus.FAIL
 
-    def test_a_top_view_still_convicts(self):
+    def test_a_top_view_alone_does_not_convict(self):
+        """box_top is not trusted as an edge view, and the reason is measured.
+
+        Two extractor failures that have both actually happened combine into a
+        false accusation: shrink-wrap reported on an already-opened box (post
+        6), and the interior tray of an opened box labelled "box_top" (post
+        10). Between them they manufacture an edge view that does not exist.
+        box_side cannot be confused with an interior tray, and requiring it
+        costs no corpus verdict - every item failed for a missing tab carries
+        box_side anyway.
+        """
         report = evaluate(self._wrapped(["box_top"]))
-        assert status_of(report, "Packaging Seal Type") is EvidenceStatus.FAIL
+        assert status_of(report, "Packaging Seal Type") is EvidenceStatus.UNKNOWN
 
     def test_a_visible_tab_still_passes_without_an_edge_view(self):
         """Seeing a tab is positive evidence; the guard is only about absence."""

@@ -521,6 +521,39 @@ packaging:
 # Panel-indexed expectations. Consumed only as observation for now - panel
 # identification is not yet accurate enough to drive a FAIL. Promote entries to
 # rules once panel-ID accuracy is measured against a labelled corpus.
+# PANEL IDENTIFICATION ACCURACY, partial measurement 2026-09-08.
+#
+# Two rules now depend on visible_panels being right - the pull-tab rule needs
+# an edge view before a missing tab counts, and the typography rule needs a
+# printed surface before a clean reading counts - so the accuracy of the panel
+# list stopped being an abstract question.
+#
+# Nine corpus posts were re-read by hand against the extractor's panel list.
+# These are the posts where those two guards decide something, not a random
+# sample, so this measures the guards rather than the extractor in general:
+#
+#   post  5   box_front, box_side, box_back, box_bottom_label      correct
+#   post  9   box_front, box_back                                  correct
+#   post 11   box_front, box_back, box_side, box_bottom_label      correct
+#             (two separate side shots correctly collapsed to one box_side)
+#   post 13   box_front + hardware, no edge view                   correct
+#   post  1   hardware only, no box                                correct
+#   post 20   hardware only, no box                                correct
+#   post 12   box_front + hardware                                 correct
+#   post 14   box_front, box_side, box_top, box_bottom_label       correct
+#   post 10   'box_top' claimed for the INSIDE of an opened box    QUESTIONABLE
+#
+# Eight of nine correct; the ninth mislabels an opened box's interior tray as
+# box_top. That one does not reach either guard - post 10 is not wrapped, so the
+# edge rule never runs, and box_top carries no printed packaging copy - but it
+# is the failure mode to watch, because box_top IS an edge panel for the seal
+# rule. A wrapped box photographed open could earn a FAIL it has not earned.
+#
+# This does NOT license promoting the panel-dependent rules in `panels` above.
+# It measures two guards on nine hand-checked posts, not the extractor across
+# all ten panel names.
+# source: measurement against the labelled corpus (hand re-read), 2026-09-08
+
 panels:
   box_bottom_label:
     description: Sticker label on the underside carrying part number, model numbers, UPC and serial.
