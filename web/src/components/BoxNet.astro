@@ -366,6 +366,24 @@ const markGlyph = (s: Status) => (s === 'FAIL' ? 'fail' : s === 'PASS' ? 'pass' 
   label.panel-hit.is-exposed .panel-hit-cue { background: var(--ink); }
 
   /* Created by script when a photograph is picked; never shipped empty. */
+  /* Created by script like the preview, so it needs :global too: Astro scopes
+     styles by stamping an attribute onto elements in the TEMPLATE, and an
+     element built in JavaScript never gets one. Without this the badge renders
+     as bare unstyled text over the photograph. */
+  :global(.panel-count) {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    font-family: var(--narrow);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--paper);
+    background: var(--ink);
+    padding: 1px 5px;
+    pointer-events: none;
+  }
+
   :global(.panel-shot) {
     position: absolute;
     inset: 0;
