@@ -15,6 +15,9 @@ import type { APIRoute } from 'astro';
 import { examine, shotsFrom, validateShots, ExamineError } from '../../lib/examine';
 import { depth, enqueue, lookup, positionOf, QueueFullError } from '../../lib/queue';
 import { budget, callerAddress, claim, refund } from '../../lib/limits';
+import { nextAttempt, record, sessionOf } from '../../lib/record';
+import { canReachVerdict, reachableWeight, RULE_BY_PARAMETER } from '../../data/sheet';
+import type { PanelId } from '../../data/sheet';
 import type { Examination } from '../../lib/examine';
 
 const json = (body: unknown, status = 200) =>
@@ -25,8 +28,11 @@ const json = (body: unknown, status = 200) =>
 
 export const POST: APIRoute = async ({ request, clientAddress }) => {
   const address = callerAddress(request, clientAddress);
+  const session = sessionOf(request);
+  const attempt = nextAttempt(session);
   const allowance = claim(address);
   if (!allowance.allowed) {
+    record({ session, attempt, outcome: 'rate-limited', offered: [] });
     return new Response(
       JSON.stringify({ problem: allowance.problem, recovery: allowance.recovery }),
       {
@@ -45,6 +51,7 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
     shots = shotsFrom(await request.formData());
   } catch {
     refund(address);
+    record({ session, attempt, outcome: 'rejected', offered: [] });
     return json(
       {
         problem: 'The photographs could not be read from that request.',
@@ -58,11 +65,55 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
     // Validate before queueing: a visitor should learn their file is the wrong
     // type now, not after waiting behind three other examinations.
     validateShots(shots);
-    const job = enqueue<Examination>(() => examine(shots));
+    const offered = [...new Set(shots.map((shot) => shot.panel))] as PanelId[];
+    const forecast = reachableWeight(offered);
+    const warned = !canReachVerdict(offered);
+    const startedAt = Date.now();
+
+    const job = enqueue<Examination>(async () => {
+      try {
+        const examination = await examine(shots);
+        const ledger = examination.report.evidence_ledger;
+        record({
+          session,
+          attempt,
+          outcome: 'examined',
+          offered,
+          read: examination.panels,
+          forecast,
+          warned,
+          reached: ledger
+            .filter((item) => item.status !== 'UNKNOWN')
+            .reduce((total, item) => total + (RULE_BY_PARAMETER[item.parameter]?.weight ?? 0), 0),
+          verdict: examination.report.summary_verdict,
+          score: examination.report.confidence_score,
+          unresolved: ledger.filter((i) => i.status === 'UNKNOWN').map((i) => i.parameter),
+          seconds: Math.round((Date.now() - startedAt) / 1000),
+        });
+        return examination;
+      } catch (error) {
+        record({
+          session,
+          attempt,
+          outcome: 'failed',
+          offered,
+          forecast,
+          warned,
+          seconds: Math.round((Date.now() - startedAt) / 1000),
+        });
+        throw error;
+      }
+    });
     return json({ id: job.id, state: job.state, position: positionOf(job.id), ...depth() });
   } catch (error) {
     // Nothing was examined, so nothing should be charged for.
     refund(address);
+    record({
+      session,
+      attempt,
+      outcome: error instanceof QueueFullError ? 'queue-full' : 'rejected',
+      offered: [],
+    });
     if (error instanceof QueueFullError) {
       return json(
         {

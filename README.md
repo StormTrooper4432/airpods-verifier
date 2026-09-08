@@ -107,6 +107,8 @@ on the same filesystem.
 | `EXAMINE_PER_IP_DAILY` | `20` | examinations per address per day |
 | `EXAMINE_DAILY_BUDGET` | `300` | total per day, everyone. **The one that bounds the bill** — a spoofed `X-Forwarded-For` defeats the per-address window but cannot defeat a total |
 | `VERIFIER_ROOT` | found by walking up from cwd | where `main.py` lives |
+| `RECORD_TOKEN` | unset | bearer token for `GET /api/record`. **Unset means the endpoint 404s** — it fails closed rather than exposing by omission |
+| `RECORD_EXAMINATIONS` | on | set to `off` to record nothing at all |
 | `SF_FONT_PATH` | macOS system path | Apple's typeface. Not in the image — its licence does not allow redistribution — so letterform checks report unavailable in a container |
 
 **A caveat on all three limits.** The queue, the per-address window and the
@@ -146,6 +148,33 @@ rather than a hang.
 CPU and 512 MB, and the instance sleeps after 15 minutes idle, so a visitor
 after a quiet spell waits about a minute for the cold start on top of the
 vision call.
+
+### What the deployed sheet records
+
+Every real improvement in this project came from measuring a corpus. A public
+test round with no record produces anecdotes instead, so each examination
+writes one anonymous line — to stdout, where the host's log viewer keeps it,
+and to a small ring buffer that `GET /api/record` reads back with a token.
+
+**Never recorded:** photographs, filenames, file sizes, serial numbers, model
+numbers, any extracted text, IP addresses, user agents, or anything derived
+from them. Panels are fixed enum values, verdicts are one of three words, and
+weights are numbers the rule table already publishes. `tools/record.test.mjs`
+fails if a serial-shaped token or any identity field reaches a record.
+
+The session id is generated in the browser, kept in `sessionStorage`, and dies
+with the tab. It exists to tell a second attempt from a second person, which is
+the one behavioural question worth asking:
+
+```
+"warning": { "sessions": 1, "warnedOnce": 1,
+             "addedAfterWarning": 1, "retriedUnchanged": 0,
+             "stoppedAfterWarning": 0 }
+```
+
+The sheet warns before an examination that cannot reach a verdict. That feature
+was built on corpus data and has never been tested on a person — this measures
+whether it changes what anyone photographs.
 
 ---
 

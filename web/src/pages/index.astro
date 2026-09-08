@@ -188,7 +188,8 @@ const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
           <span class="forecast-line">Nothing added yet.</span>
           <span class="fine forecast-caveat">
             Counted from the surface you attached each photograph to. The engine reads the
-            photographs themselves and may resolve fewer.
+            photographs themselves and may resolve different ones &mdash; a label caught in the
+            corner of another shot counts, and a blurred surface does not.
           </span>
         </p>
         <p class="fine actions-note">
@@ -452,9 +453,25 @@ const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
            reasonable response time, and the id survives where the connection
            would not. The record itself is still rendered on the server and
            swapped in whole, so this page is never rebuilt in the browser. */
+        /* An opaque token that lives in this tab and dies with it. It tells a
+           second attempt from a second person, which is the only behavioural
+           question the record asks. It is not stored, not linked to an address,
+           and carries nothing about who anyone is. */
+        let session = '';
+        try {
+          session = sessionStorage.getItem('sheet-session') ?? '';
+          if (!session) {
+            session = Math.random().toString(36).slice(2, 12);
+            sessionStorage.setItem('sheet-session', session);
+          }
+        } catch {
+          /* private browsing, or storage blocked: the run is simply anonymous */
+        }
+
         const submitted = await fetch('/api/examine', {
           method: 'POST',
           body: new FormData(form),
+          headers: session ? { 'x-sheet-session': session } : {},
         });
         const ticket = await submitted.json();
         if (!submitted.ok || !ticket.id) {
