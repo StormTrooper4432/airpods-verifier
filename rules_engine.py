@@ -532,7 +532,7 @@ _SERIAL_LABEL_RE = re.compile(r"\(\s*S\s*\)(?P<gap>\s*)serial", re.IGNORECASE)
 
 
 #: Glyph pairs an OCR confuses on printed serials. Observed: a genuine label
-#: reading D0QMG74KXN came back as DOQMG74KXN - letter O for digit zero - off a
+#: reading L0YT6B4RKN came back as LOYT6B4RKN - letter O for digit zero - off a
 #: reflective panel.
 #:
 #: These fold ONLY for comparison, never for display: the buyer is shown what

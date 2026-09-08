@@ -1636,7 +1636,7 @@ class TestReflectivePrintMustNotConvict:
 
 
 class TestSerialGlyphConfusion:
-    """A genuine label reading D0QMG74KXN came back as DOQMG74KXN off a
+    """A genuine label reading L0YT6B4RKN came back as LOYT6B4RKN off a
     reflective panel - letter O for digit zero. Folding those together for
     COMPARISON keeps a highlight from manufacturing a mismatch; the buyer is
     still shown exactly what was read."""
@@ -1644,9 +1644,9 @@ class TestSerialGlyphConfusion:
     def test_a_zero_read_as_an_o_does_not_break_the_match(self):
         report = evaluate(
             make_extraction(
-                extracted_serial_number="D0QMG74KXN",
-                serial_case_lid="DOQMG74KXN",
-                serial_label_literal="(S) Serial No. D0QMG74KXN",
+                extracted_serial_number="L0YT6B4RKN",
+                serial_case_lid="LOYT6B4RKN",
+                serial_label_literal="(S) Serial No. L0YT6B4RKN",
                 visible_panels=["box_bottom_label", "case_lid_underside"],
             )
         )
@@ -1668,23 +1668,23 @@ class TestSerialGlyphConfusion:
         from rules_engine import _same_serial
 
         assert not _same_serial("MF4TFMQ2VQ", "MF4TFMQ2VR")
-        assert not _same_serial("D0QMG74KXN", "D0QMG74KX")
-        assert _same_serial("D0QMG74KXN", "DOQMG74KXN")
+        assert not _same_serial("L0YT6B4RKN", "L0YT6B4RK")
+        assert _same_serial("L0YT6B4RKN", "LOYT6B4RKN")
 
     def test_the_buyer_is_shown_what_was_actually_read(self):
         """Folding is for comparison only; it must never rewrite the evidence."""
         detail = detail_of(
             evaluate(
                 make_extraction(
-                    extracted_serial_number="D0QMG74KXN",
+                    extracted_serial_number="L0YT6B4RKN",
                     serial_case_lid="P9WT3B8RTY",
-                    serial_label_literal="(S) Serial No. D0QMG74KXN",
+                    serial_label_literal="(S) Serial No. L0YT6B4RKN",
                     visible_panels=["box_bottom_label", "case_lid_underside"],
                 )
             ),
             "Serial Cross-Match",
         )
-        assert "D0QMG74KXN" in detail and "P9WT3B8RTY" in detail
+        assert "L0YT6B4RKN" in detail and "P9WT3B8RTY" in detail
 
 
 class TestOutOfScopeSaysWhatItCanStillDo:
@@ -1736,3 +1736,39 @@ class TestOutOfScopeSaysWhatItCanStillDo:
         """The asymmetry is the point: condemn yes, clear no."""
         report = evaluate(make_extraction(extracted_model_number=self.PRO_3))
         assert report.summary_verdict is not Verdict.GENUINE
+
+
+class TestNoGenuineSerialIsWrittenDown:
+    """A real serial identifies someone's property. None belongs in here.
+
+    This is not hypothetical: a genuine unit's serial was transcribed into the
+    knowledge base, the rules and this test file while documenting a real
+    misreading, and rode three commits before anyone noticed. The characters
+    were never load-bearing - what the observation needed was a serial with a
+    zero in it - so they are a stand-in now, and this stops that one coming
+    back under any edit.
+    """
+
+    #: Serials known to belong to a real unit. Fragments only, never the whole
+    #: string, so this guard does not reintroduce what it exists to remove.
+    KNOWN_REAL_FRAGMENTS = ("MG74KXN", "QMG74K")
+
+    #: Anything that reads a repository file is in scope. Photographs are
+    #: covered separately - .gitignore keeps them out entirely.
+    SEARCHED_SUFFIXES = {".py", ".yaml", ".yml", ".md", ".json", ".ts", ".mjs", ".astro", ".txt"}
+
+    def test_no_known_real_serial_appears_anywhere(self):
+        from pathlib import Path
+
+        root = Path(__file__).resolve().parent.parent
+        offenders = []
+        for path in root.rglob("*"):
+            if not path.is_file() or path.suffix not in self.SEARCHED_SUFFIXES:
+                continue
+            if any(part in {".git", "node_modules", ".venv", "dist"} for part in path.parts):
+                continue
+            text = path.read_text(errors="ignore")
+            for fragment in self.KNOWN_REAL_FRAGMENTS:
+                if fragment in text and path.name != Path(__file__).name:
+                    offenders.append(f"{path.relative_to(root)} contains {fragment}")
+        assert not offenders, "a real serial is back in the repository: " + "; ".join(offenders)

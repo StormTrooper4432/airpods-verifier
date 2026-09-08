@@ -526,7 +526,11 @@ serial_format:
 # Newer packaging uses a finish that throws highlights, and a washed-out stroke
 # is read as a different letter. "Apple" came back as "Appie" - one l-to-i
 # substitution - and the box was called HIGH RISK on it. The same panel gave
-# serial D0QMG74KXN as DOQMG74KXN, letter O for digit zero.
+# serial L0YT6B4RKN as LOYT6B4RKN, letter O for digit zero. Those characters
+# are a stand-in with the same shape and the same zero in it - the observation
+# is real, the serial is not. A genuine unit's serial is never written down
+# here; it identifies someone's property and this repository is not the place
+# for it.
 #
 # Neither the pattern nor the image quality separates this from a real defect:
 #
