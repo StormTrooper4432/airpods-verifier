@@ -501,3 +501,21 @@ def test_the_browser_and_the_engine_give_the_same_capture_instruction(sheet_sour
         engine = rules_engine.PANEL_REQUESTS[panel].lower()
         assert "close" in web or "frame" in web, f"{panel} web hint says nothing about framing"
         assert "close" in engine or "frame" in engine, f"{panel} engine step says nothing about framing"
+
+
+def test_the_about_page_admits_the_strongest_check_has_never_run() -> None:
+    """The masthead's claim is qualified; the limitations page must carry the reason.
+
+    Serial Cross-Match is 0 PASS, 0 FAIL, 20 UNKNOWN, and it is the only check a
+    cloned serial cannot defeat — which is exactly what the page's first
+    limitation says Apple's own lookup cannot catch. Leaving that gap unstated
+    while stating the Apple one would be the more flattering half of the truth.
+    """
+    about = (WEB / "src" / "pages" / "about.astro").read_text(encoding="utf-8")
+    limits = about[about.index('id="limits-h"') :]
+    assert "never run" in limits or "0 for 20" in limits, (
+        "the limitations list no longer says the serial cross-check has never resolved"
+    )
+    assert "arm" in limits and "frame" in limits, (
+        "the limitations list no longer gives the measured cause (framing distance)"
+    )
