@@ -333,6 +333,14 @@ def analyse_locally(
 ) -> LocalAnalysis:
     """Measurements Python makes for itself, from the pixels the LLM saw.
 
+    Reads the ORIGINAL files, deliberately, not the downscaled copies sent to
+    the vision API. Letterform measurement needs every pixel it can get: the
+    resolution gate sits at 45px of glyph height, and a label close-up shot at
+    4032px carries 100-200px glyphs that fall to 39-78px if resized to the
+    1568px API limit - straddling the gate. Resizing before this point, in the
+    browser or anywhere else, silently disables the font check on exactly the
+    photographs it was built for.
+
     The extractor says where the label is and what it says; this measures the
     letterforms against Apple's typeface. Nothing here calls an API, so it costs
     nothing and is deterministic - and it keeps the rules engine a pure function

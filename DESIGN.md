@@ -190,6 +190,15 @@ surface.** A mark is only ever drawn on a surface that was actually
 photographed. The fallback looks like a null-safety improvement and is not: it
 puts a green tick on a blank panel, claiming evidence nobody supplied.
 
+**Uploaded photographs are sent at full resolution, and must not be resized in
+the browser.** It looks like an obvious win — a 12MP phone photo is 3-4MB over
+a parking-lot connection, and the pipeline downscales to 1568px for the vision
+API anyway. But the local letterform measurement reads the *original* file, not
+that downscaled copy. A label close-up carries 100-200px glyphs at 4032px and
+39-78px at 1568px, straddling the 45px gate the font check needs. Resizing
+client-side would silently disable that check on precisely the photographs it
+exists for.
+
 **Coverage is never rescoped to the panels the visitor happened to send.** The
 denominator is always the full 19.5. Rescoping would let a case-only photoset
 read as near-complete and clear a unit whose box nobody photographed.
