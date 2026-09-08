@@ -193,6 +193,9 @@ const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
           </span>
         </p>
         <p class="fine actions-note">
+          You can attach more than one photograph to a surface. Reflective packaging washes a
+          word out at one angle and prints it plainly at another, so a second angle of the label
+          is often what settles a reading.
           Reading a set of photographs usually takes 10 to 90 seconds. The wait is the
           vision model&rsquo;s queue on Google&rsquo;s free tier, not the size of your
           photographs.
@@ -297,9 +300,10 @@ const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
         const existing = hit.querySelector<HTMLImageElement>('.panel-shot');
         if (existing?.src.startsWith('blob:')) URL.revokeObjectURL(existing.src);
         existing?.remove();
+        hit.querySelector('.panel-count')?.remove();
 
-        const file = input.files?.[0];
-        if (!file) {
+        const files = [...(input.files ?? [])];
+        if (!files.length) {
           hit.classList.remove('is-loaded');
           updateForecast();
           return;
@@ -307,10 +311,19 @@ const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
         const img = new Image();
         img.className = 'panel-shot';
         img.alt = '';
-        img.src = URL.createObjectURL(file);
+        img.src = URL.createObjectURL(files[0]!);
         hit.prepend(img);
+        /* Several angles of one surface is a deliberate move, not a mistake,
+           so the count is shown rather than silently swallowed. */
+        if (files.length > 1) {
+          const badge = document.createElement('span');
+          badge.className = 'panel-count';
+          badge.textContent = `${files.length}`;
+          badge.title = `${files.length} photographs of this surface`;
+          hit.appendChild(badge);
+        }
         hit.classList.add('is-loaded');
-        if (cue) cue.textContent = 'replace';
+        if (cue) cue.textContent = files.length > 1 ? 'replace all' : 'replace';
         updateForecast();
       });
     });

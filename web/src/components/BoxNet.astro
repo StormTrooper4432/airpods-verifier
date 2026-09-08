@@ -179,11 +179,14 @@ const markGlyph = (s: Status) => (s === 'FAIL' ? 'fail' : s === 'PASS' ? 'pass' 
       return (
         <label class:list={['panel-hit', exposed && 'is-exposed']}
                style={style} for={id} data-panel={panel.id}>
-          <input class="sr-only panel-file" type="file" id={id}
+          <!-- Several photographs of one surface are allowed, and sometimes
+               necessary: reflective packaging washes a word out at one angle
+               and prints it plainly at another. -->
+          <input class="sr-only panel-file" type="file" id={id} multiple
                  name={`panel_${panel.id}`} accept="image/jpeg,image/png,image/webp,image/heic" />
           <span class="sr-only">
-            {panel.label}{exposed ? ', photographed. Choose a different photograph.'
-                                  : ', not photographed. Add the photograph.'}
+            {panel.label}{exposed ? ', photographed. Add or replace photographs of it.'
+                                  : ', not photographed. Add one or more photographs of it.'}
             {panel.carries ? ` It carries: ${panel.carries}` : ''}
           </span>
           <span class="panel-hit-cue" aria-hidden="true">
