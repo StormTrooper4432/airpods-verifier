@@ -387,9 +387,10 @@ const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
            without stating that it clears the bar left the reader to do the
            arithmetic that changes their behaviour. */
         forecastLine.textContent =
-          `Nothing added yet. Start with the underside label: on its own it reaches ` +
-          `${fmt(reachableWeight(['box_bottom_label']))} of ${fmt(TOTAL_WEIGHT)}, which is ` +
-          `enough for a verdict. The front, back and top together reach ` +
+          `Nothing added yet. Start with the underside label: it is the only single ` +
+          `surface that can reach a verdict, at ` +
+          `${fmt(reachableWeight(['box_bottom_label']))} of ${fmt(TOTAL_WEIGHT)} against the ` +
+          `${fmt(TOTAL_WEIGHT * 0.6)} needed. The front, back and top together reach ` +
           `${fmt(reachableWeight(['box_front', 'box_back', 'box_top']))} and cannot.`;
       } else if (!ok) {
         forecastLine.textContent =

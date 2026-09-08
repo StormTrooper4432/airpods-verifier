@@ -412,11 +412,13 @@ def test_the_underside_label_alone_still_clears_the_verdict_floor() -> None:
     script = """
       import { reachableWeight, canReachVerdict, TOTAL_WEIGHT, MIN_COVERAGE_FOR_VERDICT }
         from './src/data/sheet.ts';
+      import { PANELS } from './src/data/sheet.ts';
       console.log(JSON.stringify({
         label: reachableWeight(['box_bottom_label']),
         ok: canReachVerdict(['box_bottom_label']),
         floor: TOTAL_WEIGHT * MIN_COVERAGE_FOR_VERDICT,
         instinct: reachableWeight(['box_front', 'box_back', 'box_top']),
+        soloReachers: PANELS.filter((p) => canReachVerdict([p.id])).map((p) => p.id),
       }));
     """
     result = subprocess.run(
@@ -428,6 +430,10 @@ def test_the_underside_label_alone_still_clears_the_verdict_floor() -> None:
     assert got["ok"], (
         f"the underside label alone reaches {got['label']}, under the {got['floor']:.1f} "
         "floor — index.astro tells visitors it is enough for a verdict"
+    )
+    assert got["soloReachers"] == ["box_bottom_label"], (
+        "the sheet calls the underside label the ONLY single surface that can reach a "
+        f"verdict; these now can: {got['soloReachers']}"
     )
     assert got["instinct"] < got["floor"], (
         "index.astro also tells visitors the front, back and top together are NOT enough; "

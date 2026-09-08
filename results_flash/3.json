@@ -1,0 +1,38 @@
+{
+ "post_id": "3",
+ "folder": "3",
+ "num_images": 3,
+ "provider": "gemini",
+ "model": "gemini-3.8-flash",
+ "extraction": {
+  "claimed_model_variant": "Unknown",
+  "extracted_model_number": null,
+  "part_number": null,
+  "origin_line": null,
+  "extracted_serial_number": null,
+  "serial_case_lid": null,
+  "serial_left_earbud": null,
+  "serial_right_earbud": null,
+  "serial_label_literal": null,
+  "copyright_year": 2025,
+  "has_plastic_shrinkwrap": false,
+  "has_paper_pull_tabs": false,
+  "shrinkwrap_has_pull_tab": null,
+  "shrinkwrap_looks_shoddy": null,
+  "label_image_index": null,
+  "label_left": null,
+  "label_top": null,
+  "label_right": null,
+  "label_bottom": null,
+  "label_line_texts": [],
+  "visible_panels": [
+   "box_front",
+   "box_back",
+   "case_exterior",
+   "case_lid_underside",
+   "earbud"
+  ],
+  "font_kerning_irregularities": true,
+  "visible_spelling_errors": []
+ }
+}
