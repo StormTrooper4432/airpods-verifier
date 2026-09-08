@@ -56,6 +56,9 @@ ITEM_URL = "https://api.ebay.com/buy/browse/v1/item/"
 #: what gets a key throttled.
 PAUSE_SECONDS = 0.35
 
+#: Documented set syntax for the condition filter, e.g. `sellers:{a|b}`.
+USED_FILTER = "conditions:{USED}"
+
 USER_AGENT = "airpods-verifier/1.0 (corpus collection; +https://developer.ebay.com)"
 
 
@@ -135,29 +138,39 @@ def search(token: str, query: str, limit: int) -> list[str]:
                 # Used items only: a sealed retail listing is usually stock
                 # photography, and a used listing is where a seller has to
                 # photograph the actual unit.
-                "filter": "conditions:{USED}",
+                "filter": USED_FILTER,
             }
         )
         payload = _get(f"{BROWSE_URL}?{params}", token)
-        summaries = payload.get("itemSummaries") or []
-        if not summaries:
+        if not payload.get("itemSummaries"):
             break
-        ids += [summary["itemId"] for summary in summaries if summary.get("itemId")]
+        ids += item_ids_from(payload)
         offset += page
         time.sleep(PAUSE_SECONDS)
     return ids[:limit]
 
 
-def fetch_listing(token: str, item_id: str) -> Listing | None:
-    payload = _get(f"{ITEM_URL}{urllib.parse.quote(item_id, safe='')}", token)
+#: Fields this tool reads out of a getItem response. Named here so a probe can
+#: check them against a live response in one call, rather than a forty-listing
+#: run failing on the fortieth.
+EXPECTED_ITEM_FIELDS = ("image", "additionalImages", "title", "price", "condition", "itemWebUrl")
+
+
+def parse_listing(item_id: str, payload: dict) -> Listing | None:
+    """Turn a getItem response into a Listing. Pure, so it can be tested."""
     images: list[str] = []
-    if payload.get("image", {}).get("imageUrl"):
-        images.append(payload["image"]["imageUrl"])
+    primary = (payload.get("image") or {}).get("imageUrl")
+    if primary:
+        images.append(primary)
     images += [
         entry["imageUrl"]
         for entry in payload.get("additionalImages") or []
-        if entry.get("imageUrl")
+        if isinstance(entry, dict) and entry.get("imageUrl")
     ]
+    # De-duplicate while keeping order: eBay sometimes repeats the primary
+    # image at the head of additionalImages.
+    seen: set[str] = set()
+    images = [url for url in images if not (url in seen or seen.add(url))]
     if not images:
         return None
     price = payload.get("price") or {}
@@ -170,6 +183,59 @@ def fetch_listing(token: str, item_id: str) -> Listing | None:
         url=payload.get("itemWebUrl", ""),
         image_urls=images,
     )
+
+
+def fetch_listing(token: str, item_id: str) -> Listing | None:
+    payload = _get(f"{ITEM_URL}{urllib.parse.quote(item_id, safe='')}", token)
+    return parse_listing(item_id, payload)
+
+
+def item_ids_from(payload: dict) -> list[str]:
+    """Item ids out of a search response.
+
+    `itemId` is what getItem takes; `legacyItemId` is the old numeric form and
+    is accepted as a fallback because a summary occasionally carries only that.
+    """
+    summaries = payload.get("itemSummaries") or []
+    ids: list[str] = []
+    for summary in summaries:
+        identifier = summary.get("itemId") or summary.get("legacyItemId")
+        if identifier:
+            ids.append(str(identifier))
+    return ids
+
+
+def probe(token: str, query: str) -> int:
+    """Fetch exactly one listing and report what the API actually returned.
+
+    Field names in this file were written against eBay's documentation, and
+    documentation drifts. One call is a cheap way to find that out before a
+    long run does.
+    """
+    params = urllib.parse.urlencode({"q": query, "limit": 1, "filter": USED_FILTER})
+    search_payload = _get(f"{BROWSE_URL}?{params}", token)
+    ids = item_ids_from(search_payload)
+    print(f"search returned {len(search_payload.get('itemSummaries') or [])} summaries")
+    print(f"  top-level keys: {sorted(search_payload)}")
+    if not ids:
+        print("  no usable item id — check the `filter` syntax and the marketplace header")
+        return 1
+
+    payload = _get(f"{ITEM_URL}{urllib.parse.quote(ids[0], safe='')}", token)
+    print(f"\ngetItem {ids[0]}")
+    print(f"  top-level keys: {sorted(payload)}")
+    missing = [name for name in EXPECTED_ITEM_FIELDS if name not in payload]
+    for name in EXPECTED_ITEM_FIELDS:
+        print(f"  {'  ' if name in payload else 'MISSING '}{name}")
+    listing = parse_listing(ids[0], payload)
+    if listing is None:
+        print("\nparsed no images from this listing — the image fields have moved")
+        return 1
+    print(f"\nparsed: {len(listing.image_urls)} images, condition {listing.condition!r}, "
+          f"seller {listing.seller!r}")
+    if missing:
+        print(f"\nabsent fields: {missing} — harmless if optional, check if images are short")
+    return 0
 
 
 def download(url: str, destination: Path) -> bool:
@@ -194,6 +260,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--limit", type=int, default=40, help="listings to fetch")
     parser.add_argument("--out", type=Path, default=Path("corpus"))
     parser.add_argument(
+        "--probe",
+        action="store_true",
+        help="fetch one listing and report which documented fields the API actually returned",
+    )
+    parser.add_argument(
         "--keep-stock",
         action="store_true",
         help="write press shots too, for inspecting what the filter removed",
@@ -213,6 +284,8 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         token = token_for(client_id, client_secret)
+        if args.probe:
+            return probe(token, args.query)
         print(f"searching: {args.query!r}")
         item_ids = search(token, args.query, args.limit)
         print(f"{len(item_ids)} listings")

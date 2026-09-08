@@ -271,8 +271,13 @@ immediately), then:
 
 ```bash
 export EBAY_CLIENT_ID=... EBAY_CLIENT_SECRET=...
+python tools/fetch_ebay.py --probe                      # one call: does the API still look like this?
 python tools/fetch_ebay.py --query "airpods pro 2nd generation" --limit 40 --out corpus/
 ```
+
+Run `--probe` first. Every field name here was written against eBay's
+published schema, and documentation drifts — one call reports which of them the
+API actually returned, rather than a forty-listing run failing on the fortieth.
 
 Every image passes `tools/stock_photos` first. Sellers pad listings with
 Apple's own press photography, which is a picture of a genuine unit attached to
