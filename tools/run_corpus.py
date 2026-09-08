@@ -278,9 +278,12 @@ def main() -> int:
         help="Use only Flash-Lite models. For when the full-Flash family is out of daily quota.",
     )
     parser.add_argument(
+        "--allow-flash",
         "--allow-lite",
+        dest="allow_lite",
         action="store_true",
-        help="Extend the chain to full-Flash after Lite. Better fine print, ~20 requests/day.",
+        help="Extend the chain to full-Flash after Lite. Measured 2026-09-08: identical "
+             "identifying fields to Lite on 7 posts, and quota exhausted after 7 requests.",
     )
     parser.add_argument("--max-images", type=int, default=4, help="Images per post (token cost).")
     parser.add_argument("--delay", type=float, default=DEFAULT_DELAY_S, help="Seconds between posts.")

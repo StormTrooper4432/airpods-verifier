@@ -104,9 +104,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Use only Flash-Lite models (when the full-Flash family is out of quota).",
     )
     parser.add_argument(
+        # The flag adds full Flash; it never added Lite. "--allow-lite" is kept
+        # as an alias so existing scripts keep working, but the name says the
+        # opposite of what it does and is no longer the one documented.
+        "--allow-flash",
         "--allow-lite",
+        dest="allow_lite",
         action="store_true",
-        help="Extend the chain to the full-Flash models after Lite. Better fine print, far less quota.",
+        help="Extend the chain to the full-Flash models after Lite. Measured on 7 corpus "
+             "posts: same identifying fields as Lite, slightly worse at localising the label, "
+             "and out of free-tier quota after 7 multi-image requests.",
     )
     parser.add_argument(
         "--no-fallback",

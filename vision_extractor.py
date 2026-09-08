@@ -266,7 +266,7 @@ def resolve_model_chain(
 
     if lite_only:
         attribute = "lite_only_chain"
-    elif allow_lite:  # historical name: "extend beyond the default chain"
+    elif allow_lite:  # misnamed: this ADDS full Flash, it never added Lite
         attribute = "extended_fallback_chain"
     else:
         attribute = "fallback_chain"
