@@ -234,10 +234,12 @@ containing counterfeit information.
 | — | Label Typography | *informational, weight 0 — see below* | Measurement |
 | — | Photographed Surfaces | *observation only* | — |
 
-**Serial Cross-Match is the one that can't be cloned around.** Apple prints a serial in
-four places; the box and case-lid serials must match, and each earbud carries its own.
-A counterfeiter copying one genuine serial passes Apple's lookup but would have to
-reproduce four consistent serials to pass this.
+**Serial Cross-Match is the one that can't be cloned around** — and it has never
+once run. Apple prints a serial in four places; the box and case-lid serials must
+match, and each earbud carries its own. A counterfeiter copying one genuine serial
+passes Apple's lookup but would have to reproduce four consistent serials to pass
+this. On the corpus it is 0 PASS, 0 FAIL, 20 UNKNOWN, because only the box-label
+serial was ever legible. See *Honest limitations*.
 
 ### Identification beyond Pro 2
 
@@ -333,6 +335,26 @@ mathematically elegant and font-blind at 0.0–0.8% separation).
 **Only North American boxes are characterised.** Packaging *content* varies by region —
 languages, regulatory marks, part-number suffix — so content rules don't transfer.
 Typography does not vary, since Apple sets every region in San Francisco.
+
+**The strongest check has never fired.** Serial Cross-Match carries 4.0 of the 19.5
+total and is the only check a cloned serial cannot defeat. Across 20 posts it is 0
+PASS, 0 FAIL, 20 UNKNOWN — the box-label serial was legible 7 times, the case-lid and
+both earbud serials never:
+
+```
+box label serial      7 of 20
+case lid serial       0 of 20
+left earbud serial    0 of 20
+right earbud serial   0 of 20
+```
+
+The case lid was *in frame* in 7 of those posts, so it is not that people fail to
+photograph it. Measured cause is framing distance: rendered the way the real thing
+looks, a lid filling the frame reads correctly at the pipeline's 1568px downscale,
+and the same lid at arm's length does not read at all. The capture guidance now says
+so. The practical consequence is that coverage tops out at 15.5 of 19.5 (79.5%), so
+the 60% floor for a verdict is really 75% of what is obtainable — nothing is
+reweighted, because erring toward `INCONCLUSIVE` is the safe direction.
 
 **The corpus is 20 posts.** Every number above rests on that.
 
