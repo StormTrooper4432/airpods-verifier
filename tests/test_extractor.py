@@ -18,6 +18,7 @@ import vision_extractor as ve
 from schema import VisionExtraction
 
 PIL_Image = pytest.importorskip("PIL.Image")
+PIL_ImageStat = pytest.importorskip("PIL.ImageStat")
 
 VALID_EXTRACTION = {
     "claimed_model_variant": "Pro 2 USB-C",
@@ -106,6 +107,87 @@ class TestImageEncoding:
         path.write_text("this is not an image")
         with pytest.raises(ve.VisionExtractionError, match="Could not open"):
             ve.encode_image(path)
+
+
+class TestOrientationIsCorrectedBeforeTheModelSeesIt:
+    """A phone stores sensor pixels plus a tag saying which way up they are.
+
+    Browsers apply that tag, so the person uploading sees their photograph
+    upright and has no reason to report a problem; Pillow ignores it and the
+    JPEG re-encode drops it, so the model was being handed a sideways or
+    upside-down box and asked to read the fine print on it. That is invisible
+    from both ends, and it is why this is tested rather than eyeballed.
+
+    Found on a real upload: an AirPods box photographed with the phone turned
+    over carried orientation 3, and every printed field on it came back wrong.
+    """
+
+    @staticmethod
+    def _tagged(path, orientation, size=(400, 200)):
+        """A frame whose top-left corner is black, saved with an EXIF tag.
+
+        Where that corner ends up says exactly which transform was applied.
+        """
+        image = PIL_Image.new("RGB", size, "white")
+        for x in range(size[0] // 4):
+            for y in range(size[1] // 4):
+                image.putpixel((x, y), (0, 0, 0))
+        exif = image.getexif()
+        exif[274] = orientation
+        image.save(path, format="JPEG", quality=95, exif=exif)
+        return path
+
+    @staticmethod
+    def _darkest_corner(image):
+        w, h = image.size
+        boxes = {
+            "top-left": (0, 0, w // 4, h // 4),
+            "top-right": (w - w // 4, 0, w, h // 4),
+            "bottom-left": (0, h - h // 4, w // 4, h),
+            "bottom-right": (w - w // 4, h - h // 4, w, h),
+        }
+        return min(boxes, key=lambda name: PIL_ImageStat.Stat(image.crop(boxes[name])).mean[0])
+
+    def _sent(self, path):
+        _, data = ve.encode_image(path)
+        return PIL_Image.open(io.BytesIO(base64.standard_b64decode(data))).convert("L")
+
+    def test_an_upside_down_photograph_arrives_upright(self, tmp_path):
+        """Orientation 3. The case that was actually found in the wild."""
+        path = self._tagged(tmp_path / "flipped.jpg", 3)
+        assert self._darkest_corner(self._sent(path)) == "bottom-right"
+
+    def test_a_portrait_photograph_arrives_upright(self, tmp_path):
+        """Orientation 6 - what a phone held normally writes, and the most
+        common tag there is. The corpus is screenshots, which carry no tag at
+        all, so no amount of corpus testing would have caught this."""
+        path = self._tagged(tmp_path / "portrait.jpg", 6)
+        assert self._darkest_corner(self._sent(path)) == "top-right"
+
+    def test_a_rotated_photograph_has_its_sides_swapped(self, tmp_path):
+        """A 90-degree tag means the stored width is the displayed height.
+        Getting this wrong crops every region in the wrong place."""
+        path = self._tagged(tmp_path / "sideways.jpg", 6, size=(400, 200))
+        sent = self._sent(path)
+        assert sent.size == (200, 400)
+
+    def test_an_untagged_photograph_is_left_alone(self, tmp_path):
+        """The whole existing corpus is untagged. This must be a no-op there,
+        or every recorded corpus result silently changes meaning."""
+        plain = PIL_Image.new("RGB", (400, 200), "white")
+        for x in range(100):
+            for y in range(50):
+                plain.putpixel((x, y), (0, 0, 0))
+        path = tmp_path / "plain.jpg"
+        plain.save(path, format="JPEG", quality=95)
+        sent = self._sent(path)
+        assert sent.size == (400, 200)
+        assert self._darkest_corner(sent) == "top-left"
+
+    def test_orientation_one_is_also_left_alone(self, tmp_path):
+        """Tagged, but tagged as already upright."""
+        path = self._tagged(tmp_path / "upright.jpg", 1)
+        assert self._darkest_corner(self._sent(path)) == "top-left"
 
 
 class TestImagePreparation:

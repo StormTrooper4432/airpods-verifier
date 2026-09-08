@@ -27,7 +27,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageOps
 
 #: Side length of the grid the difference hash is computed on. The usual 8 is
 #: too coarse for this subject: a white box held over a patterned surface has
@@ -126,6 +126,7 @@ class Judgement:
 def inspect(listing_id: str, path: Path) -> Candidate | None:
     try:
         with Image.open(path) as image:
+            image = ImageOps.exif_transpose(image) or image
             image.load()
             return Candidate(
                 listing_id=listing_id,

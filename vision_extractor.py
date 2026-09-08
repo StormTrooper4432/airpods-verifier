@@ -50,7 +50,7 @@ from providers import (
 from schema import LabelRegion, LocalAnalysis, VisionExtraction
 
 try:  # Optional: local downscaling / format normalisation.
-    from PIL import Image
+    from PIL import Image, ImageOps
 
     _PILLOW_AVAILABLE = True
 except ImportError:  # pragma: no cover - exercised only without Pillow
@@ -182,6 +182,13 @@ def encode_image(image_path: Path | str) -> tuple[str, str]:
 
 def _to_downscaled_jpeg(path: Path) -> str:
     with Image.open(path) as image:
+        # A phone writes the sensor's pixels plus an EXIF tag saying which
+        # way up they are. Browsers apply that tag, so whoever uploads a
+        # photograph sees it upright and has no reason to think anything is
+        # wrong; Pillow does not apply it, and the JPEG re-encode below drops
+        # the tag entirely - so without this the model is handed a sideways or
+        # upside-down box and asked to read its fine print.
+        image = ImageOps.exif_transpose(image) or image
         image = image.convert("RGB")  # drops alpha; JPEG cannot carry it
         longest_edge = max(image.size)
         if longest_edge > MAX_IMAGE_EDGE_PX:

@@ -46,7 +46,7 @@ from dataclasses import dataclass, replace
 from functools import lru_cache
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFilter, ImageFont
+from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
 
 #: San Francisco, as shipped with macOS. This is the reference.
 #: Apple's packaging typeface, which ships with macOS. Overridable because a
@@ -831,7 +831,12 @@ def analyse_label(
     resolution floor; that is reported rather than papered over.
     """
     with Image.open(image_path) as source:
-        crop = source.convert("L").crop(box)
+        # The box arrives in the coordinate space of the image the model
+        # was shown, and prepare_images() now straightens that one by its
+        # EXIF tag. Cropping the unstraightened original would read the
+        # wrong region of the box entirely.
+        upright = ImageOps.exif_transpose(source) or source
+        crop = upright.convert("L").crop(box)
 
     if crop.width < 4 or crop.height < 4:
         return None

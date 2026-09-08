@@ -520,6 +520,30 @@ serial_format:
 # number for an assumed one. Revisit if a future measurement shows drift.
 # source: measurement (this repository), 2026-09-08
 
+# PHOTOGRAPH ORIENTATION, found 2026-09-08 in the same corpus post 21.
+#
+# A phone stores the sensor's pixels plus an EXIF tag saying which way up they
+# are. Browsers apply that tag; Pillow does not, and the pipeline's JPEG
+# re-encode dropped it. So a photograph looked upright to whoever uploaded it
+# and reached the model rotated, with the fine print upside down.
+#
+# Measured on the panel itself: the encoded image differed from the stored
+# pixels by 41.6 mean absolute levels and from the EXIF-corrected image by
+# 0.43. It was being sent rotated by 180 degrees.
+#
+# THIS IS A CONFOUND FOR THE REFLECTIVE PRINT NOTE BELOW. The serial misreading
+# recorded there came off this same rotated panel, so reflection is not
+# established as its cause - rotation is at least as likely and was never
+# controlled for. The misspelling-count rule that note justifies rests on 14
+# labelled items and does not depend on this one panel, so it stands; the
+# single-panel serial claim does not. Re-measure post 21 now that orientation
+# is corrected before citing it for anything.
+#
+# Only 1 of 89 local images carries a rotation tag, which understates the
+# problem badly: the corpus is screenshots, and Reddit and every upload
+# pipeline strip EXIF. Camera originals reaching the deployed tool do not.
+# source: measurement (this repository), 2026-09-08
+
 # REFLECTIVE PRINT, observed 2026-09-08 on a genuine AirPods Pro 3 retail box
 # (corpus post 21, price sticker still attached).
 #
