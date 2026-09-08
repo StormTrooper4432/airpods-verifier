@@ -531,13 +531,24 @@ serial_format:
 # pixels by 41.6 mean absolute levels and from the EXIF-corrected image by
 # 0.43. It was being sent rotated by 180 degrees.
 #
-# THIS IS A CONFOUND FOR THE REFLECTIVE PRINT NOTE BELOW. The serial misreading
-# recorded there came off this same rotated panel, so reflection is not
-# established as its cause - rotation is at least as likely and was never
-# controlled for. The misspelling-count rule that note justifies rests on 14
-# labelled items and does not depend on this one panel, so it stands; the
-# single-panel serial claim does not. Re-measure post 21 now that orientation
-# is corrected before citing it for anything.
+# IT DOES NOT EXPLAIN THE MISREADING, though it looked like it would. The
+# serial misreading in the reflective-print note below came off this same
+# rotated panel, so rotation was the obvious suspect. Measured instead of
+# assumed, on a synthetic label with an invented serial, 180 degrees rotated
+# against upright:
+#
+#   clean render         serial read correctly, both orientations
+#   marginal contrast    4 of 4 correct upright, 4 of 4 correct rotated
+#
+# Twelve extractions, no difference. Below that contrast both orientations
+# fail together. So the model reads upside-down print about as well as
+# upright print, and rotation is NOT an alternative explanation for the
+# misreading - the reflective-print account below is not displaced and
+# stands as the better-supported one.
+#
+# The fix is still correct for reasons that have nothing to do with OCR
+# accuracy: the crop box is in the coordinate space of the image the model
+# was shown, and a difference hash is not rotation-invariant.
 #
 # Only 1 of 89 local images carries a rotation tag, which understates the
 # problem badly: the corpus is screenshots, and Reddit and every upload
