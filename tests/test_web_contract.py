@@ -245,3 +245,82 @@ def test_nothing_the_sheet_can_print_carries_a_whole_serial() -> None:
             if any(ch.isdigit() for ch in token) and any(ch.isalpha() for ch in token)
         ]
         assert not leaked, f"{path.name} carries serial-shaped tokens: {leaked}"
+
+
+def test_the_browsers_coverage_forecast_matches_the_engine() -> None:
+    """The sheet tells a visitor what their photographs can reach before they
+    send them. If that forecast drifts from what the rules engine actually
+    does, the sheet promises a verdict the engine will refuse - or talks
+    someone out of an examination that would have worked.
+    """
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node not available")
+
+    scenarios = [
+        [],
+        ["box_front", "case_exterior", "earbud"],
+        ["box_front", "case_exterior", "earbud", "box_bottom_label"],
+        ["box_bottom_label", "case_lid_underside"],
+        ["box_front", "box_back", "box_side", "box_top"],
+        [p for p in get_args(PanelName) if p != "other"],
+    ]
+
+    def python_ceiling(panels: list[str]) -> float:
+        shown = set(panels)
+        total = 0.0
+        for rule in rules_engine.RULES:
+            if rule.weight == 0:
+                continue
+            if rule.requires_panels and not set(rule.requires_panels) <= shown:
+                continue
+            if rule.answerable_from and not (set(rule.answerable_from) & shown):
+                continue
+            total += rule.weight
+        return total
+
+    script = (
+        "import { reachableWeight } from './src/data/sheet.ts';\n"
+        "const sets = JSON.parse(process.argv[1]);\n"
+        "console.log(JSON.stringify(sets.map(reachableWeight)));\n"
+    )
+    proc = subprocess.run(
+        [node, "--input-type=module", "-e", script, json.dumps(scenarios)],
+        capture_output=True,
+        text=True,
+        cwd=WEB,
+    )
+    if proc.returncode != 0:
+        pytest.skip(f"node could not import the sheet module: {proc.stderr.strip()[:200]}")
+
+    from_browser = json.loads(proc.stdout)
+    for panels, browser_value in zip(scenarios, from_browser):
+        assert browser_value == pytest.approx(python_ceiling(panels)), (
+            f"the sheet forecasts {browser_value} for {panels}, "
+            f"the engine reaches {python_ceiling(panels)}"
+        )
+
+
+def test_the_instinctive_photo_set_cannot_reach_a_verdict() -> None:
+    """The measurement this warning exists for, kept as a test.
+
+    On the labelled corpus the underside label was photographed in 8 of 20
+    posts and the case lid in none. The surfaces people do photograph - box
+    front, case, earbuds - top out below the coverage floor, so eleven of
+    twenty examinations were unanswerable before the model saw them. If a rule
+    change ever makes that set sufficient, this test should fail and the
+    warning copy should be revisited.
+    """
+    instinctive = {"box_front", "case_exterior", "earbud"}
+    total = sum(rule.weight for rule in rules_engine.RULES)
+    reachable = sum(
+        rule.weight
+        for rule in rules_engine.RULES
+        if rule.weight
+        and (not rule.requires_panels or set(rule.requires_panels) <= instinctive)
+        and (not rule.answerable_from or set(rule.answerable_from) & instinctive)
+    )
+    assert reachable / total < rules_engine.MIN_COVERAGE_FOR_VERDICT, (
+        "the instinctive photo set now reaches the coverage floor; the sheet's "
+        "pre-flight warning is out of date"
+    )

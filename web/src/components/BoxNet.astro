@@ -320,6 +320,23 @@ const markGlyph = (s: Status) => (s === 'FAIL' ? 'fail' : s === 'PASS' ? 'pass' 
     box-shadow: none;
   }
 
+  /* The single photograph that would add the most evidence right now. Ranking
+     by weight alone would keep pointing at the underside label after it had
+     been supplied, so the mark moves as the plot fills. */
+  label.panel-hit.is-best .panel-hit-cue {
+    opacity: 1;
+    background: var(--struck);
+    color: var(--paper);
+    box-shadow: none;
+  }
+  label.panel-hit.is-best::after {
+    content: '';
+    position: absolute;
+    inset: 2px;
+    border: 2px solid var(--struck);
+    pointer-events: none;
+  }
+
   .panel-hit-cue {
     font-family: var(--narrow);
     font-size: 10px;

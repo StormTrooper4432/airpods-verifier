@@ -9,6 +9,7 @@ import {
   plotPanel,
   PANELS,
   RULES,
+  MIN_COVERAGE_FOR_VERDICT,
   RULE_BY_PARAMETER,
   TOTAL_WEIGHT,
   type Finding,
@@ -174,6 +175,14 @@ const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
           <button type="submit" class="run">Run the examination</button>
           <a class="restart" href="/" id="restart" hidden={!result}>Start a new record</a>
         </div>
+        <p class="forecast" id="forecast" data-total={fmt(TOTAL_WEIGHT)}
+           data-floor={fmt(TOTAL_WEIGHT * MIN_COVERAGE_FOR_VERDICT)} aria-live="polite">
+          <span class="forecast-line">Nothing added yet.</span>
+          <span class="fine forecast-caveat">
+            Counted from the surface you attached each photograph to. The engine reads the
+            photographs themselves and may resolve fewer.
+          </span>
+        </p>
         <p class="fine actions-note">
           Reading a set of photographs usually takes 10 to 90 seconds. The wait is the
           vision model&rsquo;s queue on Google&rsquo;s free tier, not the size of your
@@ -257,6 +266,15 @@ const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 </Sheet>
 
 <script>
+  import {
+    canReachVerdict,
+    mostValuablePanel,
+    reachableWeight,
+    PANEL_BY_ID,
+    TOTAL_WEIGHT,
+    type PanelId,
+  } from '../data/sheet';
+
   const form = document.querySelector<HTMLFormElement>('#examination');
 
   if (form) {
@@ -274,6 +292,7 @@ const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
         const file = input.files?.[0];
         if (!file) {
           hit.classList.remove('is-loaded');
+          updateForecast();
           return;
         }
         const img = new Image();
@@ -283,6 +302,7 @@ const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
         hit.prepend(img);
         hit.classList.add('is-loaded');
         if (cue) cue.textContent = 'replace';
+        updateForecast();
       });
     });
 
@@ -294,6 +314,59 @@ const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
       const next = from.querySelector(selector);
       const here = document.querySelector(selector);
       if (next && here) here.innerHTML = next.innerHTML;
+    };
+
+    /**
+     * Say what this set can reach BEFORE it is sent.
+     *
+     * Measured on the labelled corpus: the surfaces people photograph by
+     * instinct reach 11.0 of 19.5, which is below the 60% floor — so eleven of
+     * twenty examinations were unanswerable before the model ever saw them,
+     * and every one of those people waited for the answer first. Telling them
+     * up front costs nothing and is the only thing that changes the outcome.
+     */
+    const forecast = document.getElementById('forecast');
+    const forecastLine = forecast?.querySelector('.forecast-line');
+    const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
+
+    const attachedPanels = (): PanelId[] =>
+      [...form!.querySelectorAll<HTMLInputElement>('.panel-file')]
+        .filter((input) => input.files && input.files.length > 0)
+        .map((input) => input.name.replace(/^panel_/, '') as PanelId);
+
+    const updateForecast = () => {
+      if (!forecast || !forecastLine) return;
+      const panels = attachedPanels();
+      const reach = reachableWeight(panels);
+      const ok = canReachVerdict(panels);
+      const next = mostValuablePanel(panels);
+      const nextName = next ? PANEL_BY_ID[next.panel]?.label.toLowerCase() : null;
+
+      forecast.classList.toggle('is-short', !ok);
+      forecast.classList.toggle('is-ready', ok);
+
+      if (panels.length === 0) {
+        forecastLine.textContent =
+          `Nothing added yet. The underside label is worth the most: it alone carries ` +
+          `${fmt(reachableWeight(['box_bottom_label']))} of ${fmt(TOTAL_WEIGHT)}.`;
+      } else if (!ok) {
+        forecastLine.textContent =
+          `These reach ${fmt(reach)} of ${fmt(TOTAL_WEIGHT)} — under the ` +
+          `${fmt(TOTAL_WEIGHT * 0.6)} needed for any verdict, so this examination would come ` +
+          `back inconclusive whatever the box is` +
+          (next ? `. Adding the ${nextName} would reach ${fmt(reach + next.gain)}.` : '.');
+      } else {
+        forecastLine.textContent =
+          `These reach ${fmt(reach)} of ${fmt(TOTAL_WEIGHT)} — enough for a verdict` +
+          (next ? `. Adding the ${nextName} would reach ${fmt(reach + next.gain)}.` : '.');
+      }
+
+      /* Point the plot at the photograph that would help most, and move the
+         mark as the set fills rather than leaving it on the label forever. */
+      document.querySelectorAll('.panel-hit').forEach((hit) => {
+        const panel = (hit as HTMLElement).dataset.panel;
+        hit.classList.toggle('is-best', Boolean(next) && panel === next!.panel);
+      });
     };
 
     /**
@@ -353,6 +426,8 @@ const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
       if (panel) panel.hidden = true;
       if (graded) graded.hidden = false;
     };
+
+    updateForecast();
 
     form.addEventListener('submit', async (event) => {
       const run = form.querySelector<HTMLButtonElement>('.run');
@@ -717,6 +792,21 @@ const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
   .run:disabled { background: none; color: var(--ink-soft); border-color: var(--intaglio-hair); cursor: progress; }
 
   .actions-note { max-width: 56ch; margin: 0; }
+
+  /* The forecast is a finding about the photographs, so it is set like one:
+     ruled off, struck when the set cannot reach a verdict. */
+  .forecast {
+    margin: 0;
+    max-width: 58ch;
+    padding-left: calc(var(--u) * 2);
+    border-left: 2px solid var(--intaglio-hair);
+    line-height: calc(var(--u) * 3);
+  }
+  .forecast.is-short { border-left-color: var(--struck); }
+  .forecast.is-ready { border-left-color: var(--intaglio); }
+  .forecast-line { display: block; font-weight: 500; }
+  .forecast.is-short .forecast-line { color: var(--struck); }
+  .forecast-caveat { display: block; margin-top: calc(var(--u) * 0.5); }
 
   .notice {
     margin-top: calc(var(--u) * 3);

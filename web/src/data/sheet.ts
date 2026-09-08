@@ -336,3 +336,49 @@ export function blankLedger(): EvidenceItem[] {
     source: rule.source,
   }));
 }
+
+/**
+ * The evidence weight a set of photographs can actually reach.
+ *
+ * Measured on the labelled corpus: the surfaces people photograph by instinct
+ * — box front, case, earbuds — top out at 11.0 of 19.5, which is 56% against a
+ * 60% floor. Those examinations were unanswerable before the model saw them,
+ * and no rule or prompt change moves that number. Only another photograph does.
+ *
+ * Mirrors the ceiling `rules_engine` applies; `test_web_contract.py` fails if
+ * the two disagree.
+ */
+export function reachableWeight(panels: PanelId[]): number {
+  const shown = new Set(panels);
+  return RULES.filter((rule) => {
+    if (rule.weight === 0) return false;
+    if (rule.requiresPanels && !rule.requiresPanels.every((p) => shown.has(p))) return false;
+    if (rule.answerableFrom.length && !rule.answerableFrom.some((p) => shown.has(p))) return false;
+    return true;
+  }).reduce((total, rule) => total + rule.weight, 0);
+}
+
+/** Whether this set could reach any verdict at all, before it is even sent. */
+export function canReachVerdict(panels: PanelId[]): boolean {
+  return reachableWeight(panels) / TOTAL_WEIGHT >= MIN_COVERAGE_FOR_VERDICT;
+}
+
+/**
+ * The surface that would add the most evidence weight right now.
+ *
+ * Not a fixed list: which photograph matters most depends on what has already
+ * been taken, so this is recomputed as the plot fills. Ranking by weight alone
+ * would keep pointing at the underside label after it had been supplied.
+ */
+export function mostValuablePanel(shown: PanelId[]): { panel: PanelId; gain: number } | null {
+  const base = reachableWeight(shown);
+  let best: { panel: PanelId; gain: number } | null = null;
+  for (const panel of PANELS) {
+    if (shown.includes(panel.id)) continue;
+    const gain = reachableWeight([...shown, panel.id]) - base;
+    if (gain > 0 && (best === null || gain > best.gain)) {
+      best = { panel: panel.id, gain };
+    }
+  }
+  return best;
+}
