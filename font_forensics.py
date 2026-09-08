@@ -48,6 +48,10 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
 
+import image_formats
+
+image_formats.register()  # Pillow alone cannot decode HEIC; a phone shoots it
+
 #: San Francisco, as shipped with macOS. This is the reference.
 #: Apple's packaging typeface, which ships with macOS. Overridable because a
 #: Linux deployment does not have it and this repository must not redistribute

@@ -776,3 +776,72 @@ class TestLocalAnalysis:
         # Check imports, not prose - the ledger legitimately says "Images show:".
         imports = [line for line in source.splitlines() if line.startswith(("import ", "from "))]
         assert not any("PIL" in line or "Image" in line for line in imports)
+
+
+class TestPhoneFormats:
+    """HEIC is what an iPhone shoots, and this tool asks for phone photographs.
+
+    Pillow does not decode it. The upload control advertised image/heic,
+    requirements.txt claimed Pillow gave "HEIC/phone-format normalisation", and
+    encode_image's own docstring said it handled HEIC — none of it true, and a
+    real iPhone photograph came back as "cannot identify image file". Three
+    separate places asserted a capability nobody had tested.
+    """
+
+    def test_the_decoder_is_registered_rather_than_assumed(self):
+        import image_formats
+
+        assert image_formats.register() is image_formats.HEIF_SUPPORTED
+
+    def test_registering_twice_is_harmless(self):
+        import image_formats
+
+        assert image_formats.register() == image_formats.register()
+
+    def test_a_heic_photograph_encodes_for_the_model(self, tmp_path):
+        import image_formats
+
+        if not image_formats.HEIF_SUPPORTED:
+            pytest.skip("pillow-heif is not installed in this environment")
+
+        import pillow_heif
+
+        source = PIL_Image.new("RGB", (800, 600), "white")
+        for x in range(200):
+            for y in range(150):
+                source.putpixel((x, y), (10, 10, 10))
+        path = tmp_path / "from_a_phone.heic"
+        pillow_heif.from_pillow(source).save(str(path), quality=90)
+
+        media_type, data = ve.encode_image(path)
+        assert media_type == "image/jpeg"
+        decoded = PIL_Image.open(io.BytesIO(base64.standard_b64decode(data)))
+        assert decoded.size == (800, 600)
+
+    def test_every_format_the_upload_advertises_can_actually_be_decoded(self):
+        """The browser must not accept a file the pipeline then refuses.
+
+        This is the check that was missing: the accept list and the decoder
+        support were maintained in two places and drifted.
+        """
+        import re
+        from pathlib import Path
+
+        import image_formats
+
+        boxnet = Path(__file__).resolve().parent.parent / "web/src/components/BoxNet.astro"
+        if not boxnet.exists():
+            pytest.skip("web frontend not present")
+
+        accept = re.search(r'accept="([^"]+)"', boxnet.read_text()).group(1)  # type: ignore
+        advertised = {token.strip().lower() for token in accept.split(",")}
+
+        PIL_Image.init()
+        for token in advertised:
+            suffix = token if token.startswith(".") else "." + token.split("/")[-1]
+            if suffix in (".heic", ".heif"):
+                assert image_formats.HEIF_SUPPORTED, (
+                    f"the upload advertises {token} but nothing can decode it"
+                )
+                continue
+            assert suffix in PIL_Image.EXTENSION, f"upload advertises {token}, Pillow cannot open it"

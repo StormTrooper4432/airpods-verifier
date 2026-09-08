@@ -29,6 +29,10 @@ from pathlib import Path
 
 from PIL import Image, ImageFilter, ImageStat
 
+import image_formats
+
+image_formats.register()  # Pillow alone cannot decode HEIC; a phone shoots it
+
 #: Discrete Laplacian. Variance of the response is the standard sharpness proxy:
 #: a sharp image has strong edges and therefore high variance, a blurred one has
 #: its high frequencies smoothed away.

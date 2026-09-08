@@ -52,6 +52,10 @@ from schema import LabelRegion, LocalAnalysis, VisionExtraction
 try:  # Optional: local downscaling / format normalisation.
     from PIL import Image, ImageOps
 
+    import image_formats
+
+    image_formats.register()  # Pillow alone cannot decode HEIC; a phone shoots it
+
     _PILLOW_AVAILABLE = True
 except ImportError:  # pragma: no cover - exercised only without Pillow
     _PILLOW_AVAILABLE = False
@@ -157,9 +161,12 @@ def load_system_prompt(prompts_path: Path | str = PROMPTS_PATH) -> str:
 def encode_image(image_path: Path | str) -> tuple[str, str]:
     """Return ``(media_type, base64_data)`` for one photograph.
 
-    With Pillow installed every image is normalised to a downscaled JPEG, which
-    also handles HEIC and other phone-camera formats neither API accepts.
-    Without it we fall back to raw bytes and the extension's media type.
+    With Pillow installed every image is normalised to a downscaled JPEG,
+    which is also how phone-camera formats neither API accepts are handled.
+    HEIC needs pillow-heif on top of Pillow - Pillow alone cannot decode it,
+    and this docstring claimed otherwise while a real iPhone photograph came
+    back as 'cannot identify image file'. See image_formats.py.
+    Without Pillow we fall back to raw bytes and the extension's media type.
     """
     path = Path(image_path)
     if not path.is_file():

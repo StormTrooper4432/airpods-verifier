@@ -20,6 +20,7 @@ ROOT = Path(__file__).resolve().parent.parent
 _IMPORT_TO_PACKAGE = {
     "yaml": "pyyaml",
     "PIL": "pillow",
+    "pillow_heif": "pillow-heif",
     "google": "google-genai",
 }
 

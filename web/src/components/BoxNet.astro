@@ -183,7 +183,7 @@ const markGlyph = (s: Status) => (s === 'FAIL' ? 'fail' : s === 'PASS' ? 'pass' 
                necessary: reflective packaging washes a word out at one angle
                and prints it plainly at another. -->
           <input class="sr-only panel-file" type="file" id={id} multiple
-                 name={`panel_${panel.id}`} accept="image/jpeg,image/png,image/webp,image/heic" />
+                 name={`panel_${panel.id}`} accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif" />
           <span class="sr-only">
             {panel.label}{exposed ? ', photographed. Add or replace photographs of it.'
                                   : ', not photographed. Add one or more photographs of it.'}

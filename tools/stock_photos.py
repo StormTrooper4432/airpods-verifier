@@ -29,6 +29,10 @@ from pathlib import Path
 
 from PIL import Image, ImageOps
 
+import image_formats
+
+image_formats.register()  # Pillow alone cannot decode HEIC; a phone shoots it
+
 #: Side length of the grid the difference hash is computed on. The usual 8 is
 #: too coarse for this subject: a white box held over a patterned surface has
 #: almost no low-frequency structure to distinguish it, and an AirPods 1 box and

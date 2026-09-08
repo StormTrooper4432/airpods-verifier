@@ -2,5 +2,7 @@ pydantic>=2.0          # extraction contract + Evidence Ledger schemas
 pyyaml>=6.0            # knowledge/*.yaml ground truth
 google-genai>=2.0      # default vision provider (AI Studio free tier)
 anthropic>=1.4.0       # optional: --provider anthropic
-pillow>=10.0           # optional: local downscaling + HEIC/phone-format normalisation
+pillow>=10.0           # optional: local downscaling and pixel analysis
+pillow-heif>=0.13      # optional: decodes HEIC. Pillow alone CANNOT, and HEIC is what
+                       # an iPhone shoots by default - see image_formats.py
 pytest>=8.0            # tests only
