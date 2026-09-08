@@ -3,7 +3,7 @@
  * endpoint must refuse when unconfigured. Both are asserted here rather than
  * trusted, because a leak would be silent.
  */
-import { record, all, summary, sessionOf, nextAttempt } from '../src/lib/record.ts';
+import { record, all, summary, sessionOf, nextAttempt, forecastAccuracy } from '../src/lib/record.ts';
 
 let pass = 0, fail = 0;
 const ok = (c, n) => { c ? pass++ : (fail++, console.log('  FAIL:', n)); };
@@ -71,6 +71,22 @@ ok(w.warnedOnce === w.addedAfterWarning + w.retriedUnchanged + w.stoppedAfterWar
 // The field that says what the tool actually decides on in the wild.
 ok(JSON.stringify(summary().rulesThatFailed) === '{"Serial Label Format":1}',
    `rulesThatFailed: ${JSON.stringify(summary().rulesThatFailed)}`);
+
+// Forecast honesty: the direction of the error matters, not just its size.
+record({ session: 'f1', attempt: 1, outcome: 'examined', offered: ['box_front'],
+         forecast: 4.5, reached: 10.5 });   // undershot, the observed live case
+record({ session: 'f2', attempt: 1, outcome: 'examined', offered: ['box_front'],
+         forecast: 15.5, reached: 15.5 });  // exact
+record({ session: 'f3', attempt: 1, outcome: 'examined', offered: ['box_front'],
+         forecast: 15.5, reached: 11.0 });  // overshot
+// The buffer already holds records from the checks above, so these assert on
+// properties that hold whatever else is in it rather than on absolute counts.
+const f = forecastAccuracy();
+ok(f.runs >= 3, `forecast runs: ${f.runs}`);
+ok(f.undershot >= 1 && f.overshot >= 1, `under ${f.undershot}, over ${f.overshot}`);
+ok(f.exact + f.undershot + f.overshot === f.runs, 'every run lands in exactly one bucket');
+ok(f.worstUnder === 6, `worst undershoot: ${f.worstUnder}`);
+ok(f.worstOver === -4.5, `worst overshoot: ${f.worstOver}`);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

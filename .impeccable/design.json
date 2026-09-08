@@ -1,48 +1,253 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-07T00:00:00Z",
+  "generatedAt": "2026-09-08T00:00:00Z",
   "title": "Design System: AirPods Pro 2 Examination Record",
   "extensions": {
     "colorMeta": {
-      "paper": { "role": "neutral", "displayName": "Security Stock", "canonical": "#e9edef", "tonalRamp": ["#141a1c", "#242e31", "#3a474b", "#566468", "#7b8a8f", "#a3b1b6", "#cfd8dc", "#eff3f5"] },
-      "paper-field": { "role": "neutral", "displayName": "Recessed Field", "canonical": "#dfe5e8", "tonalRamp": ["#121819", "#22292c", "#374245", "#525f63", "#77858a", "#9fadb2", "#c7d1d5", "#eaeff1"] },
-      "paper-deep": { "role": "neutral", "displayName": "Fold Shadow", "canonical": "#cfd8dc", "tonalRamp": ["#101618", "#1f272a", "#333e42", "#4d5b60", "#718187", "#98a8ae", "#bfcbd0", "#e4ebee"] },
-      "ink": { "role": "neutral", "displayName": "Blue-Black Ink", "canonical": "#0d1417", "tonalRamp": ["#0d1417", "#182327", "#26343a", "#3a4b52", "#54686f", "#7a8d94", "#a9bac0", "#dde7ea"] },
-      "ink-soft": { "role": "neutral", "displayName": "Tinted Ink", "canonical": "#4a5a63", "tonalRamp": ["#131a1e", "#1f2b31", "#2e3d45", "#3d4f58", "#4a5a63", "#6d818b", "#9aacb5", "#ccd9de"] },
-      "intaglio": { "role": "primary", "displayName": "Intaglio Green", "canonical": "#0b6b4f", "tonalRamp": ["#04211a", "#063327", "#084635", "#0b6b4f", "#0f8a67", "#2fb28c", "#7fd0b6", "#cdece1"] },
-      "intaglio-soft": { "role": "primary", "displayName": "Soft Register", "canonical": "#7fa899", "tonalRamp": ["#152722", "#1f3b33", "#2d5548", "#3f7263", "#5b9080", "#7fa899", "#a9c6bb", "#d8e8e1"] },
-      "intaglio-hair": { "role": "primary", "displayName": "Register Hair", "canonical": "#b9cfc7", "tonalRamp": ["#1a2a26", "#254038", "#33574c", "#457062", "#618c7e", "#8bb0a3", "#b9cfc7", "#e3efeb"] },
-      "struck": { "role": "secondary", "displayName": "Struck Vermilion", "canonical": "#c2371d", "tonalRamp": ["#2d0b05", "#460f07", "#63170b", "#8a2312", "#c2371d", "#dd5f45", "#ec9782", "#f8d6cd"] }
+      "paper": {
+        "role": "neutral",
+        "displayName": "Security Stock",
+        "canonical": "#e9edef",
+        "tonalRamp": [
+          "#141a1c",
+          "#242e31",
+          "#3a474b",
+          "#566468",
+          "#7b8a8f",
+          "#a3b1b6",
+          "#cfd8dc",
+          "#eff3f5"
+        ]
+      },
+      "paper-field": {
+        "role": "neutral",
+        "displayName": "Recessed Field",
+        "canonical": "#dfe5e8",
+        "tonalRamp": [
+          "#121819",
+          "#22292c",
+          "#374245",
+          "#525f63",
+          "#77858a",
+          "#9fadb2",
+          "#c7d1d5",
+          "#eaeff1"
+        ]
+      },
+      "paper-deep": {
+        "role": "neutral",
+        "displayName": "Fold Shadow",
+        "canonical": "#cfd8dc",
+        "tonalRamp": [
+          "#101618",
+          "#1f272a",
+          "#333e42",
+          "#4d5b60",
+          "#718187",
+          "#98a8ae",
+          "#bfcbd0",
+          "#e4ebee"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Blue-Black Ink",
+        "canonical": "#0d1417",
+        "tonalRamp": [
+          "#0d1417",
+          "#182327",
+          "#26343a",
+          "#3a4b52",
+          "#54686f",
+          "#7a8d94",
+          "#a9bac0",
+          "#dde7ea"
+        ]
+      },
+      "ink-soft": {
+        "role": "neutral",
+        "displayName": "Tinted Ink",
+        "canonical": "#4a5a63",
+        "tonalRamp": [
+          "#131a1e",
+          "#1f2b31",
+          "#2e3d45",
+          "#3d4f58",
+          "#4a5a63",
+          "#6d818b",
+          "#9aacb5",
+          "#ccd9de"
+        ]
+      },
+      "intaglio": {
+        "role": "primary",
+        "displayName": "Intaglio Green",
+        "canonical": "#0b6b4f",
+        "tonalRamp": [
+          "#04211a",
+          "#063327",
+          "#084635",
+          "#0b6b4f",
+          "#0f8a67",
+          "#2fb28c",
+          "#7fd0b6",
+          "#cdece1"
+        ]
+      },
+      "intaglio-soft": {
+        "role": "primary",
+        "displayName": "Soft Register",
+        "canonical": "#7fa899",
+        "tonalRamp": [
+          "#152722",
+          "#1f3b33",
+          "#2d5548",
+          "#3f7263",
+          "#5b9080",
+          "#7fa899",
+          "#a9c6bb",
+          "#d8e8e1"
+        ]
+      },
+      "intaglio-hair": {
+        "role": "primary",
+        "displayName": "Register Hair",
+        "canonical": "#b9cfc7",
+        "tonalRamp": [
+          "#1a2a26",
+          "#254038",
+          "#33574c",
+          "#457062",
+          "#618c7e",
+          "#8bb0a3",
+          "#b9cfc7",
+          "#e3efeb"
+        ]
+      },
+      "struck": {
+        "role": "secondary",
+        "displayName": "Struck Vermilion",
+        "canonical": "#c2371d",
+        "tonalRamp": [
+          "#2d0b05",
+          "#460f07",
+          "#63170b",
+          "#8a2312",
+          "#c2371d",
+          "#dd5f45",
+          "#ec9782",
+          "#f8d6cd"
+        ]
+      }
     },
     "typographyMeta": {
-      "masthead": { "displayName": "Masthead", "purpose": "The product name at the head of the sheet. One per page, Archivo Narrow 700 uppercase." },
-      "grade": { "displayName": "Grade", "purpose": "The verdict word, always sitting on a 3px rule that takes the verdict's colour." },
-      "title": { "displayName": "Title", "purpose": "Filed-record and method headings." },
-      "subtitle": { "displayName": "Subtitle", "purpose": "A ledger row's parameter name; the masthead standfirst." },
-      "body": { "displayName": "Body", "purpose": "All prose. Tabular lining figures on. Measures capped 46-82ch by content." },
-      "label": { "displayName": "Label", "purpose": "Section headings, uppercase Narrow in the register colour." },
-      "caption": { "displayName": "Caption", "purpose": "Field keys, table heads, Source keys, row meta." },
-      "fine": { "displayName": "Fine print", "purpose": "The citation line under every finding, plot captions, register sources." }
+      "masthead": {
+        "displayName": "Masthead",
+        "purpose": "The product name at the head of the sheet. One per page, Archivo Narrow 700 uppercase."
+      },
+      "grade": {
+        "displayName": "Grade",
+        "purpose": "The verdict word, always sitting on a 3px rule that takes the verdict's colour."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Filed-record and method headings."
+      },
+      "subtitle": {
+        "displayName": "Subtitle",
+        "purpose": "A ledger row's parameter name; the masthead standfirst."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "All prose. Tabular lining figures on. Measures capped 46-82ch by content."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Section headings, uppercase Narrow in the register colour."
+      },
+      "caption": {
+        "displayName": "Caption",
+        "purpose": "Field keys, table heads, Source keys, row meta."
+      },
+      "fine": {
+        "displayName": "Fine print",
+        "purpose": "The citation line under every finding, plot captions, register sources."
+      }
     },
     "shadows": [
-      { "name": "none", "value": "none", "purpose": "The system has no elevation shadows. Depth is tonal: paper to recessed field to hatch." },
-      { "name": "hairline-outline", "value": "inset 0 0 0 1px var(--intaglio)", "purpose": "A stroke written in shadow syntax, on a de-emphasised panel cue. The only acceptable use of box-shadow." }
+      {
+        "name": "none",
+        "value": "none",
+        "purpose": "The system has no elevation shadows. Depth is tonal: paper to recessed field to hatch."
+      },
+      {
+        "name": "hairline-outline",
+        "value": "inset 0 0 0 1px var(--intaglio)",
+        "purpose": "A stroke written in shadow syntax, on a de-emphasised panel cue. The only acceptable use of box-shadow."
+      }
     ],
     "motion": [
-      { "name": "ease-sheet", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "The only easing on the surface. Exponential ease-out." },
-      { "name": "grade-strike", "value": "520ms cubic-bezier(0.16, 1, 0.3, 1), delay 560ms", "purpose": "The one authored moment: the grade word resolves out of blur and 0.16em tracking." },
-      { "name": "strike-on", "value": "420ms cubic-bezier(0.16, 1, 0.3, 1), staggered 55ms per row", "purpose": "Marks strike onto the sheet in ledger order." },
-      { "name": "seg-in", "value": "380ms cubic-bezier(0.16, 1, 0.3, 1), delay 640ms", "purpose": "Coverage rail segments scale in from the left." },
-      { "name": "state-transition", "value": "140-180ms cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "Opacity and colour transitions on cues, buttons, and the skip link." },
-      { "name": "reduced-motion-guard", "value": "animation-duration: 1ms; transition-duration: 1ms", "purpose": "Global guard under prefers-reduced-motion: reduce." }
+      {
+        "name": "ease-sheet",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "The only easing on the surface. Exponential ease-out."
+      },
+      {
+        "name": "grade-strike",
+        "value": "520ms cubic-bezier(0.16, 1, 0.3, 1), delay 560ms",
+        "purpose": "The one authored moment: the grade word resolves out of blur and 0.16em tracking."
+      },
+      {
+        "name": "strike-on",
+        "value": "420ms cubic-bezier(0.16, 1, 0.3, 1), staggered 55ms per row",
+        "purpose": "Marks strike onto the sheet in ledger order."
+      },
+      {
+        "name": "seg-in",
+        "value": "380ms cubic-bezier(0.16, 1, 0.3, 1), delay 640ms",
+        "purpose": "Coverage rail segments scale in from the left."
+      },
+      {
+        "name": "rail-sweep",
+        "value": "1.9s cubic-bezier(0.16, 1, 0.3, 1) infinite, 110ms stagger across 8 cells",
+        "purpose": "The examining rail's indeterminate sweep. Runs only while a request is in flight; holds a static lit rail under prefers-reduced-motion."
+      },
+      {
+        "name": "state-transition",
+        "value": "140-180ms cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Opacity and colour transitions on cues, buttons, and the skip link."
+      },
+      {
+        "name": "reduced-motion-guard",
+        "value": "animation-duration: 1ms; transition-duration: 1ms",
+        "purpose": "Global guard under prefers-reduced-motion: reduce."
+      }
     ],
     "breakpoints": [
-      { "name": "wide", "value": "1560px" },
-      { "name": "stack", "value": "1100px" },
-      { "name": "ledger-tight", "value": "900px" },
-      { "name": "masthead-stack", "value": "860px" },
-      { "name": "pan", "value": "720px" },
-      { "name": "phone", "value": "560px" }
+      {
+        "name": "wide",
+        "value": "1560px"
+      },
+      {
+        "name": "stack",
+        "value": "1100px"
+      },
+      {
+        "name": "ledger-tight",
+        "value": "900px"
+      },
+      {
+        "name": "masthead-stack",
+        "value": "860px"
+      },
+      {
+        "name": "pan",
+        "value": "720px"
+      },
+      {
+        "name": "phone",
+        "value": "560px"
+      }
     ]
   },
   "components": [
@@ -109,40 +314,137 @@
       "description": "The only boxed element on the sheet: a 2px vermilion outline around a blocking problem and its fix. Outline only, never a fill.",
       "html": "<div class=\"ds-notice\"><p class=\"ds-notice-head\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 14 14\" aria-hidden=\"true\"><rect x=\"0.7\" y=\"0.7\" width=\"12.6\" height=\"12.6\" fill=\"none\" stroke=\"#c2371d\" stroke-width=\"1.4\"/><path d=\"M2.4 2.4 L11.6 11.6 M11.6 2.4 L2.4 11.6\" fill=\"none\" stroke=\"#c2371d\" stroke-width=\"2\" stroke-linecap=\"square\"/></svg>The photograph could not be read.</p><p class=\"ds-notice-fix\">Re-shoot the underside label square on, in daylight, close enough to fill the frame.</p></div>",
       "css": ".ds-notice { padding: 16px 24px; border: 2px solid var(--struck, #c2371d); border-radius: 0; max-width: 62ch; font-family: 'Archivo', system-ui, sans-serif; font-size: 15px; line-height: 24px; } .ds-notice-head { display: flex; align-items: center; gap: 12px; margin: 0 0 8px; font-weight: 600; color: var(--struck, #c2371d); } .ds-notice-fix { margin: 0; color: var(--ink-soft, #4a5a63); }"
+    },
+    {
+      "name": "Restart Link",
+      "kind": "button",
+      "refersTo": "button-restart",
+      "description": "Starts a new record. Hidden until a grade exists; sits beside Run, never above it.",
+      "html": "<a class=\"ds-restart\" href=\"/\">Start a new record</a>",
+      "css": ".ds-restart { font-family: 'Archivo Narrow', system-ui, sans-serif; text-transform: uppercase; letter-spacing: 0.16em; font-weight: 700; font-size: 14px; color: var(--ink, #0d1417); background: none; border: 2px solid var(--intaglio, #0b6b4f); padding: 14px 24px; text-decoration: none; display: inline-flex; align-items: center; transition: background 160ms cubic-bezier(0.16,1,0.3,1), color 160ms cubic-bezier(0.16,1,0.3,1); } .ds-restart:hover { background: var(--intaglio, #0b6b4f); color: var(--paper, #e9edef); } .ds-restart:focus-visible { outline: 2px solid var(--intaglio, #0b6b4f); outline-offset: 3px; }"
+    },
+    {
+      "name": "Coverage Forecast",
+      "kind": "custom",
+      "refersTo": "forecast-note",
+      "description": "Live before the run: what the attached photographs can reach against the full evidence weight, whether that clears the verdict floor, and which surface would add most.",
+      "html": "<p class=\"ds-forecast is-short\"><span class=\"ds-forecast-line\">These reach 9.5 of 19.5 &mdash; under the 11.7 needed for any verdict, so this examination would come back inconclusive whatever the box is. Adding the underside label would reach 16.5.</span><span class=\"ds-forecast-caveat\">Counted from the surface you attached each photograph to.</span></p>",
+      "css": ".ds-forecast { margin: 0; max-width: 58ch; padding-left: 16px; border-left: 2px solid var(--intaglio-hair, #b9cfc7); font-family: 'Archivo', system-ui, sans-serif; font-size: 15px; line-height: 24px; color: var(--ink, #0d1417); font-variant-numeric: tabular-nums lining-nums; } .ds-forecast.is-ready { border-left-color: var(--intaglio, #0b6b4f); } .ds-forecast.is-short { border-left-color: var(--struck, #c2371d); } .ds-forecast-line { display: block; font-weight: 500; } .ds-forecast.is-short .ds-forecast-line { color: var(--struck, #c2371d); } .ds-forecast-caveat { display: block; margin-top: 4px; font-family: 'Archivo Narrow', system-ui, sans-serif; font-size: 11.5px; line-height: 16px; color: var(--ink-soft, #4a5a63); }"
+    },
+    {
+      "name": "Examining State",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "Replaces the grade while a run is in flight: an indeterminate rail, the true pipeline stage, and an elapsed clock. No percentage, ever.",
+      "html": "<div class=\"ds-examining\"><p class=\"ds-examining-word\">Examining</p><div class=\"ds-examining-rail\" role=\"progressbar\" aria-label=\"Examination in progress. The length is not known in advance.\"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div><p class=\"ds-examining-stage\">Reading model numbers, the copyright year and the serial line</p><p class=\"ds-examining-clock\"><span class=\"ds-elapsed\">0:24</span> elapsed <span class=\"ds-sep\">/</span> the length is not known in advance, so no percentage is shown</p></div>",
+      "css": ".ds-examining-word { font-family: 'Archivo Narrow', system-ui, sans-serif; font-weight: 700; text-transform: uppercase; font-size: clamp(26px, 3.6vw, 42px); line-height: 0.92; margin: 0; padding-bottom: 12px; color: var(--ink-soft, #4a5a63); border-bottom: 3px solid var(--intaglio-hair, #b9cfc7); } .ds-examining-rail { display: flex; gap: 3px; height: 16px; margin: 24px 0 16px; } .ds-examining-rail span { flex: 1; border: 1px solid var(--intaglio-hair, #b9cfc7); background: transparent; animation: ds-rail-sweep 1.9s cubic-bezier(0.16,1,0.3,1) infinite; } .ds-examining-rail span:nth-child(2){animation-delay:110ms} .ds-examining-rail span:nth-child(3){animation-delay:220ms} .ds-examining-rail span:nth-child(4){animation-delay:330ms} .ds-examining-rail span:nth-child(5){animation-delay:440ms} .ds-examining-rail span:nth-child(6){animation-delay:550ms} .ds-examining-rail span:nth-child(7){animation-delay:660ms} .ds-examining-rail span:nth-child(8){animation-delay:770ms} @keyframes ds-rail-sweep { 0%,55%,100% { background: transparent; border-color: var(--intaglio-hair, #b9cfc7); } 18% { background: var(--intaglio, #0b6b4f); border-color: var(--intaglio, #0b6b4f); } } .ds-examining-stage { font-family: 'Archivo', system-ui, sans-serif; font-size: 15px; line-height: 24px; margin: 0 0 8px; max-width: 54ch; color: var(--ink, #0d1417); } .ds-examining-clock { margin: 0; font-family: 'Archivo Narrow', system-ui, sans-serif; font-size: 11.5px; line-height: 16px; color: var(--ink-soft, #4a5a63); } .ds-elapsed { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink, #0d1417); } .ds-sep { padding: 0 0.5em; color: var(--intaglio, #0b6b4f); } @media (prefers-reduced-motion: reduce) { .ds-examining-rail span { animation: none; background: var(--intaglio-hair, #b9cfc7); border-color: var(--intaglio-soft, #7fa899); } }"
+    },
+    {
+      "name": "Grader's Seal",
+      "kind": "custom",
+      "refersTo": "seal",
+      "description": "A drawn lathe ring signing the record: GRADED BY / RULES ENGINE / n CHECKS. Appears only when a grade exists.",
+      "html": "<figure class=\"ds-seal\" role=\"img\" aria-label=\"Graded by the rules engine: 13 checks. No language model returned this verdict.\"><div class=\"ds-seal-ring\" aria-hidden=\"true\"></div><figcaption class=\"ds-seal-face\" aria-hidden=\"true\"><span class=\"ds-seal-top\">Graded by</span><span class=\"ds-seal-name\">Rules<br>engine</span><span class=\"ds-seal-foot\">13 checks</span></figcaption></figure>",
+      "css": ".ds-seal { position: relative; width: 132px; height: 132px; margin: 0; display: grid; place-items: center; } .ds-seal-ring { position: absolute; inset: 0; border: 0.6px solid var(--intaglio, #0b6b4f); border-radius: 50%; background-image: var(--ring); background-size: contain; background-repeat: no-repeat; opacity: 0.55; } .ds-seal-face { position: relative; text-align: center; font-family: 'Archivo Narrow', system-ui, sans-serif; color: var(--intaglio, #0b6b4f); line-height: 1.15; } .ds-seal-top, .ds-seal-foot { display: block; font-size: 7px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-soft, #4a5a63); white-space: nowrap; } .ds-seal-name { display: block; font-size: 13px; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; line-height: 1.05; margin: 4px 0 5px; }"
     }
   ],
   "narrative": {
     "northStar": "The Graded Examination Certificate",
-    "overview": "This surface is a document, not an app screen. It behaves like a printed examination record on cold security stock: a guilloche border traced by an actual geometric lathe, a masthead ruled off from the body, a plot of the specimen, graded rows with their sources in fine print, and a grader's seal that names who graded it. The buyer holding a phone over a stranger's box and the buyer at a desk reading listing photographs are looking at the same sheet at two widths, not at two products.\n\nDensity is high and deliberately unpadded. There are no cards, no panels, no containers, no rounded corners anywhere in the shipped stylesheet - the entire surface is one hard unit of paper, and its sections are separated by voids and by a small number of heavy printed rules. The ornament is real: the border, the underprint behind the grade, and the seal ring all come from one lathe function (guilloche.ts) tracing hypotrochoids on integer teeth so the curves close without a seam.\n\nThe refusals are structural. There is no drop-zone hero, no colour-coded score badge, and no authenticity percentage, because the pipeline behind the sheet does not produce one. Coverage and confidence are printed as two separate figures and never merged. State is carried by a struck mark - a tick, a crossed box, a dashed box - so every outcome survives colour being removed, and INCONCLUSIVE reads as an unfilled field rather than a failure.",
+    "overview": "This surface is two documents, not an app screen. `/` is the record being made — masthead, plot, findings, grade — and `/about` is the method behind it: the filed records, the full register of checks with their sources, and the limits. Splitting them took the tool page from 6,702px to 2,600px; the working sheet carries only what an examination needs, and the argument for the examination lives on its own sheet. Both read as one printed examination record on cold security stock: a guilloche border traced by an actual geometric lathe, a masthead ruled off from the body, a plot of the specimen, graded rows with their sources in fine print, and a grader's seal that names who graded it. The buyer holding a phone over a stranger's box and the buyer at a desk reading listing photographs are looking at the same sheet at two widths, not at two products. Density is high and deliberately unpadded. There are no cards, no panels, no containers, no rounded corners anywhere in the shipped stylesheet — the entire surface is one hard unit of paper, and its sections are separated by voids and by a small number of heavy printed rules. The ornament is real: the border, the underprint behind the grade, and the seal ring all come from one lathe function (`guilloche.ts`) tracing hypotrochoids on integer teeth so the curves close without a seam. The refusals are structural. There is no drop-zone hero, no colour-coded score badge, and no authenticity percentage, because the pipeline behind the sheet does not produce one. Coverage and confidence are printed as two separate figures and never merged. State is carried by a struck mark — a tick, a crossed box, a dashed box — so every outcome survives colour being removed, and INCONCLUSIVE reads as an unfilled field rather than a failure.",
     "keyCharacteristics": [
       "One hard modular unit (--u: 8px); every measure a whole multiple of it",
-      "Four colour roles only; vermilion reserved for struck FAIL marks",
+      "Four colour roles only; vermilion for struck failures and the one missing surface",
       "Zero corner radius, zero drop shadows, zero containers",
       "Drawn ornament from a real lathe, never an image asset",
       "State is a mark, never a hue",
       "Tabular lining figures on globally, so numbers align down a column",
-      "One authored motion moment, guarded for reduced motion"
+      "One authored motion moment plus one live-state loop, both guarded for reduced motion"
     ],
     "rules": [
-      { "name": "The Four Roles Rule", "body": "Paper, ink, intaglio, struck. Nothing outside these four roles reaches the sheet. A new need is a tint of an existing role, not a tenth colour.", "section": "colors" },
-      { "name": "The Strike Reserve Rule", "body": "Vermilion appears only where a mark is struck through or a finding is disqualifying. It is never a fill, a background, a hover state, or an emphasis colour.", "section": "colors" },
-      { "name": "The Colour-Removed Rule", "body": "Every state must remain readable with colour stripped out. A tick, a crossed box, a dashed box, a solid versus dashed border, a hatched versus solid fill - the glyph or the stroke style carries the meaning and the hue only reinforces it.", "section": "colors" },
-      { "name": "The Two Widths Rule", "body": "Narrow is the printed apparatus - mastheads, grades, labels, keys, figures on the drawing, fine print. Regular is the reading voice. A third family is never introduced, and a system display face is never substituted for the self-hosted ones.", "section": "typography" },
-      { "name": "The Tabular Figures Rule", "body": "Figures are tabular and lining everywhere. Any new numeric readout inherits this; never disable it for a 'nicer' proportional set.", "section": "typography" },
-      { "name": "The Uppercase Is Apparatus Rule", "body": "Uppercase + wide tracking marks something as form furniture (a key, a heading, a stamp). It is never used on a sentence the buyer has to read.", "section": "typography" },
-      { "name": "The Whole Unit Rule", "body": "Every measure is calc(var(--u) * n) for a whole n. If a value cannot be expressed that way, the layout is wrong, not the unit.", "section": "layout" },
-      { "name": "The Void Rule", "body": "Sections are separated by space and by mass. A hairline between two sections is a failure to give them enough room; rules are reserved for the four places the sheet already uses them.", "section": "layout" },
-      { "name": "The Pan-Don't-Shrink Rule", "body": "A drawing whose type would become illegible at the phone's column width keeps its size and pans inside its own box (min-width: 560px in an overflow-x: auto figure). Shrinking to fit is not responsive, it is unreadable.", "section": "layout" },
-      { "name": "The Printed-Flat Rule", "body": "Nothing on this sheet floats. Depth comes from tone (paper to field to hatch) and from ink weight. No box-shadow for elevation, no hard offset shadow, no blur, ever.", "section": "elevation" },
-      { "name": "The Square Corner Rule", "body": "Radius is 0. Everywhere. A rounded corner on this sheet is a bug.", "section": "shapes" },
-      { "name": "The Drawn Ornament Rule", "body": "Guilloche is generated by lib/guilloche.ts, never shipped as an image. Teeth must be integers or the curve leaves a seam; pen distance under the rolling radius gives petals, over it gives loops.", "section": "shapes" },
-      { "name": "The Two Figures Rule", "body": "Coverage and confidence are printed as two labelled numbers, side by side, in the same size. They are never averaged, never combined into a score, and no authenticity percentage exists on this surface.", "section": "components" },
-      { "name": "The Unfilled Field Rule", "body": "An empty record is a blank ruled form, not an error or an empty state illustration. Every check is already listed, the grade field is ruled and captioned 'Not yet graded', and the values print as dashes.", "section": "components" },
-      { "name": "The Motion Budget Rule", "body": "One authored moment: on a fresh result, marks strike onto the sheet in ledger order (420ms, 55ms apart), the grade word resolves out of blur and wide tracking (grade-strike, 520ms), and the rail segments scale in - all on cubic-bezier(0.16, 1, 0.3, 1), all cut to 1ms under prefers-reduced-motion. Everything else is a 140-180ms opacity or colour transition. No parallax, no scroll animation, no looping decoration.", "section": "components" }
+      {
+        "name": "The Four Roles Rule",
+        "body": "Paper, ink, intaglio, struck. Nothing outside these four roles reaches the sheet. A new need is a tint of an existing role, not a tenth colour.",
+        "section": "colors"
+      },
+      {
+        "name": "The Strike Reserve Rule",
+        "body": "Vermilion appears only where something is struck through, disqualifying, or missing: a failed check, a grade that fails, a set of photographs that cannot reach a verdict, and the one absent surface the record most needs. It is never a hover state, never an emphasis colour, and never a flat block behind text. At most one filled vermilion element exists on a page, and it is the best-next-photograph cue.",
+        "section": "colors"
+      },
+      {
+        "name": "The Colour-Removed Rule",
+        "body": "Every state must remain readable with colour stripped out. A tick, a crossed box, a dashed box, a solid versus dashed border, a hatched versus solid fill — the glyph or the stroke style carries the meaning and the hue only reinforces it.",
+        "section": "colors"
+      },
+      {
+        "name": "The Two Widths Rule",
+        "body": "Narrow is the printed apparatus — mastheads, grades, labels, keys, figures on the drawing, fine print. Regular is the reading voice. A third family is never introduced, and a system display face is never substituted for the self-hosted ones.",
+        "section": "typography"
+      },
+      {
+        "name": "The Tabular Figures Rule",
+        "body": "Figures are tabular and lining everywhere. Any new numeric readout inherits this; never disable it for a \"nicer\" proportional set.",
+        "section": "typography"
+      },
+      {
+        "name": "The Uppercase Is Apparatus Rule",
+        "body": "Uppercase + wide tracking marks something as form furniture (a key, a heading, a stamp). It is never used on a sentence the buyer has to read.",
+        "section": "typography"
+      },
+      {
+        "name": "The Whole Unit Rule",
+        "body": "Every measure is calc(var(--u) * n) for a whole n. If a value cannot be expressed that way, the layout is wrong, not the unit.",
+        "section": "layout"
+      },
+      {
+        "name": "The Void Rule",
+        "body": "Sections are separated by space and by mass. A hairline between two sections is a failure to give them enough room; rules are reserved for the four places listed above.",
+        "section": "layout"
+      },
+      {
+        "name": "The Pan-Don't-Shrink Rule",
+        "body": "A drawing whose type would become illegible at the phone's column width keeps its size and pans inside its own box (min-width: 560px in an overflow-x: auto figure). Shrinking to fit is not responsive, it is unreadable.",
+        "section": "layout"
+      },
+      {
+        "name": "The Printed-Flat Rule",
+        "body": "Nothing on this sheet floats. Depth comes from tone (paper → field → hatch) and from ink weight. No box-shadow for elevation, no hard offset shadow, no blur, ever.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Square Corner Rule",
+        "body": "Radius is 0. Everywhere. A rounded corner on this sheet is a bug.",
+        "section": "shapes"
+      },
+      {
+        "name": "The Drawn Ornament Rule",
+        "body": "Guilloche is generated by lib/guilloche.ts, never shipped as an image. Teeth must be integers or the curve leaves a seam; pen distance under the rolling radius gives petals, over it gives loops.",
+        "section": "shapes"
+      },
+      {
+        "name": "The Two Figures Rule",
+        "body": "Coverage and confidence are printed as two labelled numbers, side by side, in the same size. They are never averaged, never combined into a score, and no authenticity percentage exists on this surface.",
+        "section": "components"
+      },
+      {
+        "name": "The Unfilled Field Rule",
+        "body": "An empty record is a blank ruled form, not an error or an empty state illustration. Every check is already listed, the grade field is ruled and captioned \"Not yet graded\", and the values print as dashes.",
+        "section": "components"
+      },
+      {
+        "name": "The Motion Budget Rule",
+        "body": "One authored moment and one live-state loop. The moment: on a fresh result, marks strike onto the sheet in ledger order (420ms, 55ms apart), the grade word resolves out of blur and wide tracking (grade-strike, 520ms), and the rail segments scale in. The loop: the examining rail's sweep, which exists only while a request is in flight and stops when it returns. Everything runs on cubic-bezier(0.16, 1, 0.3, 1); everything else is a 140–180ms opacity or colour transition. No parallax, no scroll animation, no motion that decorates rather than reports. Under prefers-reduced-motion the authored moment is cut to 1ms and the loop resolves to a static lit rail.",
+        "section": "components"
+      },
+      {
+        "name": "The No-Percentage Rule",
+        "body": "Nothing on this sheet reports progress or certainty as a percentage or a filling bar. Waiting is reported as a named stage, a true elapsed clock, and an indeterminate rail; evidence is reported as two labelled weights. A number appears only when it is known.",
+        "section": "components"
+      }
     ],
     "dos": [
       "Do express every measure as calc(var(--u) * n) with a whole n; --u is 8px and it is the only rhythm on the sheet.",
-      "Do carry state with a drawn glyph and a stroke style first - tick, cross, dashed box, solid vs. dashed border, hatch vs. fill - and let colour only reinforce it.",
+      "Do carry state with a drawn glyph and a stroke style first — tick, cross, dashed box, solid vs. dashed border, hatch vs. fill — and let colour only reinforce it.",
       "Do keep vermilion for struck FAIL marks, the disqualifying grade word and its rule, and the failure notice border. Nothing else.",
       "Do theme the browser's own surfaces from the palette: selection, scrollbar track and thumb, :focus-visible ring at 2px/3px offset, link underline offset at 3px. They are part of the printing.",
       "Do keep tabular lining figures on for every numeric readout.",
@@ -150,20 +452,28 @@
       "Do let a drawing pan inside its own overflow-x: auto box rather than shrink below legibility, and keep overscroll-behavior-x: contain on it.",
       "Do give a primary action on a touch surface a cue that is visible at rest; hover-only affordances are invisible to half the audience.",
       "Do print every finding's cited source in fine print directly beneath it.",
-      "Do keep the print stylesheet working: interactive furniture hides, the examination goes to two even columns, the border drops out."
+      "Do keep the print stylesheet working and verified at 703px (A4 less @page margins of 14mm/12mm): every affordance hides, the record reads down the page in one column, findings hold break-inside: avoid so a citation cannot break away from its finding, and the guilloche and underprint drop out.",
+      "Do emit the lathe ornament once per page from the layout as a single inline <style> block, and let components inherit --horizontal, --vertical, --underprint and --ring from it.",
+      "Do tell the visitor what a photograph set can reach *before* it is sent, against the full 19.5, and name the one surface that would add the most.",
+      "Do report a run in flight as a named pipeline stage plus a true elapsed clock, and let the indeterminate rail say only \"working\".",
+      "Do keep a keyboard path that completes an examination: skip link, method link, all nine plot panels in drawn order, then Run, each with the 2px intaglio focus ring."
     ],
     "donts": [
       "Don't add a border-radius. The radius scale has one value and it is 0.",
-      "Don't add a drop shadow, glow, or blur for elevation. Depth is tonal: paper to recessed field to hatch.",
+      "Don't add a drop shadow, glow, or blur for elevation. Depth is tonal: paper → recessed field → hatch.",
       "Don't merge coverage and confidence, or introduce an authenticity percentage, a score ring, or a colour-graded meter.",
-      "Don't style INCONCLUSIVE as a failure. It takes tinted ink and a dashed rule - the visual language of an unfilled field.",
-      "Don't use vermilion as a fill, a background, a hover, or an emphasis colour; a failed rail segment is striped precisely so it is never a flat block of it.",
+      "Don't style INCONCLUSIVE as a failure. It takes tinted ink and a dashed rule — the visual language of an unfilled field.",
+      "Don't use vermilion as a background behind prose, a hover, or an emphasis colour; a failed rail segment is striped precisely so it is never a flat block of it. The one filled vermilion element is the best-next-photograph cue, and there is at most one on the page.",
       "Don't introduce a fifth colour role, a third type family, a system display face, or an icon font. The three state glyphs and the hardware silhouettes are drawn paths at a declared stroke weight.",
-      "Don't ship guilloche as an image asset, and don't pass non-integer teeth to trace() - the curve will not close and the seam is visible.",
-      "Don't divide two sections with a hairline. Use a void. The only rules on the sheet are the masthead/colophon 2px ink lines, the 2px intaglio heading rules, the 3px grade rule, and the 1px register-hair row lines.",
+      "Don't ship guilloche as an image asset, and don't pass non-integer teeth to trace() — the curve will not close and the seam is visible.",
+      "Don't divide two sections with a hairline. Use a void. The only rules on the sheet are the masthead/colophon 2px ink lines, the 2px intaglio heading rules, the 3px grade rule, and the 1px intaglio-hair row lines.",
       "Don't plot a mark on a panel whose source photograph does not exist; plotPanel() returning null is a correctness guarantee, not an edge case.",
       "Don't publish a whole serial number anywhere on the sheet.",
-      "Don't add a second animated moment. One strike, guarded for reduced motion, is the budget."
+      "Don't add a second animated moment. One strike on a result, plus the examining rail while a request is genuinely in flight, both guarded for reduced motion, is the whole budget.",
+      "Don't show a progress percentage, an estimated completion, or a bar that fills at a guessed rate. The queue length is not knowable and a guessed number is a lie in the same register as an authenticity score.",
+      "Don't move the guilloche back into the components that draw it via define:vars; it stamps the property onto every element and takes the page from 109KB to 2MB.",
+      "Don't let a second photograph of the same surface raise the coverage forecast. The forecast counts surfaces, because a rule answered twice does not answer twice.",
+      "Don't print an affordance. Cues, rings, buttons, forecasts and links are invitations, and a printed record has nobody to invite."
     ]
   }
 }

@@ -92,6 +92,15 @@ components:
   button-run-disabled:
     backgroundColor: "transparent"
     textColor: "{colors.ink-soft}"
+  button-restart:
+    backgroundColor: "transparent"
+    textColor: "{colors.ink}"
+    typography: "{typography.label}"
+    rounded: "{rounded.none}"
+    padding: "14px 24px"
+  button-restart-hover:
+    backgroundColor: "{colors.intaglio}"
+    textColor: "{colors.paper}"
   panel-cue:
     backgroundColor: "{colors.intaglio}"
     textColor: "{colors.paper}"
@@ -99,6 +108,9 @@ components:
     padding: "3px 7px"
   panel-cue-exposed:
     backgroundColor: "{colors.ink}"
+    textColor: "{colors.paper}"
+  panel-cue-best:
+    backgroundColor: "{colors.struck}"
     textColor: "{colors.paper}"
   ledger-row:
     backgroundColor: "transparent"
@@ -111,6 +123,13 @@ components:
     textColor: "{colors.struck}"
     rounded: "{rounded.none}"
     padding: "16px 24px"
+  forecast-note:
+    backgroundColor: "transparent"
+    textColor: "{colors.ink}"
+    typography: "{typography.body}"
+    rounded: "{rounded.none}"
+    padding: "0 0 0 16px"
+    width: "58ch"
   seal:
     backgroundColor: "transparent"
     textColor: "{colors.intaglio}"
@@ -124,7 +143,12 @@ components:
 
 **Creative North Star: "The Graded Examination Certificate"**
 
-This surface is a document, not an app screen. It behaves like a printed
+This surface is two documents, not an app screen. `/` is the record being
+made — masthead, plot, findings, grade — and `/about` is the method behind it:
+the filed records, the full register of checks with their sources, and the
+limits. Splitting them took the tool page from 6,702px to 2,600px; the working
+sheet carries only what an examination needs, and the argument for the
+examination lives on its own sheet. Both read as one printed
 examination record on cold security stock: a guilloche border traced by an
 actual geometric lathe, a masthead ruled off from the body, a plot of the
 specimen, graded rows with their sources in fine print, and a grader's seal
@@ -199,6 +223,23 @@ that downscaled copy. A label close-up carries 100-200px glyphs at 4032px and
 client-side would silently disable that check on precisely the photographs it
 exists for.
 
+**The lathe ornament is emitted from the layout, not from the components that
+use it.** `Sheet.astro` builds one inline `<style>` block holding the border
+strips, the underprint rosette and the seal ring, and Grade/Guilloche/GraderMark
+read them as inherited custom properties. It looks like misplaced coupling and
+an obvious refactor. Astro's `define:vars` stamps the property onto every
+element the component renders, which inlined one 87KB rosette 22 times and made
+the page 2MB; moving the ornament back into the components that draw it
+recreates exactly that. The page is 109KB because the ornament is emitted once.
+
+**The coverage forecast counts surfaces, not photographs.** Attaching a second
+angle of the underside label leaves the forecast figure unchanged, which looks
+like a counting bug. A second angle is a better reading of the same evidence,
+not more evidence — the weight is carried by the rule the surface can answer,
+and a rule answered twice does not answer twice. Making a photograph count
+would have the sheet overstate what it knows before the engine has read
+anything.
+
 **Coverage is never rescoped to the panels the visitor happened to send.** The
 denominator is always the full 19.5. Rescoping would let a case-only photoset
 read as near-complete and clear a unit whose box nobody photographed.
@@ -218,11 +259,15 @@ grey-blue stock, with one vermilion reserved for the strike.
   colour of the printing itself, not of any state.
 
 ### Secondary
-- **Struck Vermilion** (`#c2371d`): the strike. It appears only on a FAIL mark's
-  box and cross, the failing row's parameter, the `HIGH RISK SUSPECTED` grade
-  word and its rule, the diagonal hatch of a failed rail segment, and the
-  border of the failure notice. It is never a fill, never a background, never a
-  mood.
+- **Struck Vermilion** (`#c2371d`): the strike, and by extension the
+  deficiency. It appears on a FAIL mark's box and cross, the failing row's
+  parameter, the `HIGH RISK SUSPECTED` grade word and its rule, the diagonal
+  hatch of a failed rail segment, the border of the failure notice, the
+  forecast's left rule and text when the attached set cannot reach a verdict,
+  and the plot's marker on the single surface that would add the most evidence.
+  That last marker — a 3px/7px cue badge and a 2px inset ring, at most one on
+  the page — is the only place vermilion is a fill. It is never a background
+  behind prose, never a hover, never a mood.
 
 ### Neutral
 - **Security Stock** (`#e9edef`): the sheet. Body background, the browser
@@ -248,9 +293,12 @@ grey-blue stock, with one vermilion reserved for the strike.
 four roles reaches the sheet. A new need is a tint of an existing role, not a
 tenth colour.
 
-**The Strike Reserve Rule.** Vermilion appears only where a mark is struck
-through or a finding is disqualifying. It is never a fill, a background, a
-hover state, or an emphasis colour.
+**The Strike Reserve Rule.** Vermilion appears only where something is struck
+through, disqualifying, or missing: a failed check, a grade that fails, a set of
+photographs that cannot reach a verdict, and the one absent surface the record
+most needs. It is never a hover state, never an emphasis colour, and never a
+flat block behind text. At most one filled vermilion element exists on a page,
+and it is the best-next-photograph cue.
 
 **The Colour-Removed Rule.** Every state must remain readable with colour
 stripped out. A tick, a crossed box, a dashed box, a solid versus dashed border,
@@ -325,12 +373,11 @@ track is a whole multiple of it — the two half-steps that exist (`0.75u`,
 heights are expressed in units too: body prose runs `calc(var(--u) * 3)`, fine
 print `calc(var(--u) * 2)`.
 
-**Structure.** The masthead is a two-column grid (title / record fields) ruled
-off with a 2px ink line. The examination below it is `1.15fr / 1fr` — plot left,
-findings right — with a 64px gutter, the plot column sticky at `24px`. Filed
-records are a three-column grid; the method block is
-`repeat(auto-fit, minmax(28ch, 1fr))`. Every major section is closed with 96px
-(`12u`) of void.
+**Structure.** The masthead is a two-column grid ruled off with a 2px ink line —
+title against record fields on the record, title against the back button on the
+method. The examination below it is `1.15fr / 1fr` — plot left, findings right —
+with a 64px gutter, the plot column sticky at `24px`. Every major section is
+closed with 96px (`12u`) of void.
 
 **Sections are split by voids, not hairlines.** The whole page carries exactly
 four rule weights: a 2px ink rule under the masthead and above the colophon, a
@@ -344,6 +391,26 @@ masthead, left-aligns the record fields, and drops the register's source
 column. 720px repads the sheet, drops the side border strips, and switches the
 plot to panning. 560px halves the record grid to two columns, hides the
 underprint, and shrinks the seal.
+
+**Two sheets, one grammar.** The method page reuses the sheet, the guilloche,
+the masthead rule and the section headings unchanged; only its blocks differ.
+Filed records are a `20ch / 0.8fr / 1.35fr` three-column grid separated by 72px
+of void with no rule between them, the method block is
+`repeat(auto-fit, minmax(26ch, 1fr))`, and each section closes with 96px.
+
+**Print is a first-class layout, not a stylesheet afterthought.** Margins come
+from `@page` (14mm/12mm) and the sheet's own padding drops to zero — stripping
+the padding without setting `@page` printed the masthead against the trimmed
+edge. The examination goes to **one** column (two columns at A4 clipped the
+source lines off the right edge), the plot caps at 150mm, the sticky column
+unsticks, and every affordance disappears: the skip link, the actions, the
+forecast, the legend, the method links, panel cues, the best-panel ring, the
+back button. Findings set `break-inside: avoid` so a citation cannot be
+separated from its finding by a page break. The guilloche border and the
+underprint rosette are dropped, because ornament running past a trimmed edge is
+a defect, not decoration. Verified at the true printable width (A4 less
+margins, 703px): no overflow, the record runs about three pages and the method
+about seven.
 
 **Wide content pans; the page never does.** Anything wider than its column —
 the plot, the register table — lives inside its own `overflow-x: auto` box with
@@ -405,7 +472,10 @@ The only curves on the sheet are lathe-generated: the border strip's
 interwoven sinusoids, the seal ring, and the underprint rosette. They are
 computed as hypotrochoids on integer teeth so the pen returns exactly to its
 start — 53 teeth against 8 for the open rosette and seal, 37 against 6 for the
-inner ring, two full wave periods per 120px border tile.
+inner ring, two full wave periods per 120px border tile. Curves are traced at 1000 samples
+with one decimal of coordinate precision: compared at real display size, 2400
+and 1000 samples are indistinguishable and 500 goes visibly polygonal, and 1000
+costs 21KB against 58KB for the same picture.
 
 ### Named Rules
 **The Square Corner Rule.** Radius is 0. Everywhere. A rounded corner on this
@@ -425,9 +495,12 @@ distance under the rolling radius gives petals, over it gives loops.
   `cubic-bezier(0.16, 1, 0.3, 1)`. Focus uses the global 2px intaglio ring at
   3px offset.
 - **Disabled (running):** fill drops out entirely, text goes tinted ink, border
-  goes `intaglio-hair`, cursor `progress`. Meanwhile the grade word pulses on a
-  1.6s opacity loop — the disabled button is not the only signal that work is
-  happening.
+  goes `intaglio-hair`, cursor `progress`. The examining state, not the button,
+  carries the news that work is happening.
+- **Secondary ("Start a new record"):** the same block, inverted — no fill, ink
+  text, a 2px intaglio border, padded `14px 24px` (`1.75u 3u`), filling to
+  intaglio on hover. It is hidden until a grade exists and sits beside Run in a
+  wrapping `actions-row`, never above it.
 
 ### Marks (the three state glyphs)
 The system's smallest and most important component. Three drawn SVG glyphs on a
@@ -480,13 +553,44 @@ panels are hatched and carry an "ADD PHOTO" cue **visible at rest**, because the
 meet-up buyer's phone has no hover and an unexposed panel is the primary
 action; an exposed panel's cue drops to "REPLACE" and only appears on hover or
 `:focus-visible`. Photographs load into the panel at 0.58 opacity with
-`mix-blend-mode: multiply` so the drawing shows through.
+`mix-blend-mode: multiply` so the drawing shows through. A surface accepts
+several photographs — reflective packaging washes a word out at one angle and
+prints it plainly at another — and when it carries more than one, the cue's verb
+becomes "replace all". The single surface that would add the most evidence right
+now wears a vermilion cue and a 2px vermilion inset ring; both are print-hidden,
+because an invitation printed on a finished record is an instruction to nobody.
 
 Two honesty behaviours are load-bearing and must be preserved: `plotPanel()`
 returns null when the source surface was never photographed, so a tick can
 never land on a surface nobody shot; and on an ungraded record the panels print
 what each surface is *worth* in evidence weight, swapping to marks once the
 record fills.
+
+### Coverage forecast
+A finding about the photographs, set like a finding: a paragraph capped at 58ch
+behind a 2px left rule, live in the actions area of the record. It prints what
+the attached set can reach against the full 19.5 evidence weight, whether that
+clears the 60% floor a verdict needs, and which single surface would add the
+most — recomputed on every attachment, so the recommendation moves as the plot
+fills instead of pointing at the underside label forever. Its left rule is
+`intaglio-hair` at rest, intaglio once the set can reach a verdict, vermilion
+(with vermilion text) while it cannot. The named surface is simultaneously
+marked on the plot. A fine-print caveat under it states that the count is by
+the surface the photograph was attached to and that the engine may resolve
+different ones. It is hidden in print.
+
+### Examining state
+While a run is in flight, this replaces the grade block rather than sitting
+beside it, so the sheet holds one state at a time. The word "Examining" is set
+in the ungraded grade's size on a 3px `intaglio-hair` rule; beneath it an
+indeterminate rail of eight fixed cells with a lit run passing along them
+(1.9s, staggered 110ms), then a caption naming the pipeline stage the run is
+actually in — encoding, local sharpness, the vision request, transcription into
+the schema, or a queue position when one exists — and an elapsed clock in
+tabular figures. There is deliberately no percentage and no estimate: the
+free-tier queue length is unknowable, and a bar filling at a guessed rate is the
+false precision this whole sheet exists to refuse. Under `prefers-reduced-
+motion` the rail holds a steady lit state rather than freezing mid-frame.
 
 ### Ruled record fields
 The masthead's record block and the grade readouts share one pattern: a 9.5px
@@ -503,12 +607,20 @@ combined into a score, and no authenticity percentage exists on this surface.
 or an empty state illustration. Every check is already listed, the grade field
 is ruled and captioned "Not yet graded", and the values print as dashes.
 
-**The Motion Budget Rule.** One authored moment: on a fresh result, marks strike
-onto the sheet in ledger order (420ms, 55ms apart), the grade word resolves out
-of blur and wide tracking (`grade-strike`, 520ms), and the rail segments scale
-in — all on `cubic-bezier(0.16, 1, 0.3, 1)`, all cut to 1ms under
-`prefers-reduced-motion`. Everything else is a 140–180ms opacity or colour
-transition. No parallax, no scroll animation, no looping decoration.
+**The Motion Budget Rule.** One authored moment and one live-state loop. The
+moment: on a fresh result, marks strike onto the sheet in ledger order (420ms,
+55ms apart), the grade word resolves out of blur and wide tracking
+(`grade-strike`, 520ms), and the rail segments scale in. The loop: the examining
+rail's sweep, which exists only while a request is in flight and stops when it
+returns. Everything runs on `cubic-bezier(0.16, 1, 0.3, 1)`; everything else is
+a 140–180ms opacity or colour transition. No parallax, no scroll animation, no
+motion that decorates rather than reports. Under `prefers-reduced-motion` the
+authored moment is cut to 1ms and the loop resolves to a static lit rail.
+
+**The No-Percentage Rule.** Nothing on this sheet reports progress or certainty
+as a percentage or a filling bar. Waiting is reported as a named stage, a true
+elapsed clock, and an indeterminate rail; evidence is reported as two labelled
+weights. A number appears only when it is known.
 
 ## Do's and Don'ts
 
@@ -532,8 +644,20 @@ transition. No parallax, no scroll animation, no looping decoration.
 - **Do** give a primary action on a touch surface a cue that is visible at rest;
   hover-only affordances are invisible to half the audience.
 - **Do** print every finding's cited source in fine print directly beneath it.
-- **Do** keep the print stylesheet working: interactive furniture hides, the
-  examination goes to two even columns, the border drops out.
+- **Do** keep the print stylesheet working and verified at 703px (A4 less
+  `@page` margins of 14mm/12mm): every affordance hides, the record reads down
+  the page in one column, findings hold `break-inside: avoid` so a citation
+  cannot break away from its finding, and the guilloche and underprint drop out.
+- **Do** emit the lathe ornament once per page from the layout as a single
+  inline `<style>` block, and let components inherit `--horizontal`,
+  `--vertical`, `--underprint` and `--ring` from it.
+- **Do** tell the visitor what a photograph set can reach *before* it is sent,
+  against the full 19.5, and name the one surface that would add the most.
+- **Do** report a run in flight as a named pipeline stage plus a true elapsed
+  clock, and let the indeterminate rail say only "working".
+- **Do** keep a keyboard path that completes an examination: skip link, method
+  link, all nine plot panels in drawn order, then Run, each with the 2px
+  intaglio focus ring.
 
 ### Don't:
 - **Don't** add a border-radius. The radius scale has one value and it is `0`.
@@ -543,9 +667,10 @@ transition. No parallax, no scroll animation, no looping decoration.
   percentage, a score ring, or a colour-graded meter.
 - **Don't** style INCONCLUSIVE as a failure. It takes tinted ink and a dashed
   rule — the visual language of an unfilled field.
-- **Don't** use vermilion as a fill, a background, a hover, or an emphasis
+- **Don't** use vermilion as a background behind prose, a hover, or an emphasis
   colour; a failed rail segment is striped precisely so it is never a flat block
-  of it.
+  of it. The one filled vermilion element is the best-next-photograph cue, and
+  there is at most one on the page.
 - **Don't** introduce a fifth colour role, a third type family, a system display
   face, or an icon font. The three state glyphs and the hardware silhouettes are
   drawn paths at a declared stroke weight.
@@ -557,5 +682,17 @@ transition. No parallax, no scroll animation, no looping decoration.
 - **Don't** plot a mark on a panel whose source photograph does not exist;
   `plotPanel()` returning null is a correctness guarantee, not an edge case.
 - **Don't** publish a whole serial number anywhere on the sheet.
-- **Don't** add a second animated moment. One strike, guarded for reduced
-  motion, is the budget.
+- **Don't** add a second animated moment. One strike on a result, plus the
+  examining rail while a request is genuinely in flight, both guarded for
+  reduced motion, is the whole budget.
+- **Don't** show a progress percentage, an estimated completion, or a bar that
+  fills at a guessed rate. The queue length is not knowable and a guessed number
+  is a lie in the same register as an authenticity score.
+- **Don't** move the guilloche back into the components that draw it via
+  `define:vars`; it stamps the property onto every element and takes the page
+  from 109KB to 2MB.
+- **Don't** let a second photograph of the same surface raise the coverage
+  forecast. The forecast counts surfaces, because a rule answered twice does not
+  answer twice.
+- **Don't** print an affordance. Cues, rings, buttons, forecasts and links are
+  invitations, and a printed record has nobody to invite.

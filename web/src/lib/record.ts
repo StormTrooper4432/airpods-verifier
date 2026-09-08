@@ -140,6 +140,43 @@ export function warningEffect() {
   };
 }
 
+/**
+ * Is the forecast honest?
+ *
+ * The sheet tells a visitor what their photographs can reach before it runs,
+ * counted from the surface they attached each one to. The engine then reads the
+ * photographs themselves and can resolve different surfaces - a label caught in
+ * the corner of another shot counts, a blurred one does not. The very first
+ * live run forecast 4.5 and reached 10.5, so the error is not small and it is
+ * not one-sided.
+ *
+ * A forecast that systematically undershoots talks people out of examinations
+ * that would have worked. One that overshoots promises a verdict the engine
+ * refuses. Both are worth knowing before anyone trusts the number.
+ */
+export function forecastAccuracy() {
+  const pairs = buffer.filter(
+    (entry) =>
+      entry.outcome === 'examined' &&
+      typeof entry.forecast === 'number' &&
+      typeof entry.reached === 'number',
+  );
+  if (!pairs.length) return { runs: 0 };
+
+  const errors = pairs.map((entry) => entry.reached! - entry.forecast!);
+  const sorted = [...errors].sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)]!;
+  return {
+    runs: pairs.length,
+    exact: errors.filter((e) => e === 0).length,
+    undershot: errors.filter((e) => e > 0).length,
+    overshot: errors.filter((e) => e < 0).length,
+    medianError: Number(median.toFixed(2)),
+    worstUnder: Number(Math.max(0, ...errors).toFixed(2)),
+    worstOver: Number(Math.min(0, ...errors).toFixed(2)),
+  };
+}
+
 export function summary() {
   const outcomes: Record_<string, number> = {};
   const verdicts: Record_<string, number> = {};
@@ -166,6 +203,7 @@ export function summary() {
     panelsOffered: panelCounts,
     rulesThatFailed: failures,
     meanWeightReached: examined ? Number((reached / examined).toFixed(2)) : null,
+    forecast: forecastAccuracy(),
     warning: warningEffect(),
   };
 }
