@@ -14,6 +14,7 @@ import type { APIRoute } from 'astro';
 
 import { examine, shotsFrom, validateShots, ExamineError } from '../../lib/examine';
 import { depth, enqueue, lookup, positionOf, QueueFullError } from '../../lib/queue';
+import { budget, callerAddress, claim, refund } from '../../lib/limits';
 import type { Examination } from '../../lib/examine';
 
 const json = (body: unknown, status = 200) =>
@@ -22,11 +23,28 @@ const json = (body: unknown, status = 200) =>
     headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
   });
 
-export const POST: APIRoute = async ({ request }) => {
+export const POST: APIRoute = async ({ request, clientAddress }) => {
+  const address = callerAddress(request, clientAddress);
+  const allowance = claim(address);
+  if (!allowance.allowed) {
+    return new Response(
+      JSON.stringify({ problem: allowance.problem, recovery: allowance.recovery }),
+      {
+        status: 429,
+        headers: {
+          'content-type': 'application/json',
+          'cache-control': 'no-store',
+          ...(allowance.retryAfter ? { 'retry-after': String(allowance.retryAfter) } : {}),
+        },
+      },
+    );
+  }
+
   let shots;
   try {
     shots = shotsFrom(await request.formData());
   } catch {
+    refund(address);
     return json(
       {
         problem: 'The photographs could not be read from that request.',
@@ -43,6 +61,8 @@ export const POST: APIRoute = async ({ request }) => {
     const job = enqueue<Examination>(() => examine(shots));
     return json({ id: job.id, state: job.state, position: positionOf(job.id), ...depth() });
   } catch (error) {
+    // Nothing was examined, so nothing should be charged for.
+    refund(address);
     if (error instanceof QueueFullError) {
       return json(
         {
@@ -61,7 +81,7 @@ export const POST: APIRoute = async ({ request }) => {
 
 export const GET: APIRoute = async ({ url }) => {
   const id = url.searchParams.get('job');
-  if (!id) return json({ ...depth() });
+  if (!id) return json({ ...depth(), budget: budget() });
 
   const job = lookup<Examination>(id);
   if (!job) {

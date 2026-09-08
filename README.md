@@ -103,6 +103,9 @@ on the same filesystem.
 | `PORT` / `HOST` | `8080` / `0.0.0.0` | listen address |
 | `EXAMINE_CONCURRENCY` | `1` | vision calls at once. **Leave at 1.** Two concurrent calls on the free tier make both slow down and then fail |
 | `EXAMINE_MAX_QUEUE` | `12` | waiting examinations before new ones are refused with a reason |
+| `EXAMINE_PER_IP_HOURLY` | `6` | examinations per address per hour |
+| `EXAMINE_PER_IP_DAILY` | `20` | examinations per address per day |
+| `EXAMINE_DAILY_BUDGET` | `300` | total per day, everyone. **The one that bounds the bill** — a spoofed `X-Forwarded-For` defeats the per-address window but cannot defeat a total |
 | `VERIFIER_ROOT` | found by walking up from cwd | where `main.py` lives |
 | `SF_FONT_PATH` | macOS system path | Apple's typeface. Not in the image — its licence does not allow redistribution — so letterform checks report unavailable in a container |
 

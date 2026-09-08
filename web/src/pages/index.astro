@@ -17,6 +17,7 @@ import {
 } from '../data/sheet';
 import { examine, shotsFrom, ExamineError } from '../lib/examine';
 import { enqueue, lookup, QueueFullError } from '../lib/queue';
+import { callerAddress, claim, refund } from '../lib/limits';
 import type { Examination } from '../lib/examine';
 
 let result: Awaited<ReturnType<typeof examine>> | null = null;
@@ -44,6 +45,12 @@ if (requestedJob) {
     };
   }
 } else if (Astro.request.method === 'POST') {
+  // The scripted path is limited in the API route; this is the same door.
+  const address = callerAddress(Astro.request, Astro.clientAddress);
+  const allowance = claim(address);
+  if (!allowance.allowed) {
+    failure = { problem: allowance.problem!, recovery: allowance.recovery! };
+  } else
   try {
     const shots = shotsFrom(await Astro.request.formData());
     // Even without scripting the work is serialised: one visitor must not be
@@ -66,6 +73,7 @@ if (requestedJob) {
       }, 400);
     });
   } catch (err) {
+    refund(address);
     failure =
       err instanceof QueueFullError
         ? {
