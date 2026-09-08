@@ -80,6 +80,11 @@ jobs:
       - name: Build the sheet
         working-directory: web
         run: npm run build
+      - name: Rate limiter and origin check
+        working-directory: web
+        run: |
+          node tools/limits.test.mjs
+          node tools/middleware.test.mjs
       - name: Check nothing published carries a serial
         run: |
           python3 - <<'PY'
