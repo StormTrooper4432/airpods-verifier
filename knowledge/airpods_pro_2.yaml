@@ -182,6 +182,15 @@ case_serial_suffixes:
       introduced: 2019
   source: apple-identify
 
+# The `max` values below are OBSERVED ceilings - the latest year seen on a
+# handful of genuine boxes - and they do not move when the calendar does. They
+# no longer convict. On 2026-09-08 the ceiling stood at 2025 while the date was
+# 2026, so a genuine box reprinted this year was being called HIGH RISK; the
+# rule now reports a year above the ceiling and charges only a year later than
+# the present one, which is the single bound that cannot go stale. Measured
+# cost on the corpus: none. The only item the ceiling convicted is post 9, a
+# confirmed counterfeit that fails Typography & Print Quality as well.
+# The `min` values still convict: a box cannot predate its product.
 copyright_years:
   Pro 2 USB-C:
     min: 2023

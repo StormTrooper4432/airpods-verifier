@@ -21,6 +21,8 @@ the product's release), so rules carry an explicit ``disqualifying`` flag.
 
 from __future__ import annotations
 
+import datetime
+
 import inspect
 import re
 import unicodedata
@@ -449,6 +451,15 @@ def _rule_packaging_seal(extraction: VisionExtraction, variant: str) -> RuleOutc
     )
 
 
+def _this_year() -> int:
+    """The current calendar year.
+
+    A function rather than a module constant so a long-running process cannot
+    hold a stale year, and so tests can freeze it.
+    """
+    return datetime.date.today().year
+
+
 def _rule_copyright_year(extraction: VisionExtraction, variant: str) -> RuleOutcome:
     other = identifies_another_product(extraction)
     if other is not None:
@@ -466,13 +477,30 @@ def _rule_copyright_year(extraction: VisionExtraction, variant: str) -> RuleOutc
             "underside of the box.",
         )
 
+    # A year later than the present one is impossible: no box is printed in the
+    # future. That is the only ceiling that cannot age, and it is the only one
+    # that convicts.
+    if year > _this_year():
+        return RuleOutcome(
+            EvidenceStatus.FAIL,
+            f"Copyright year {year} is later than the current year ({_this_year()}). "
+            f"A box cannot be printed with a future copyright.",
+        )
+
+    # Above the OBSERVED ceiling is an observation, not a conviction. The
+    # ceiling is four genuine units seen by one person, and it does not move
+    # when the calendar does: on 2026-09-08 it stood at 2025, so a genuine box
+    # reprinted this year was being called HIGH RISK. Measured on the corpus,
+    # softening this costs nothing - the only item it convicted, post 9, is a
+    # confirmed counterfeit that fails Typography & Print Quality as well.
     ceiling = COPYRIGHT_YEARS.get(variant, {}).get("max", MAXIMUM_COPYRIGHT_YEAR)
     if year > ceiling:
         return RuleOutcome(
-            EvidenceStatus.FAIL,
-            f"Copyright year {year} is later than any year observed on genuine AirPods Pro 2 "
-            f"packaging (latest is {ceiling}). Apple reprints boxes over a product's life, but "
-            f"not beyond it.",
+            EvidenceStatus.PASS,
+            f"Copyright year {year} is later than any year observed on genuine "
+            f"{variant} packaging (latest seen is {ceiling}), which is recorded but not "
+            f"charged: Apple reprints boxes, and the observed ceiling is a handful of "
+            f"units rather than a specification.",
         )
 
     minimum = COPYRIGHT_YEARS.get(variant, {}).get('min', _PERMISSIVE_MINIMUM_YEAR)

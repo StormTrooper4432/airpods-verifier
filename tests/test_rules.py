@@ -408,8 +408,45 @@ class TestCopyrightYearRule:
         )
         assert status_of(report, "Copyright Year Constraint") is EvidenceStatus.FAIL
 
-    def test_year_beyond_the_observed_ceiling_fails(self):
-        report = evaluate(make_extraction(copyright_year=MAXIMUM_COPYRIGHT_YEAR + 1))
+    def test_the_current_year_never_fails(self):
+        """The guard that would have caught this, and did not exist.
+
+        The ceiling is an OBSERVED one — four genuine units, seen by one person
+        — and it does not move when the calendar does. It stood at 2025 while
+        the date was 2026-09-08, so a genuine box reprinted this year was being
+        called HIGH RISK. Nothing failed; the tests asserted the stale ceiling
+        rather than the property that matters.
+        """
+        import datetime
+
+        this_year = datetime.date.today().year
+        report = evaluate(make_extraction(copyright_year=this_year))
+        assert status_of(report, "Copyright Year Constraint") is not EvidenceStatus.FAIL, (
+            f"a box printed this year ({this_year}) is being convicted against an observed "
+            f"ceiling of {MAXIMUM_COPYRIGHT_YEAR}; the ceiling has aged"
+        )
+
+    def test_a_year_above_the_observed_ceiling_is_recorded_not_charged(self):
+        """Apple reprints boxes. The ceiling is a handful of units, not a spec.
+
+        Measured before softening: the only corpus item this convicted is post
+        9, a confirmed counterfeit that fails Typography & Print Quality as
+        well, so agreement is unchanged at 12/20 with 0 fakes passed and 0
+        genuine units accused.
+        """
+        import datetime
+
+        above = MAXIMUM_COPYRIGHT_YEAR + 1
+        if above > datetime.date.today().year:
+            pytest.skip("the observed ceiling has caught up with the calendar")
+        report = evaluate(make_extraction(copyright_year=above))
+        assert status_of(report, "Copyright Year Constraint") is EvidenceStatus.PASS
+
+    def test_a_future_year_fails(self):
+        """The one ceiling that cannot age: no box is printed in the future."""
+        import datetime
+
+        report = evaluate(make_extraction(copyright_year=datetime.date.today().year + 1))
         assert status_of(report, "Copyright Year Constraint") is EvidenceStatus.FAIL
 
     def test_the_ceiling_year_itself_passes(self):
