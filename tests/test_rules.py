@@ -94,6 +94,18 @@ TOO_SMALL_FONT = LocalAnalysis(
 )
 
 
+#: Wrapped with no tear-strip, AND photographed from an edge - which is what
+#: makes the absence a finding rather than a limit of the viewpoint. Tests about
+#: the tab rule use this; tests about the coverage guard override panels
+#: themselves.
+WRAPPED_NO_TAB = {
+    "has_plastic_shrinkwrap": True,
+    "has_paper_pull_tabs": False,
+    "shrinkwrap_has_pull_tab": False,
+    "visible_panels": ["box_bottom_label", "box_side"],
+}
+
+
 def make_extraction(**overrides) -> VisionExtraction:
     return VisionExtraction.model_validate({**GENUINE_USB_C, **overrides})
 
@@ -292,9 +304,7 @@ class TestPackagingSealRule:
         assert report.summary_verdict is not Verdict.HIGH_RISK_SUSPECTED
 
     def test_wrap_without_a_side_pull_tab_fails(self):
-        report = evaluate(
-            make_extraction(has_plastic_shrinkwrap=True, shrinkwrap_has_pull_tab=False)
-        )
+        report = evaluate(make_extraction(**WRAPPED_NO_TAB))
         assert status_of(report, "Packaging Seal Type") is EvidenceStatus.FAIL
         assert report.summary_verdict is Verdict.HIGH_RISK_SUSPECTED
 
@@ -313,13 +323,7 @@ class TestPackagingSealRule:
         assert "observation only" in detail_of(report, "Packaging Seal Type")
 
     def test_shoddy_wrap_without_a_tab_still_fails_on_the_tab(self):
-        report = evaluate(
-            make_extraction(
-                has_plastic_shrinkwrap=True,
-                shrinkwrap_has_pull_tab=False,
-                shrinkwrap_looks_shoddy=True,
-            )
-        )
+        report = evaluate(make_extraction(**WRAPPED_NO_TAB, shrinkwrap_looks_shoddy=True))
         assert status_of(report, "Packaging Seal Type") is EvidenceStatus.FAIL
 
     def test_unverifiable_wrap_is_unknown_even_if_called_shoddy(self):
@@ -492,7 +496,7 @@ class TestVerdictAggregation:
     def test_stacked_disqualifiers_raise_confidence(self):
         # Wrap alone is no longer a finding - it needs the missing pull tab,
         # which is the objective half of that rule.
-        wrapped = dict(has_plastic_shrinkwrap=True, shrinkwrap_has_pull_tab=False)
+        wrapped = dict(WRAPPED_NO_TAB)
         one = evaluate(make_extraction(**wrapped))
         two = evaluate(make_extraction(**wrapped, copyright_year=2019))
         three = evaluate(
@@ -1247,8 +1251,7 @@ class TestVerdictScenarioMatrix:
             ("cross-variant model", dict(extracted_model_number="A2700")),
             ("repeated serial", dict(serial_left_earbud="H4XQ7K2LMN9P")),
             ("(S)Serial no space", dict(serial_label_literal="(S)Serial No. H4XQ7K2LMN9P")),
-            ("wrap without pull tab",
-             dict(has_plastic_shrinkwrap=True, shrinkwrap_has_pull_tab=False)),
+            ("wrap without pull tab", dict(WRAPPED_NO_TAB)),
         ],
     )
     def test_each_disqualifier_condemns_alone(self, name, overrides):
@@ -1395,16 +1398,57 @@ class TestProductScopedRules:
         assert status_of(report, "Typography & Print Quality") is EvidenceStatus.FAIL
 
     def test_a_pro_2_item_is_unaffected(self):
-        report = evaluate(make_extraction(
-            has_plastic_shrinkwrap=True, shrinkwrap_has_pull_tab=False,
-        ))
+        report = evaluate(make_extraction(**WRAPPED_NO_TAB))
         assert status_of(report, "Packaging Seal Type") is EvidenceStatus.FAIL
 
     def test_an_unrecognised_number_does_not_disable_the_rules(self):
         # Only a number that IDENTIFIES another product scopes them out. A
         # malformed one is still a Pro 2 claim and must be judged as one.
-        report = evaluate(make_extraction(
-            extracted_model_number="B1234",
-            has_plastic_shrinkwrap=True, shrinkwrap_has_pull_tab=False,
-        ))
+        report = evaluate(make_extraction(**WRAPPED_NO_TAB, extracted_model_number="B1234"))
         assert status_of(report, "Packaging Seal Type") is EvidenceStatus.FAIL
+
+
+class TestTheTabMustBeVisibleToBeMissing:
+    """A tear-strip runs along a side edge. A photograph of the front face
+    cannot establish that it is absent, and a model that says so is reporting
+    the limit of its viewpoint rather than a fact about the box.
+
+    Corpus post 13 was called HIGH RISK on exactly that - three photographs,
+    none of them an edge - where the domain expert said inconclusive. It is the
+    only item in the corpus where this pipeline out-claimed the expert on a
+    disqualifying rule.
+    """
+
+    def _wrapped(self, panels, tab=False):
+        return make_extraction(
+            has_plastic_shrinkwrap=True,
+            has_paper_pull_tabs=False,
+            shrinkwrap_has_pull_tab=tab,
+            visible_panels=panels,
+        )
+
+    def test_no_edge_photographed_is_unknown_not_a_finding(self):
+        report = evaluate(self._wrapped(["box_front", "case_exterior"]))
+        assert status_of(report, "Packaging Seal Type") is EvidenceStatus.UNKNOWN
+        detail = detail_of(report, "Packaging Seal Type")
+        assert "side or top edge" in detail
+        assert report.summary_verdict is not Verdict.HIGH_RISK_SUSPECTED
+
+    def test_it_says_which_photograph_would_settle_it(self):
+        detail = detail_of(
+            evaluate(self._wrapped(["box_front"])), "Packaging Seal Type"
+        )
+        assert "Photograph the box edges" in detail
+
+    def test_a_side_view_still_convicts(self):
+        report = evaluate(self._wrapped(["box_front", "box_side"]))
+        assert status_of(report, "Packaging Seal Type") is EvidenceStatus.FAIL
+
+    def test_a_top_view_still_convicts(self):
+        report = evaluate(self._wrapped(["box_top"]))
+        assert status_of(report, "Packaging Seal Type") is EvidenceStatus.FAIL
+
+    def test_a_visible_tab_still_passes_without_an_edge_view(self):
+        """Seeing a tab is positive evidence; the guard is only about absence."""
+        report = evaluate(self._wrapped(["box_front"], tab=True))
+        assert status_of(report, "Packaging Seal Type") is EvidenceStatus.PASS

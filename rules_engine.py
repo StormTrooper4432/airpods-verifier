@@ -337,6 +337,15 @@ def _rule_model_number(extraction: VisionExtraction, variant: str) -> RuleOutcom
 # --------------------------------------------------------------------------- #
 
 
+#: Panels that can actually show the tear-strip. The tab runs along a side
+#: edge, so the front face cannot establish its absence however sharp the
+#: photograph is. Measured on the corpus: of four items failed for a missing
+#: tab, three were photographed from a side or top and one - post 13 - from the
+#: front alone, and that one is the only item where this rule out-claimed the
+#: domain expert.
+_PANELS_SHOWING_AN_EDGE = frozenset({"box_side", "box_top"})
+
+
 def _rule_packaging_seal(extraction: VisionExtraction, variant: str) -> RuleOutcome:
     """Seal check.
 
@@ -369,6 +378,24 @@ def _rule_packaging_seal(extraction: VisionExtraction, variant: str) -> RuleOutc
         )
 
         if extraction.shrinkwrap_has_pull_tab is False:
+            # The tab is on the SIDE. A photograph of the front face cannot
+            # establish that it is missing, and a model reporting "no tab" from
+            # one is reporting the limit of its viewpoint, not a fact about the
+            # box. Corpus post 13 was accused on exactly that: three
+            # photographs, none of them an edge, wrapped front only - and the
+            # domain expert called it inconclusive.
+            #
+            # This is the converse of the standing rule that absence of
+            # evidence is never evidence of authenticity. It is not evidence of
+            # forgery either.
+            if not (set(extraction.visible_panels) & _PANELS_SHOWING_AN_EDGE):
+                return RuleOutcome(
+                    EvidenceStatus.UNKNOWN,
+                    "The box is shrink-wrapped and no pull tab is visible, but no photograph "
+                    "shows a side or top edge - which is where the tear-strip runs. Absence "
+                    "from a view that could not show it is not a finding. Photograph the box "
+                    "edges and this resolves either way." + shoddy_note,
+                )
             return RuleOutcome(
                 EvidenceStatus.FAIL,
                 "The box is shrink-wrapped with no pull tab at the side. Genuine wrapped retail "

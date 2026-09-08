@@ -192,12 +192,12 @@ WHAT TO ASK FOR NEXT
 seeing any pipeline output:
 
 ```
-agreement          11/20
+agreement          13/20
 counterfeits passed as genuine      0
 genuine units accused               0
 ```
 
-The disagreements are `INCONCLUSIVE` on items the expert could judge — the tool
+Almost every disagreement is `INCONCLUSIVE` on an item the expert could judge — the tool
 declining rather than being wrong. For a buyer-protection tool that's the correct
 direction to fail: a missed fake costs $200, an unnecessary re-photograph costs nothing.
 

@@ -85,3 +85,4 @@ class TestRequirementsCoverImports:
 
     def test_requirements_file_parses(self):
         assert declared_packages(), "requirements.txt yielded no packages"
+

@@ -477,6 +477,14 @@ serial_format:
   discriminates_counterfeits: false
   source: owner (4 genuine units) + corpus (7 listings) + 2 confirmed counterfeits
 
+# The tear-strip runs along a SIDE edge, so a photograph of the front face
+# cannot establish that it is absent. Measured on the corpus: of four items
+# failed for a missing tab, three were photographed from a side or top and one
+# (post 13) from the front alone - and post 13 is the only item where this
+# pipeline out-claimed the domain expert on a disqualifying rule. Requiring an
+# edge view before the absence counts moved corpus agreement from 12/20 to
+# 13/20 with no other verdict changing.
+# source: measurement against the expert-labelled corpus, 2026-09-08
 packaging:
   shrinkwrap:
     # Contradicts the common "wrapped = fake" claim, and contradicts the
