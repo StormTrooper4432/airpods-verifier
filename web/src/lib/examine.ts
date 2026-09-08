@@ -136,7 +136,12 @@ export interface Shot {
   file: File;
 }
 
-export async function examine(shots: Shot[]): Promise<Examination> {
+/**
+ * Reject a bad set before it joins the queue. Learning that a file is the
+ * wrong type after waiting behind three other examinations is a worse answer
+ * than learning it immediately, and costs the queue nothing.
+ */
+export function validateShots(shots: Shot[]): void {
   if (shots.length === 0) {
     throw new ExamineError(
       'No photographs were supplied.',
@@ -163,6 +168,11 @@ export async function examine(shots: Shot[]): Promise<Examination> {
       );
     }
   }
+
+}
+
+export async function examine(shots: Shot[]): Promise<Examination> {
+  validateShots(shots);
 
   const dir = await mkdtemp(path.join(tmpdir(), 'airpods-exam-'));
   try {

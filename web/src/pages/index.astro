@@ -15,21 +15,68 @@ import {
   type PanelId,
 } from '../data/sheet';
 import { examine, shotsFrom, ExamineError } from '../lib/examine';
+import { enqueue, lookup, QueueFullError } from '../lib/queue';
+import type { Examination } from '../lib/examine';
 
 let result: Awaited<ReturnType<typeof examine>> | null = null;
 let failure: { problem: string; recovery: string } | null = null;
 
-if (Astro.request.method === 'POST') {
+/*
+ * Three ways in, one queue behind all of them.
+ *
+ * - `?job=<id>` renders a record the API route already produced, so the
+ *   scripted path never has to rebuild this page in the browser.
+ * - POST is the no-script path: it joins the same queue and waits.
+ * - Otherwise, a blank record.
+ */
+const requestedJob = Astro.url.searchParams.get('job');
+if (requestedJob) {
+  const job = lookup<Examination>(requestedJob);
+  if (job?.state === 'done' && job.result) {
+    result = job.result;
+  } else if (job?.state === 'failed' && job.error) {
+    failure = job.error;
+  } else if (!job) {
+    failure = {
+      problem: 'That examination is no longer on the server.',
+      recovery: 'Records are held for ten minutes after they finish. Run it again.',
+    };
+  }
+} else if (Astro.request.method === 'POST') {
   try {
-    result = await examine(shotsFrom(await Astro.request.formData()));
+    const shots = shotsFrom(await Astro.request.formData());
+    // Even without scripting the work is serialised: one visitor must not be
+    // able to start a second vision call while another is still running.
+    result = await new Promise<Examination>((resolve, reject) => {
+      const job = enqueue<Examination>(() => examine(shots));
+      const poll = setInterval(() => {
+        const current = lookup<Examination>(job.id);
+        if (current?.state === 'done' && current.result) {
+          clearInterval(poll);
+          resolve(current.result);
+        } else if (current?.state === 'failed') {
+          clearInterval(poll);
+          const error = new ExamineError(
+            current.error?.problem ?? 'The examination failed.',
+            current.error?.recovery ?? 'Run it again.',
+          );
+          reject(error);
+        }
+      }, 400);
+    });
   } catch (err) {
     failure =
-      err instanceof ExamineError
-        ? { problem: err.message, recovery: err.recovery }
-        : {
-            problem: 'The examination stopped on an error the sheet did not expect.',
-            recovery: 'Try again. If it repeats, the server log carries the detail.',
-          };
+      err instanceof QueueFullError
+        ? {
+            problem: `${err.waiting} examinations are already waiting.`,
+            recovery: 'The free tier reads one set at a time. Try again in a few minutes.',
+          }
+        : err instanceof ExamineError
+          ? { problem: err.message, recovery: err.recovery }
+          : {
+              problem: 'The examination stopped on an error the sheet did not expect.',
+              recovery: 'Try again. If it repeats, the server log carries the detail.',
+            };
   }
 }
 
@@ -274,8 +321,10 @@ const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
     const graded = document.getElementById('graded-slot');
 
     let ticker: ReturnType<typeof setInterval> | undefined;
+    let queued = 0;
 
     const startProgress = () => {
+      queued = 0;
       const began = Date.now();
       if (panel) panel.hidden = false;
       if (graded) graded.hidden = true;
@@ -285,8 +334,15 @@ const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
           elapsedEl.textContent =
             `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
         }
-        const stage = STAGES.filter(([at]) => at <= seconds).pop();
-        if (stage && stageEl && stageEl.textContent !== stage[1]) stageEl.textContent = stage[1];
+        /* A place in line is a true number, so it outranks the stage text. */
+        const line =
+          queued > 1
+            ? `${queued} examinations ahead of this one. The free tier reads one set at a time.`
+            : queued === 1
+              ? 'One examination ahead of this one.'
+              : null;
+        const stage = line ?? STAGES.filter(([at]) => at <= seconds).pop()?.[1];
+        if (stage && stageEl && stageEl.textContent !== stage) stageEl.textContent = stage;
       };
       tick();
       ticker = setInterval(tick, 1000);
@@ -309,12 +365,58 @@ const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
       startProgress();
 
       try {
-        const response = await fetch(form.action || location.pathname, {
+        /* Submit, then poll. A queued run can outlast any proxy's idea of a
+           reasonable response time, and the id survives where the connection
+           would not. The record itself is still rendered on the server and
+           swapped in whole, so this page is never rebuilt in the browser. */
+        const submitted = await fetch('/api/examine', {
           method: 'POST',
           body: new FormData(form),
-          headers: { 'x-sheet-swap': '1' },
         });
+        const ticket = await submitted.json();
+        if (!submitted.ok || !ticket.id) {
+          throw Object.assign(new Error(ticket.problem ?? 'The examination could not start.'), {
+            recovery: ticket.recovery,
+          });
+        }
+
+        const finished = await new Promise<any>((resolve, reject) => {
+          /* Bound the wait. Without this a stalled server leaves the visitor
+             watching a rail forever, which is a worse answer than saying so. */
+          const started = Date.now();
+          const LIMIT_MS = 8 * 60 * 1000;
+          const poll = window.setInterval(async () => {
+            if (Date.now() - started > LIMIT_MS) {
+              window.clearInterval(poll);
+              reject(
+                Object.assign(new Error('The examination has not come back in eight minutes.'), {
+                  recovery:
+                    'The server may be overloaded. Your photographs are still attached — ' +
+                    'run it again in a few minutes.',
+                }),
+              );
+              return;
+            }
+            try {
+              const state = await (await fetch(`/api/examine?job=${ticket.id}`)).json();
+              if (state.state === 'done') {
+                window.clearInterval(poll);
+                resolve(state);
+              } else if (state.state === 'failed' || state.problem) {
+                window.clearInterval(poll);
+                reject(Object.assign(new Error(state.problem), { recovery: state.recovery }));
+              } else {
+                queued = state.position ?? 0;
+              }
+            } catch {
+              /* a dropped poll is not a failed examination; the next one retries */
+            }
+          }, 1500);
+        });
+
+        const response = await fetch(`/?job=${ticket.id}`);
         const parsed = new DOMParser().parseFromString(await response.text(), 'text/html');
+        void finished;
 
         swap(parsed, '#findings-col');
         swap(parsed, '#settle');
@@ -339,10 +441,20 @@ const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
       } catch (error) {
         const slot = document.getElementById('notice-slot');
         if (slot) {
+          const problem =
+            error instanceof Error ? error.message : 'The examination could not be sent.';
+          const recovery =
+            (error as { recovery?: string })?.recovery ??
+            'Check the connection and run it again.';
+          const escape = (text: string) =>
+            text.replace(/[&<>"]/g, (c) =>
+              ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
           slot.innerHTML =
             '<div class="notice" role="alert"><p class="notice-head">' +
-            'The examination could not be sent.</p>' +
-            '<p class="notice-fix">Check the connection and run it again.</p></div>';
+            escape(problem) +
+            '</p><p class="notice-fix">' +
+            escape(recovery) +
+            '</p></div>';
         }
       } finally {
         stopProgress();

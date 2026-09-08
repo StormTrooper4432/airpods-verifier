@@ -1,0 +1,22 @@
+# Reference photographs carry real serial numbers. They are measured locally
+# and never leave the machine — least of all inside a distributable image.
+knowledge/real_*/
+knowledge/fake/
+corpus/
+results/
+tests/sample_data/
+
+.git/
+.venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+.impeccable/
+web/node_modules/
+web/dist/
+web/tools/
+*.md
+!PROMPTS.md
+!REQUIREMENTS.md
+.DS_Store

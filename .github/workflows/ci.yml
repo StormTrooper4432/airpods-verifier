@@ -91,3 +91,33 @@ jobs:
               sys.exit(f"unredacted serial-shaped tokens published: {leaked}")
           print("filed records carry no readable serial")
           PY
+
+  container:
+    # The image is the only artifact that can carry a reference photograph off
+    # this machine, and one serial has already had to be purged from git
+    # history once. Build it on every change so a broken Dockerfile or a leaked
+    # path is caught here rather than at deploy.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the image
+        run: docker build -t airpods-verifier:ci .
+      - name: It starts, serves the sheet, and says what it cannot do
+        run: |
+          docker run -d --name sheet -p 8080:8080 airpods-verifier:ci
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8080/api/examine >/dev/null 2>&1; then break; fi
+            sleep 2
+          done
+          curl -fsS http://127.0.0.1:8080/ | grep -q "Examination record"
+          curl -fsS http://127.0.0.1:8080/about | grep -q "How the record"
+          curl -fsS http://127.0.0.1:8080/api/examine | grep -q '"concurrency":1'
+          docker logs sheet
+      - name: No reference photograph reached the image
+        run: |
+          docker run --rm --entrypoint sh airpods-verifier:ci -c '
+            if ls knowledge/real_* knowledge/fake 2>/dev/null | grep -q .; then
+              echo "reference photographs are inside the image"; exit 1
+            fi
+            echo "knowledge/ carries only the sourced YAML:"; ls knowledge/
+          '

@@ -40,6 +40,7 @@ Glyphs are therefore selected by measured signal-to-noise, not by intuition.
 
 from __future__ import annotations
 
+import os
 import string
 from dataclasses import dataclass, replace
 from functools import lru_cache
@@ -48,7 +49,13 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 #: San Francisco, as shipped with macOS. This is the reference.
-SF_FONT_PATH = "/System/Library/Fonts/SFNS.ttf"
+#: Apple's packaging typeface, which ships with macOS. Overridable because a
+#: Linux deployment does not have it and this repository must not redistribute
+#: it: Apple's font licence does not allow bundling it into a container image.
+#: Where it is absent every letterform check reports unavailable rather than
+#: guessing, and the rule already carries weight 0, so nothing is scored on its
+#: absence. A deployer entitled to the font can mount it and set this.
+SF_FONT_PATH = os.environ.get("SF_FONT_PATH", "/System/Library/Fonts/SFNS.ttf")
 
 #: Fonts counterfeit packaging is known or likely to substitute.
 SUBSTITUTE_FONT_PATHS = {

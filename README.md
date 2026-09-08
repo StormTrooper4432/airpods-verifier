@@ -86,6 +86,49 @@ to `main.py`, so the browser never sees a rule and never renders a verdict of it
 `web/src/data/sheet.ts` restates the rule table for the register and the plot;
 `tests/test_web_contract.py` fails the build if that copy drifts from `rules_engine.py`.
 
+### Deploying it
+
+```bash
+docker build -t airpods-verifier .
+docker run -p 8080:8080 -e GEMINI_API_KEY=... airpods-verifier
+```
+
+The image carries both halves, because the web layer runs `main.py` as a
+subprocess — the browser never evaluates a rule, so the rules engine has to be
+on the same filesystem.
+
+| variable | default | what it does |
+|---|---|---|
+| `GEMINI_API_KEY` | — | required; without it every examination returns a notice saying so |
+| `PORT` / `HOST` | `8080` / `0.0.0.0` | listen address |
+| `EXAMINE_CONCURRENCY` | `1` | vision calls at once. **Leave at 1.** Two concurrent calls on the free tier make both slow down and then fail |
+| `EXAMINE_MAX_QUEUE` | `12` | waiting examinations before new ones are refused with a reason |
+| `VERIFIER_ROOT` | found by walking up from cwd | where `main.py` lives |
+| `SF_FONT_PATH` | macOS system path | Apple's typeface. Not in the image — its licence does not allow redistribution — so letterform checks report unavailable in a container |
+
+**Two constraints any host must satisfy**, both because examinations are
+serialised in-process:
+
+- **One instance.** The queue lives in the server's memory. Two instances means
+  two queues means two concurrent vision calls, which is the thing the queue
+  exists to prevent.
+- **CPU allocated outside the request.** The submit endpoint returns a job id
+  immediately and the pipeline keeps running after the response is sent. A host
+  that throttles CPU between requests will stall it.
+
+On Google Cloud Run — whose always-free tier covers this comfortably, and which
+is the same account the Gemini key comes from — that is:
+
+```bash
+gcloud run deploy airpods-verifier --source . \
+  --max-instances=1 --no-cpu-throttling \
+  --set-env-vars GEMINI_API_KEY=...
+```
+
+Scale-to-zero is fine: a job id that outlives its instance returns "that
+examination is no longer on the server", which the sheet renders as a notice
+rather than a hang.
+
 ---
 
 ## What it checks
@@ -255,4 +298,7 @@ web/                Astro front end — the examination record
 - Grow the labelled corpus; it has produced every real improvement so far
 - Region ↔ regulatory-mark consistency (data is being collected; not yet enough to rule on)
 - Extend verification beyond Pro 2 — the knowledge base is already structured for it
-- Web frontend so the tool is usable from a phone during a meet-up
+- ~~Web frontend so the tool is usable from a phone during a meet-up~~ — done
+- A counterfeit label photographed close enough to calibrate the letterform
+  check (glyphs 45px or taller). It is the one measurement that would move that
+  rule off weight 0, and the rule now asks every user for exactly that shot
