@@ -845,3 +845,63 @@ class TestPhoneFormats:
                 )
                 continue
             assert suffix in PIL_Image.EXTENSION, f"upload advertises {token}, Pillow cannot open it"
+
+
+class TestTheChainCommentMatchesTheChain:
+    """A comment that contradicts the code under it is worse than no comment.
+
+    `fallback_chain` carried "deliberately all full Flash models, no Flash-Lite
+    ... a silent downgrade to it would cost accuracy without anyone noticing"
+    directly above three Flash-Lite models. The chain had been changed and the
+    prose had not, so the file asserted the opposite of what it did — and warned
+    about exactly the thing that had already happened. Nothing caught it because
+    prose is not executed.
+    """
+
+    @staticmethod
+    def _comment_above(name: str) -> str:
+        """The comment on the GEMINI chain specifically.
+
+        Scoped to the class, not the module: `fallback_chain` exists on the
+        Anthropic provider too and appears first in the file, so searching the
+        whole source read the wrong comment and passed no matter what the
+        Gemini one said. That mistake made the first version of these tests
+        vacuous — they went green with the false comment restored.
+        """
+        import inspect
+
+        source = inspect.getsource(pv.GeminiVisionProvider)
+        at = source.index(f"    {name} = (")
+        block = source[:at].rsplit("\n\n", 1)[-1]
+        return " ".join(line.strip(" #:") for line in block.splitlines()).lower()
+
+    def test_a_chain_of_lite_models_is_not_described_as_having_none(self):
+        chain = pv.GeminiVisionProvider.fallback_chain
+        if not all("lite" in model for model in chain):
+            pytest.skip("the chain is no longer all Flash-Lite")
+        comment = self._comment_above("fallback_chain")
+        assert "no flash-lite" not in comment, (
+            "the chain is entirely Flash-Lite and the comment says it contains none"
+        )
+
+    def test_the_chain_is_not_claimed_to_be_full_flash(self):
+        chain = pv.GeminiVisionProvider.fallback_chain
+        if not all("lite" in model for model in chain):
+            pytest.skip("the chain is no longer all Flash-Lite")
+        comment = self._comment_above("fallback_chain")
+        assert "all full flash models" not in comment, (
+            "the chain is entirely Flash-Lite and the comment calls it all full Flash"
+        )
+
+    def test_the_weaker_at_small_print_claim_is_not_reasserted_unsourced(self):
+        """It was never measured, and measurement did not support it.
+
+        7 posts on gemini-3.8-flash read identical identifying fields to Lite.
+        If anyone reasserts it, the comment must carry the measurement saying so.
+        """
+        comment = self._comment_above("fallback_chain")
+        if "measurably weaker at small print" in comment:
+            assert "measured" in comment, (
+                "'measurably weaker at small print' is back without a measurement; "
+                "the one that exists found identical extraction on 7 posts"
+            )

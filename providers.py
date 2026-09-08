@@ -372,10 +372,43 @@ class GeminiVisionProvider:
     #: Override with --model or --allow-flash when accuracy matters more than
     #: volume - e.g. re-extracting a post whose result looks model-limited.
     default_model = "gemini-3.5-flash-lite"
-    #: Deliberately all full Flash models, no Flash-Lite. Lite is cheaper still
-    #: but measurably weaker at small print, which is the entire job here - a
-    #: silent downgrade to it would cost accuracy without anyone noticing.
-    #: Reach it explicitly with --model gemini-3.5-flash-lite if you want it.
+    #: All Flash-Lite, and that is now a measured choice rather than an
+    #: accident. This comment previously described the chain as containing no
+    #: Lite models whatsoever, and warned that quietly falling back to them
+    #: would cost accuracy unnoticed - while sitting directly on top of three
+    #: Lite models. The chain had been changed and the prose had not, so the
+    #: file asserted the opposite of the code and warned about precisely what
+    #: had already happened to it.
+    #:
+    #: MEASURED 2026-09-08, 7 corpus posts re-extracted on gemini-3.8-flash and
+    #: compared against the cached Lite extractions of the same photographs:
+    #:
+    #:                                    lite   flash
+    #:   model number read                   3       3
+    #:   box serial read                     3       3
+    #:   case lid / earbud serials    0 0 0   0 0 0
+    #:   copyright year read                 5       5
+    #:   label box localised                 4       3
+    #:   underside label identified          4       3
+    #:   misspellings reported               5      10
+    #:   kerning "irregular" (demoted)       1       3
+    #:
+    #: Every identifying field came back identical. Full Flash was slightly
+    #: WORSE at localising the label and naming the panel, and fired the
+    #: kerning signal three times as often - a signal this project measured as
+    #: firing only on genuine units. It reported twice the misspellings, which
+    #: flipped one post to the expert's HIGH_RISK; on a genuine unit the same
+    #: sensitivity flips the other way, and no genuine unit has ever been
+    #: accused here.
+    #:
+    #: The run also settled capacity: gemini-3.8-flash exhausted its free-tier
+    #: daily quota after 7 multi-image requests, against a 300/day budget. Even
+    #: if it were better it could not serve the deployment.
+    #:
+    #: n=7 with one differing verdict decides nothing about which model is
+    #: better. It does retire "measurably weaker at small print", which was
+    #: never measured and is not supported. Reach full Flash with --allow-lite
+    #: or --model gemini-3.8-flash.
     #:
     #: Free-tier quota is metered PER MODEL, so each distinct model in this
     #: chain is extra daily capacity, not just extra redundancy. Verified live
