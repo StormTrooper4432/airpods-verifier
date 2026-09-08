@@ -13,7 +13,7 @@ record({
   offered: ['box_front'], read: ['box_front'],
   forecast: 4.5, warned: true, reached: 4.5,
   verdict: 'INCONCLUSIVE', score: 0.23,
-  unresolved: ['Serial Cross-Match'], seconds: 12,
+  unresolved: ['Serial Cross-Match'], failed: ['Serial Label Format'], seconds: 12,
 });
 
 const text = JSON.stringify(all());
@@ -37,7 +37,7 @@ for (const banned of FORBIDDEN) {
 
 // Only the fields the type declares, nothing picked up along the way.
 const allowed = new Set(['at','session','attempt','outcome','offered','read','forecast',
-  'warned','reached','verdict','score','unresolved','seconds']);
+  'warned','reached','verdict','score','unresolved','failed','seconds']);
 for (const key of Object.keys(all()[0])) ok(allowed.has(key), `unexpected field: ${key}`);
 
 // A session id is an opaque token or nothing; never a header echoed back.
@@ -67,6 +67,10 @@ ok(w.retriedUnchanged === 1, `retried unchanged: ${w.retriedUnchanged}`);
 ok(w.stoppedAfterWarning >= 1, `stopped after warning: ${w.stoppedAfterWarning}`);
 ok(w.warnedOnce === w.addedAfterWarning + w.retriedUnchanged + w.stoppedAfterWarning,
    'every warned session lands in exactly one bucket');
+
+// The field that says what the tool actually decides on in the wild.
+ok(JSON.stringify(summary().rulesThatFailed) === '{"Serial Label Format":1}',
+   `rulesThatFailed: ${JSON.stringify(summary().rulesThatFailed)}`);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -54,6 +54,14 @@ export interface Record {
   score?: number;
   /** Checks that could not run, by name. No detail text. */
   unresolved?: string[];
+  /**
+   * Checks that FAILED, by name. The single most useful field for reading a
+   * live round: it says what the tool is actually deciding on out there, which
+   * on the corpus turned out to be a much narrower set of rules than the nine
+   * suggest. Names only, never the finding text - a detail line can quote a
+   * serial.
+   */
+  failed?: string[];
   seconds?: number;
 }
 
@@ -136,6 +144,7 @@ export function summary() {
   const outcomes: Record_<string, number> = {};
   const verdicts: Record_<string, number> = {};
   const panelCounts: Record_<string, number> = {};
+  const failures: Record_<string, number> = {};
   let reached = 0;
   let examined = 0;
 
@@ -143,6 +152,7 @@ export function summary() {
     outcomes[entry.outcome] = (outcomes[entry.outcome] ?? 0) + 1;
     if (entry.verdict) verdicts[entry.verdict] = (verdicts[entry.verdict] ?? 0) + 1;
     for (const panel of entry.offered) panelCounts[panel] = (panelCounts[panel] ?? 0) + 1;
+    for (const rule of entry.failed ?? []) failures[rule] = (failures[rule] ?? 0) + 1;
     if (entry.outcome === 'examined' && typeof entry.reached === 'number') {
       reached += entry.reached;
       examined += 1;
@@ -154,6 +164,7 @@ export function summary() {
     outcomes,
     verdicts,
     panelsOffered: panelCounts,
+    rulesThatFailed: failures,
     meanWeightReached: examined ? Number((reached / examined).toFixed(2)) : null,
     warning: warningEffect(),
   };

@@ -88,6 +88,7 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
           verdict: examination.report.summary_verdict,
           score: examination.report.confidence_score,
           unresolved: ledger.filter((i) => i.status === 'UNKNOWN').map((i) => i.parameter),
+          failed: ledger.filter((i) => i.status === 'FAIL').map((i) => i.parameter),
           seconds: Math.round((Date.now() - startedAt) / 1000),
         });
         return examination;

@@ -156,6 +156,10 @@ test round with no record produces anecdotes instead, so each examination
 writes one anonymous line — to stdout, where the host's log viewer keeps it,
 and to a small ring buffer that `GET /api/record` reads back with a token.
 
+Records are written to stdout whatever `RECORD_TOKEN` is set to — the host's
+log viewer keeps them, and `grep examination` finds them. The token only makes
+them readable over HTTP; an unset token loses nothing.
+
 **Never recorded:** photographs, filenames, file sizes, serial numbers, model
 numbers, any extracted text, IP addresses, user agents, or anything derived
 from them. Panels are fixed enum values, verdicts are one of three words, and
