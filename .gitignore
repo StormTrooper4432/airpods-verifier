@@ -20,6 +20,9 @@ extraction*.json
 # Scraped corpus: other people's photos. Evaluate against them, don't republish.
 corpus/
 results/
+# A second scoring run under a different model, same reasoning as results/:
+# other people's listing photographs, and derived data that goes stale.
+results_*/
 
 # Reference photographs - genuine units and counterfeits alike. Measurements
 # derived from them live in knowledge/*.yaml; the images themselves stay local.
