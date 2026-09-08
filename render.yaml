@@ -19,6 +19,12 @@ services:
         sync: false
       - key: PORT
         value: 8080
+      # Optional, and set in the dashboard because it is a secret. Without it
+      # /api/record refuses to answer at all, which is the safe default — the
+      # records still reach stdout either way, so leaving it unset loses
+      # nothing except reading them over HTTP.
+      - key: RECORD_TOKEN
+        sync: false
       # One vision call at a time. The free tier is the constraint, not the CPU.
       - key: EXAMINE_CONCURRENCY
         value: 1
