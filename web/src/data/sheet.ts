@@ -370,15 +370,35 @@ export function canReachVerdict(panels: PanelId[]): boolean {
  * been taken, so this is recomputed as the plot fills. Ranking by weight alone
  * would keep pointing at the underside label after it had been supplied.
  */
+/**
+ * Panels that can settle the pull-tab question in BOTH directions.
+ *
+ * Mirrors `_PANELS_SHOWING_AN_EDGE` in rules_engine.py; test_web_contract.py
+ * fails if the two drift. The tear strip runs down the side, so box_side can
+ * confirm a tab and can also establish there is none. box_top can only ever
+ * confirm one is present — the engine refuses to read absence from it, because
+ * the extractor has labelled an opened box's interior tray box_top and that
+ * manufactures an edge view which does not exist.
+ */
+export const PANELS_SHOWING_AN_EDGE: PanelId[] = ['box_side'];
+
 export function mostValuablePanel(shown: PanelId[]): { panel: PanelId; gain: number } | null {
   const base = reachableWeight(shown);
+  const decisive = (panel: PanelId) => PANELS_SHOWING_AN_EDGE.includes(panel);
   let best: { panel: PanelId; gain: number } | null = null;
   for (const panel of PANELS) {
     if (shown.includes(panel.id)) continue;
     const gain = reachableWeight([...shown, panel.id]) - base;
-    if (gain > 0 && (best === null || gain > best.gain)) {
-      best = { panel: panel.id, gain };
-    }
+    if (gain <= 0) continue;
+    /* Ties were broken by array order, which put box_top ahead of box_side for
+       the same promised 3.0 — and box_top is the one panel the engine will not
+       read a missing tab from. Identical forecast, strictly worse photograph.
+       On a tie, send them to the surface that can resolve it either way. */
+    const better =
+      best === null ||
+      gain > best.gain ||
+      (gain === best.gain && decisive(panel.id) && !decisive(best.panel));
+    if (better) best = { panel: panel.id, gain };
   }
   return best;
 }

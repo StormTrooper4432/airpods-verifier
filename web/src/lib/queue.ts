@@ -62,6 +62,30 @@ function sweep() {
   }
 }
 
+/**
+ * Turn whatever was thrown into something a visitor can act on.
+ *
+ * The pipeline raises errors carrying their own `recovery` line, and those are
+ * worth showing verbatim. Everything else gets the generic pair. The previous
+ * version cast a `recovery`-carrying object straight to `Error` and read
+ * `.message` off it — so anything thrown with a recovery but no message printed
+ * the literal word "undefined" to the visitor as the problem. Nothing in the
+ * codebase throws that shape today, which is exactly why it would have gone
+ * unnoticed until something did.
+ */
+function readableFailure(error: unknown): { problem: string; recovery: string } {
+  const GENERIC = {
+    problem: 'The examination stopped on an error the sheet did not expect.',
+    recovery: 'Run it again. If it repeats, the server log carries the detail.',
+  };
+  if (!error || typeof error !== 'object' || !('recovery' in error)) return GENERIC;
+
+  const message = 'message' in error ? String((error as { message: unknown }).message) : '';
+  const recovery = String((error as { recovery: unknown }).recovery);
+  if (!message.trim() || !recovery.trim()) return GENERIC;
+  return { problem: message, recovery };
+}
+
 function pump() {
   while (running < CONCURRENCY && pending.length > 0) {
     const id = pending.shift()!;
@@ -80,16 +104,7 @@ function pump() {
       })
       .catch((error: unknown) => {
         job.state = 'failed';
-        job.error =
-          error && typeof error === 'object' && 'recovery' in error
-            ? {
-                problem: String((error as Error).message),
-                recovery: String((error as { recovery: unknown }).recovery),
-              }
-            : {
-                problem: 'The examination stopped on an error the sheet did not expect.',
-                recovery: 'Run it again. If it repeats, the server log carries the detail.',
-              };
+        job.error = readableFailure(error);
       })
       .finally(() => {
         job.finishedAt = Date.now();

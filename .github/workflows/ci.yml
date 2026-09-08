@@ -77,6 +77,15 @@ jobs:
       - name: Install
         working-directory: web
         run: npm ci
+      - name: Type-check the sheet
+        # Never ran until 2026-09-08, and the first run found a real defect:
+        # a cast in the queue's failure handler that would have printed the
+        # word "undefined" to a visitor as the problem text. It also catches
+        # the class of mistake made while adding the panel tiebreak — passing
+        # a panel object where an id was expected, which type-checks as false
+        # forever and leaves the ranking silently unchanged.
+        working-directory: web
+        run: npm run check
       - name: Build the sheet
         working-directory: web
         run: npm run build

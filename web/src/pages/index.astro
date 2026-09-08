@@ -368,9 +368,18 @@ const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
       forecast.classList.toggle('is-ready', ok);
 
       if (panels.length === 0) {
+        /* The strongest true thing this sheet can say, and it was buried.
+           The label alone reaches 12.5 against a floor of 11.7, so ONE
+           photograph decides whether there is an answer at all - while the
+           front, back and top people shoot by instinct reach 6.5 together and
+           cannot produce a verdict however good the box is. Stating the weight
+           without stating that it clears the bar left the reader to do the
+           arithmetic that changes their behaviour. */
         forecastLine.textContent =
-          `Nothing added yet. The underside label is worth the most: it alone carries ` +
-          `${fmt(reachableWeight(['box_bottom_label']))} of ${fmt(TOTAL_WEIGHT)}.`;
+          `Nothing added yet. Start with the underside label: on its own it reaches ` +
+          `${fmt(reachableWeight(['box_bottom_label']))} of ${fmt(TOTAL_WEIGHT)}, which is ` +
+          `enough for a verdict. The front, back and top together reach ` +
+          `${fmt(reachableWeight(['box_front', 'box_back', 'box_top']))} and cannot.`;
       } else if (!ok) {
         forecastLine.textContent =
           `These reach ${fmt(reach)} of ${fmt(TOTAL_WEIGHT)} — under the ` +

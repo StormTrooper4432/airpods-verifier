@@ -324,3 +324,52 @@ def test_the_instinctive_photo_set_cannot_reach_a_verdict() -> None:
         "the instinctive photo set now reaches the coverage floor; the sheet's "
         "pre-flight warning is out of date"
     )
+
+
+def test_the_edge_panel_set_matches_the_engine(sheet_source: str) -> None:
+    """The browser must not send someone to a surface the engine won't read.
+
+    `mostValuablePanel` broke ties by array order, which put box_top ahead of
+    box_side for the same promised 3.0 — and box_top is precisely the panel the
+    engine refuses to read a missing pull tab from, because the extractor has
+    labelled an opened box's interior tray box_top. Identical forecast, strictly
+    worse photograph. The tiebreak now consults this set, so the set has to stay
+    equal to the engine's or the advice silently rots again.
+    """
+    match = re.search(
+        r"export const PANELS_SHOWING_AN_EDGE: PanelId\[\] = \[([^\]]*)\]", sheet_source
+    )
+    assert match, "sheet.ts no longer exports PANELS_SHOWING_AN_EDGE"
+    shipped = {name for name in re.findall(r"'([^']+)'", match.group(1))}
+    assert shipped == set(rules_engine._PANELS_SHOWING_AN_EDGE), (
+        f"web says {sorted(shipped)}, engine says "
+        f"{sorted(rules_engine._PANELS_SHOWING_AN_EDGE)}"
+    )
+
+
+def test_the_tiebreak_actually_prefers_the_decisive_panel(sheet_source: str) -> None:
+    """Runs the shipped function rather than re-implementing it in Python.
+
+    The first version of this tiebreak passed the panel OBJECT where the helper
+    expected an id, so the check was always false and the ranking was unchanged
+    while the code read as though it worked. Only executing it catches that.
+    """
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not available")
+
+    script = """
+      import { mostValuablePanel } from './src/data/sheet.ts';
+      const shown = ['box_bottom_label', 'case_lid_underside'];
+      console.log(JSON.stringify(mostValuablePanel(shown)));
+    """
+    result = subprocess.run(
+        [node, "--input-type=module", "-e", script],
+        cwd=WEB, capture_output=True, text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    best = json.loads(result.stdout.strip())
+    assert best["panel"] == "box_side", (
+        f"tie went to {best['panel']}; box_side carries the same weight and is the only "
+        "panel that can establish a missing tear strip"
+    )
