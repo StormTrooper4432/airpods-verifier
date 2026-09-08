@@ -1685,3 +1685,54 @@ class TestSerialGlyphConfusion:
             "Serial Cross-Match",
         )
         assert "D0QMG74KXN" in detail and "P9WT3B8RTY" in detail
+
+
+class TestOutOfScopeSaysWhatItCanStillDo:
+    """A Pro 3 cannot be cleared here, but it can still be condemned.
+
+    The Pro-2-sourced checks - seal type, copyright range, model compatibility -
+    are withheld. The serial checks are not: Apple never repeats a serial and
+    never ships a box whose label disagrees with the case inside it, whatever
+    the generation. The message used to say "no authenticity finding can be
+    made about this item", which overstated it, and a buyer who read that and
+    stopped reading would miss a finding sitting three rows below.
+    """
+
+    PRO_3 = "A3063"
+
+    def test_it_does_not_claim_nothing_can_be_found(self):
+        detail = detail_of(
+            evaluate(make_extraction(extracted_model_number=self.PRO_3)),
+            "Model Number Compatibility",
+        )
+        assert "cannot be cleared" in detail
+        assert "can still catch a fake" in detail
+
+    def test_the_serial_label_tell_still_convicts_a_pro_3(self):
+        report = evaluate(
+            make_extraction(
+                extracted_model_number=self.PRO_3,
+                extracted_serial_number="HGHP9X4047",
+                serial_label_literal="(S)Serial No. HGHP9X4047",
+            )
+        )
+        assert status_of(report, "Serial Label Format") is EvidenceStatus.FAIL
+        assert report.summary_verdict is Verdict.HIGH_RISK_SUSPECTED
+
+    def test_a_serial_mismatch_still_convicts_a_pro_3(self):
+        report = evaluate(
+            make_extraction(
+                extracted_model_number=self.PRO_3,
+                extracted_serial_number="H4XQ7K2LMN",
+                serial_case_lid="P9WT3B8RTY",
+                serial_label_literal="(S) Serial No. H4XQ7K2LMN",
+                visible_panels=["box_bottom_label", "case_lid_underside"],
+            )
+        )
+        assert status_of(report, "Serial Cross-Match") is EvidenceStatus.FAIL
+        assert report.summary_verdict is Verdict.HIGH_RISK_SUSPECTED
+
+    def test_a_clean_pro_3_is_still_never_cleared(self):
+        """The asymmetry is the point: condemn yes, clear no."""
+        report = evaluate(make_extraction(extracted_model_number=self.PRO_3))
+        assert report.summary_verdict is not Verdict.GENUINE

@@ -281,11 +281,21 @@ def _rule_model_number(extraction: VisionExtraction, variant: str) -> RuleOutcom
         if generation is not None:
             return RuleOutcome(
                 EvidenceStatus.UNKNOWN,
+                # Precise about what is and is not withheld. The checks sourced
+                # for Pro 2 packaging - seal type, copyright range, this one -
+                # are scoped out. The checks that hold for any Apple product are
+                # not: Apple never repeats a serial and never ships a box whose
+                # label disagrees with the case inside it, whatever the
+                # generation. So this item can still be CONDEMNED on those, and
+                # only clearing it is impossible. Saying "no finding can be
+                # made" overstated it, and a buyer who reads that and stops
+                # looking is worse off than one who reads the rows below.
                 f"Extracted model {number} is a genuine Apple model number, but it belongs to "
                 f"{generation['name']} (introduced {generation['introduced']}), not AirPods Pro 2. "
-                f"This tool only verifies AirPods Pro 2, so no authenticity finding can be made "
-                f"about this item - a counterfeit {generation['name']} and a genuine one would "
-                f"both look like this here.",
+                f"The checks sourced specifically for Pro 2 packaging are withheld, so this unit "
+                f"cannot be cleared here - a counterfeit {generation['name']} and a genuine one "
+                f"look the same to those. The serial checks below still apply to any Apple "
+                f"product and can still catch a fake.",
             )
 
         if _MODEL_NUMBER_SHAPE.fullmatch(number):
