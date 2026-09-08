@@ -69,8 +69,14 @@ const { title, description } = Astro.props;
         .sheet-body { padding: calc(var(--u) * 6) calc(var(--u) * 3) calc(var(--u) * 8); }
       }
 
+      /* Margins come from @page. Stripping the body padding without setting
+         them printed the masthead hard against the trimmed edge. */
+      @page {
+        margin: 14mm 12mm;
+      }
       @media print {
         .skip { display: none; }
+        .sheet { min-height: 0; }
         .sheet-body { padding: 0; max-width: none; }
       }
     </style>

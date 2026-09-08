@@ -152,6 +152,12 @@ const unrun = allRows.filter((r) => r.item.status === 'UNKNOWN');
   .is-condensed .row-fail { padding-bottom: calc(var(--u) * 2.5); }
   .is-condensed .row-fail .row-meta { margin-bottom: calc(var(--u) * 1); }
 
+  @media print {
+    .row { break-inside: avoid; }
+    .is-striking .row-mk,
+    .is-striking .row-n { animation: none; }
+  }
+
   @media (max-width: 900px) {
     .row { grid-template-columns: calc(var(--u) * 3.5) calc(var(--u) * 3) 1fr; }
     .row-param { font-size: 16px; }

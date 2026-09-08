@@ -374,8 +374,6 @@ const markGlyph = (s: Status) => (s === 'FAIL' ? 'fail' : s === 'PASS' ? 'pass' 
   }
 
 
-  /* At arm's length on a phone the plot is ~340px wide, so its type is set in
-     user units large enough to survive that scale rather than shrinking with it. */
   /* On a phone the column is ~340px. Shrinking a 960-unit plot into that makes
      its type illegible, so the drawing keeps a usable size and pans instead —
      which also keeps the tap targets big enough to hit at a meet-up. */
@@ -390,5 +388,15 @@ const markGlyph = (s: Status) => (s === 'FAIL' ? 'fail' : s === 'PASS' ? 'pass' 
     .panel-label { font-size: 15px; }
     .panel-short { font-size: 13px; }
     .panel-hit-cue { font-size: 9px; padding: 2px 5px; letter-spacing: 0.12em; }
+  }
+
+  /* Nothing on paper can be tapped. The cue and the next-photograph ring are
+     invitations; printing them puts instructions on a finished record. */
+  @media print {
+    .panel-hit-cue { display: none; }
+    label.panel-hit.is-best::after { display: none; }
+    .plot { overflow: visible; }
+    .plot-net,
+    .plot-overlay { min-width: 0; }
   }
 </style>

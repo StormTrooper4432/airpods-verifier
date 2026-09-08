@@ -134,6 +134,8 @@ const underprint = rosette(300);
     pointer-events: none;
   }
   @media (max-width: 560px) { .grade-ground { display: none; } }
+  /* An underprint that runs off a trimmed edge is a defect, not a flourish. */
+  @media print { .grade-ground { display: none; } }
   .grade > *:not(.grade-ground) { position: relative; }
 
   .grade-word {

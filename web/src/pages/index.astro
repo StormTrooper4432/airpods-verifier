@@ -863,9 +863,26 @@ const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 
   /* Printed --------------------------------------------------------------- */
 
+  /* Printed ---------------------------------------------------------------
+     A certificate that cannot be printed is not one. What prints is the
+     record: masthead, plot, findings, and what would settle it. What does not
+     print is every affordance - nothing on paper can be tapped. */
+
   @media print {
-    .actions, .legend, .to-method, .to-method-top { display: none; }
-    .examination { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; }
-    .masthead { margin-bottom: 24px; }
+    .actions,
+    .legend,
+    .to-method,
+    .to-method-top,
+    .forecast { display: none; }
+
+    /* Two columns at A4 clipped the source lines off the right edge. The
+       record reads down the page instead. */
+    .examination { grid-template-columns: minmax(0, 1fr); gap: calc(var(--u) * 4); }
+    .col-plot { position: static; }
+    .plot { max-width: 150mm; }
+
+    .masthead { margin-bottom: calc(var(--u) * 3); }
+    .settle { margin-bottom: 0; }
+    .steps li { break-inside: avoid; }
   }
 </style>

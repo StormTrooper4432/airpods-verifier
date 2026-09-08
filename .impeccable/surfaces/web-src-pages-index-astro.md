@@ -52,7 +52,7 @@ The box net. Findings are marked at the panel they were read from, and the panel
 
 ## Decided during the build
 
-- **It prints.** A certificate that cannot be printed is not one. `@media print` drops the guilloche, the actions, the legend and the marketing sections, and keeps the record two-column.
+- **It prints, and this was verified rather than assumed.** The first version was bad: the masthead sat hard against the trimmed edge, source lines ran off the right, and `ADD PHOTO` cues printed onto paper. Margins now come from `@page` (14mm/12mm), the record reads down the page in one column instead of two, and every affordance is hidden. Checked at the true printable width of 703px: no overflow on either page, sheet ~3 pages, method ~7.
 - **Serials are masked wherever the sheet prints them**, at the `examine()` boundary rather than per rule, so a rule added later cannot word its way around it. The buyer reads the serial off the box for Apple's lookup.
 - **`RUN THE EXAMINATION` sits below the fold deliberately.** The first viewport's action is `ADD PHOTO` on the unexposed panels; RUN does nothing until a photograph exists, and hoisting a dead control above a live one would have cost either the plot or the thesis.
 - **The examination does not navigate when scripting is on.** The next step is almost always "add one more photograph", and a navigation empties every file input.
