@@ -159,6 +159,17 @@ const markGlyph = (s: Status) => (s === 'FAIL' ? 'fail' : s === 'PASS' ? 'pass' 
           </text>
         )}
 
+        {/* A surface no rule reads said so only by having no number, and an
+            absent number reads as "not measured" rather than "worth nothing".
+            It is not a hypothetical confusion: the case exterior is the second
+            most photographed surface in the corpus, 13 of 20, and carries zero
+            evidence. People are spending a photograph on it. Say so. */}
+        {isPrimary && showWeights && weight === 0 && (
+          <text x={box.x + 10} y={box.y + 48} class="panel-weight is-none">
+            <tspan class="panel-weight-unit">no checks read this</tspan>
+          </text>
+        )}
+
         {marks.map((m, i) => {
           const mx = box.x + 10 + (i % 5) * 34;
           const my = box.y + box.h - 42;
@@ -270,7 +281,10 @@ const markGlyph = (s: Status) => (s === 'FAIL' ? 'fail' : s === 'PASS' ? 'pass' 
     font-weight: 700;
     fill: var(--intaglio);
   }
-  .panel-weight-unit {
+  .panel-weight.is-none .panel-weight-unit {
+        fill: var(--ink-faint, #8a9299);
+      }
+      .panel-weight-unit {
     font-size: 10px;
     font-weight: 600;
     letter-spacing: 0.16em;

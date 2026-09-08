@@ -519,3 +519,30 @@ def test_the_about_page_admits_the_strongest_check_has_never_run() -> None:
     assert "arm" in limits and "frame" in limits, (
         "the limitations list no longer gives the measured cause (framing distance)"
     )
+
+
+def test_a_surface_no_rule_reads_says_so(sheet_source: str) -> None:
+    """An absent number reads as "not measured", not as "worth nothing".
+
+    The case exterior is the second most photographed surface in the corpus,
+    13 of 20, and carries zero evidence weight. Signalling that by omitting the
+    badge asked the reader to infer it from an absence, and 13 of 20 people did
+    not. The plot states it now.
+    """
+    boxnet = (WEB / "src" / "components" / "BoxNet.astro").read_text(encoding="utf-8")
+    assert "weight === 0" in boxnet, "the plot no longer renders anything for a zero-weight panel"
+    assert "no checks read this" in boxnet.lower()
+
+    # And there must still BE such a panel, or the branch is dead code.
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not available")
+    script = """
+      import { PANELS, reachableWeight } from './src/data/sheet.ts';
+      console.log(JSON.stringify(PANELS.filter((p) => reachableWeight([p.id]) === 0)
+        .map((p) => p.id)));
+    """
+    result = subprocess.run([node, "--input-type=module", "-e", script],
+                            cwd=WEB, capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout.strip()), "no zero-weight panels; the branch is unreachable"
