@@ -373,3 +373,79 @@ def test_the_tiebreak_actually_prefers_the_decisive_panel(sheet_source: str) -> 
         f"tie went to {best['panel']}; box_side carries the same weight and is the only "
         "panel that can establish a missing tear strip"
     )
+
+
+def test_the_plot_badge_and_the_forecast_are_the_same_calculation() -> None:
+    """A surface cannot be worth two different numbers on one screen.
+
+    The plot printed each panel's weight by summing every rule that listed it in
+    `answerableFrom`, ignoring `requiresPanels` — so Serial Cross-Match, which
+    needs the underside label AND the case lid, was credited whole to the label.
+    The badge read 16.5 and the forecast a few inches below it read 12.5, for
+    the same photograph. The badge now defers to reachableWeight, and this fails
+    if anyone reintroduces a second way of counting.
+    """
+    boxnet = WEB / "src" / "components" / "BoxNet.astro"
+    source = boxnet.read_text(encoding="utf-8")
+
+    assert "reachableWeight([panel])" in source, (
+        "BoxNet no longer defers to reachableWeight for the panel badge"
+    )
+    assert not re.search(r"RULES\s*\.filter\([^)]*answerableFrom", source), (
+        "BoxNet is summing rule weights itself again instead of asking "
+        "reachableWeight; that is how the badge and the forecast drifted apart"
+    )
+
+
+def test_the_underside_label_alone_still_clears_the_verdict_floor() -> None:
+    """The sheet tells people one photograph is enough. It has to stay true.
+
+    This is a claim printed to visitors, not an internal invariant. If a weight
+    or the floor ever moves so the label alone stops clearing it, the copy
+    becomes a lie — so run the shipped calculation rather than a Python
+    restatement of it, which could agree with itself while the page disagrees.
+    """
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not available")
+
+    script = """
+      import { reachableWeight, canReachVerdict, TOTAL_WEIGHT, MIN_COVERAGE_FOR_VERDICT }
+        from './src/data/sheet.ts';
+      console.log(JSON.stringify({
+        label: reachableWeight(['box_bottom_label']),
+        ok: canReachVerdict(['box_bottom_label']),
+        floor: TOTAL_WEIGHT * MIN_COVERAGE_FOR_VERDICT,
+        instinct: reachableWeight(['box_front', 'box_back', 'box_top']),
+      }));
+    """
+    result = subprocess.run(
+        [node, "--input-type=module", "-e", script], cwd=WEB, capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stderr
+    got = json.loads(result.stdout.strip())
+
+    assert got["ok"], (
+        f"the underside label alone reaches {got['label']}, under the {got['floor']:.1f} "
+        "floor — index.astro tells visitors it is enough for a verdict"
+    )
+    assert got["instinct"] < got["floor"], (
+        "index.astro also tells visitors the front, back and top together are NOT enough; "
+        f"they now reach {got['instinct']} against a floor of {got['floor']:.1f}"
+    )
+
+
+def test_the_sheet_prints_the_numbers_it_computes(sheet_source: str) -> None:
+    """The empty-state copy must not hard-code a weight that has moved on.
+
+    It states the label's reach and the instinctive set's reach. Both are
+    interpolated from the shipped functions rather than typed in, and this fails
+    if someone replaces either with a literal.
+    """
+    index = (WEB / "src" / "pages" / "index.astro").read_text(encoding="utf-8")
+    # The literal string also appears as the server-rendered placeholder; the
+    # branch that computes the numbers is the last occurrence, in the script.
+    at = index.rindex("Nothing added yet.")
+    empty_state = index[at : at + 600]
+    assert "reachableWeight(['box_bottom_label'])" in empty_state
+    assert "reachableWeight(['box_front', 'box_back', 'box_top'])" in empty_state

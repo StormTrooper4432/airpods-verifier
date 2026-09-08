@@ -7,7 +7,7 @@
 import {
   PANELS,
   PLOT_VIEWBOX,
-  RULES,
+  reachableWeight,
   type Finding,
   type PanelId,
   type Status,
@@ -77,8 +77,19 @@ const FIGURES: Record<string, string[]> = {
 };
 
 /** What is still riding on a surface, straight off the rule table. */
-const weightBehind = (panel: PanelId) =>
-  RULES.filter((r) => r.answerableFrom.includes(panel)).reduce((n, r) => n + r.weight, 0);
+/**
+ * What one photograph of this surface actually delivers, on its own.
+ *
+ * This used to sum every rule listing the panel in `answerableFrom` and ignore
+ * `requiresPanels`, so Serial Cross-Match — which needs the underside label AND
+ * the case lid together — was credited whole to the label. The badge read 16.5
+ * while the forecast, four inches away on the same screen, read 12.5 for the
+ * same photograph. One of them had to be wrong and it was this one.
+ *
+ * Deferring to reachableWeight means the plot and the forecast cannot disagree
+ * again, because they are now the same calculation.
+ */
+const weightBehind = (panel: PanelId) => reachableWeight([panel]);
 const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 
 const placed = PANELS.flatMap((panel) => {
