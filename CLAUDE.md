@@ -110,3 +110,12 @@ These were paid for with false positives on real units. Read before adding a rul
    `knowledge/fake` are blocked from every vision API in code, not by
    convention - they carry real serials, and free-tier terms allow providers to
    retain submitted content.
+
+9. **A serial is private data even when you are only quoting it.** Rule 8
+   blocks the photographs because they carry serials; it says nothing about
+   typing one in, and a genuine unit's serial got transcribed into the
+   knowledge base, the rules and the tests while documenting a real misreading.
+   It rode three commits. The characters are never load-bearing - what an
+   observation about OCR needs is a serial of the right *shape* - so invent
+   one, and say that it is invented. A test walks every text file in the
+   repository and fails if a known real serial reappears.
