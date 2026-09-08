@@ -237,11 +237,11 @@ observed_part_numbers:
 origin_line_evidence:
   assembled_in_vietnam: {genuine: 3, counterfeit: 0}
   made_in_vietnam: {genuine: 1, counterfeit: 1}
-  # Was genuine 0 / counterfeit 1, and read as a promising tell on that basis.
-  # The owner's own genuine AirPods Pro 3 label reads "Product of Vietnam"
-  # verbatim (photographed 2026-09-08, the unit in corpus post 21), so the
-  # phrase sits on both sides and discriminates nothing. Implemented, it would
-  # have accused a genuine unit - the failure this project has never had.
+  # The genuine one is the owner's AirPods Pro 3 (knowledge/real_app3), which reads
+  # "Product of Vietnam" verbatim. Confirmed genuine by the owner directly on
+  # 2026-09-08, which is what promotes it from inference to source - it had
+  # previously been called genuine only because a retail price sticker was
+  # still attached, and a price sticker is not a provenance.
   product_of_vietnam: {genuine: 1, counterfeit: 1}
   status: insufficient_evidence
   source: owner (photographed units) + corpus
@@ -652,7 +652,8 @@ serial_format:
 # source: measurement (this repository), 2026-09-08
 
 # REFLECTIVE PRINT, observed 2026-09-08 on a genuine AirPods Pro 3 retail box
-# (corpus post 21, price sticker still attached).
+# (knowledge/real_app3; genuine confirmed by the owner 2026-09-08, not inferred
+# from the retail price sticker that is also still attached).
 #
 # Newer packaging uses a finish that throws highlights, and a washed-out stroke
 # is read as a different letter. "Apple" came back as "Appie" - one l-to-i
@@ -910,15 +911,27 @@ counterfeit_observations:
         Pro 1) - genuine phrasing varies, and "Product of" appears on neither.
       status: refuted
       refuted_by: >-
-        The owner's genuine AirPods Pro 3 reads "Product of Vietnam" verbatim
-        (photographed 2026-09-08 - the same unit as corpus post 21). The claim
-        above that "Product of" appears on no genuine label is false, and the
-        phrase now stands at genuine 1 / counterfeit 1. The block was right for
-        the wrong reason: it asked for more genuine samples before shipping, and
-        the very first one that arrived killed the rule outright rather than
-        sharpening it. Do not reopen without genuine samples in the dozens -
-        Apple's origin phrasing varies by product and by year, and three labels
-        never characterised it.
+        The owner's AirPods Pro 3 (knowledge/real_app3) reads "Product of Vietnam"
+        verbatim, and the owner confirmed that unit genuine on 2026-09-08. The
+        claim above - that "Product of" appears on no genuine label - is false,
+        and the phrase now stands at genuine 1 / counterfeit 1. It discriminates
+        nothing, and shipped it would have accused a genuine unit.
+
+        The block was right for the wrong reason: it asked for more genuine
+        samples before shipping, and the first one to arrive killed the rule
+        rather than sharpening it. Do not reopen without genuine samples in the
+        dozens - Apple's origin phrasing varies by product and by year, and
+        three labels never characterised it.
+      how_the_confirmation_was_reached: >-
+        The unit was first called genuine because a retail price sticker was
+        still on the box, which is an inference rather than a provenance, and it
+        appeared in no expert label and had no reference set. Asked directly,
+        the owner confirmed it genuine. Recorded because the distinction
+        matters: this rule is refuted by an owner confirmation, not by a price
+        sticker. On confirmation the photographs moved from tests/sample_data/21
+        to knowledge/real_app3, which is where confirmed-genuine units live and
+        which is blocked from every vision API in code - they carry a real
+        serial and had been sitting outside that protection.
     - id: shared_misspelling_family
       detail: >-
         Carries the same Spanish errors as corpus post 4 - inallimbricos,
