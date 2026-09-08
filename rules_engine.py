@@ -632,6 +632,21 @@ def _rule_serial_label_spacing(extraction: VisionExtraction, variant: str) -> Ru
     )
 
 
+#: Surfaces that actually carry printed packaging copy. "No misspellings found"
+#: means nothing unless one of them was photographed - the case, the lid and the
+#: earbuds carry no prose to misspell.
+_PANELS_CARRYING_PRINTED_COPY = frozenset({"box_back", "box_front", "box_bottom_label"})
+
+#: A reported misspelling has to look like a word. The extractor returns OCR
+#: fragments alongside real findings - corpus post 15 reported 'b,' next to
+#: 'Apnie' - and a fragment is a reading artefact, not a printing defect.
+_MINIMUM_MISSPELLING_LETTERS = 3
+
+
+def _is_word_shaped(token: str) -> bool:
+    return sum(character.isalpha() for character in token) >= _MINIMUM_MISSPELLING_LETTERS
+
+
 def _rule_typography(extraction: VisionExtraction, variant: str) -> RuleOutcome:
     kerning_note = (
         " A kerning or font-weight irregularity was also reported, but that observation is not "
@@ -641,8 +656,16 @@ def _rule_typography(extraction: VisionExtraction, variant: str) -> RuleOutcome:
     )
 
     reported = list(extraction.visible_spelling_errors)
-    accent_only = [word for word in reported if is_accent_loss(word)]
-    real_errors = [word for word in reported if not is_accent_loss(word)]
+    fragments = [word for word in reported if not _is_word_shaped(word)]
+    words = [word for word in reported if _is_word_shaped(word)]
+    accent_only = [word for word in words if is_accent_loss(word)]
+    real_errors = [word for word in words if not is_accent_loss(word)]
+    fragment_note = (
+        f" {len(fragments)} reported item(s) too short to be a word were discarded as reading "
+        f"artefacts."
+        if fragments
+        else ""
+    )
 
     if real_errors:
         listed = ", ".join(f"'{word}'" for word in real_errors)
@@ -650,6 +673,7 @@ def _rule_typography(extraction: VisionExtraction, variant: str) -> RuleOutcome:
             EvidenceStatus.FAIL,
             f"Misspelled text is printed on the packaging ({listed}). Apple's retail packaging is "
             f"proofed and offset-printed, so printed misspellings indicate a reproduction."
+            + fragment_note
             + kerning_note,
         )
 
@@ -673,9 +697,23 @@ def _rule_typography(extraction: VisionExtraction, variant: str) -> RuleOutcome:
             "packaging, so it is recorded as an observation rather than treated as evidence.",
         )
 
+    # Finding no misspellings in copy nobody photographed is not a pass. The
+    # case, the lid and the earbuds carry no printed prose, so a clean reading
+    # of them says nothing about the packaging - and granting PASS here adds
+    # weight toward a verdict on the strength of absent evidence, which is the
+    # one thing this pipeline must never do.
+    if not (set(extraction.visible_panels) & _PANELS_CARRYING_PRINTED_COPY):
+        return RuleOutcome(
+            EvidenceStatus.UNKNOWN,
+            "No misspellings were reported, but no surface carrying printed packaging copy was "
+            "photographed - the case, the lid and the earbuds have no prose to check. Photograph "
+            "the box back or the underside label and this becomes a real reading."
+            + fragment_note,
+        )
+
     return RuleOutcome(
         EvidenceStatus.PASS,
-        "No misspelled text was found in the printed packaging copy.",
+        "No misspelled text was found in the printed packaging copy." + fragment_note,
     )
 
 

@@ -75,10 +75,18 @@ These were paid for with false positives on real units. Read before adding a rul
    printed features have held up - misspellings, `(S) Serial` spacing, model
    numbers.
 
-4. **Absence of evidence is never evidence of authenticity.** An unreadable
-   Tier 1 check forces INCONCLUSIVE. Coverage is deliberately NOT rescoped to
-   the panels provided, or a case-only photoset would clear a unit nobody
-   photographed the box of.
+4. **Absence of evidence is never evidence of authenticity - and never
+   evidence of forgery either.** An unreadable Tier 1 check forces
+   INCONCLUSIVE. Coverage is deliberately NOT rescoped to the panels provided,
+   or a case-only photoset would clear a unit nobody photographed the box of.
+
+   The subtle form of this bug is a rule concluding from a viewpoint that could
+   not support the conclusion, and both directions have now been found in
+   shipped rules. A missing pull tab was a FAIL even when no photograph showed
+   a side edge, where the tear-strip runs. "No misspelled text was found" was a
+   PASS even when no surface carrying printed copy had been photographed, which
+   bought 1.5 of coverage on nothing. Before a rule concludes, ask which panel
+   would have had to be in frame for the answer to mean anything.
 
 5. **Measure before believing.** Synthetic tests said font comparison separated
    genuine from counterfeit by 10x; photographs said the variation within

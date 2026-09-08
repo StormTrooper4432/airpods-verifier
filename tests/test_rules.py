@@ -1452,3 +1452,101 @@ class TestTheTabMustBeVisibleToBeMissing:
         """Seeing a tab is positive evidence; the guard is only about absence."""
         report = evaluate(self._wrapped(["box_front"], tab=True))
         assert status_of(report, "Packaging Seal Type") is EvidenceStatus.PASS
+
+
+class TestCleanCopyNobodyPhotographedIsNotAPass:
+    """The dangerous half of the same bug the pull-tab rule had.
+
+    "No misspelled text was found in the printed packaging copy" was returned
+    whenever the extractor reported no misspellings — including when no surface
+    carrying printed copy had been photographed at all. The case, the lid and
+    the earbuds have no prose to misspell, so a clean reading of them says
+    nothing, and PASS added 1.5 of evidence weight toward a verdict on the
+    strength of absent evidence.
+
+    Measured on the corpus: 3 of 20 items collected that free pass, including
+    one the expert labelled HIGH RISK.
+    """
+
+    HARDWARE_ONLY = ["case_exterior", "case_lid_underside", "earbud"]
+
+    def test_a_clean_reading_of_hardware_only_is_unknown(self):
+        report = evaluate(
+            make_extraction(visible_panels=self.HARDWARE_ONLY, visible_spelling_errors=[])
+        )
+        assert status_of(report, "Typography & Print Quality") is EvidenceStatus.UNKNOWN
+
+    def test_it_names_the_photograph_that_would_make_it_real(self):
+        detail = detail_of(
+            evaluate(make_extraction(visible_panels=self.HARDWARE_ONLY)),
+            "Typography & Print Quality",
+        )
+        assert "box back" in detail and "underside label" in detail
+
+    def test_that_pass_no_longer_buys_coverage(self):
+        """The point of the fix: absent evidence must not move the score.
+
+        Compared against the same extraction with a printed surface added, so
+        the difference measured is the rule's own contribution and nothing
+        else. (These fixtures deliberately carry a full set of extracted
+        values, so most rules resolve whatever the panel list says — which is
+        exactly why this asserts on the delta rather than on the verdict.)
+        """
+        hardware = evaluate(make_extraction(visible_panels=self.HARDWARE_ONLY))
+        with_copy = evaluate(make_extraction(visible_panels=[*self.HARDWARE_ONLY, "box_back"]))
+        assert status_of(hardware, "Typography & Print Quality") is EvidenceStatus.UNKNOWN
+        assert status_of(with_copy, "Typography & Print Quality") is EvidenceStatus.PASS
+        assert hardware.confidence_score < with_copy.confidence_score, (
+            "a clean reading of copy nobody photographed still buys coverage"
+        )
+
+    def test_printed_copy_photographed_still_passes(self):
+        report = evaluate(
+            make_extraction(visible_panels=["box_back"], visible_spelling_errors=[])
+        )
+        assert status_of(report, "Typography & Print Quality") is EvidenceStatus.PASS
+
+    def test_a_misspelling_convicts_from_any_panel_set(self):
+        """A misspelling that was actually read is positive evidence, and the
+        guard is only ever about absence."""
+        report = evaluate(
+            make_extraction(
+                visible_panels=self.HARDWARE_ONLY, visible_spelling_errors=["Apnie"]
+            )
+        )
+        assert status_of(report, "Typography & Print Quality") is EvidenceStatus.FAIL
+
+
+class TestOcrFragmentsAreNotMisspellings:
+    """Corpus post 15 reported 'b,' beside 'Apnie'. One is a printing defect and
+    the other is a reading artefact, and a fragment must never convict alone."""
+
+    def test_a_fragment_alone_does_not_convict(self):
+        report = evaluate(
+            make_extraction(visible_panels=["box_back"], visible_spelling_errors=["b,", ".", "x"])
+        )
+        assert status_of(report, "Typography & Print Quality") is not EvidenceStatus.FAIL
+
+    def test_a_real_misspelling_beside_a_fragment_still_convicts(self):
+        report = evaluate(
+            make_extraction(visible_panels=["box_back"], visible_spelling_errors=["b,", "Apnie"])
+        )
+        assert status_of(report, "Typography & Print Quality") is EvidenceStatus.FAIL
+        detail = detail_of(report, "Typography & Print Quality")
+        assert "Apnie" in detail and "'b,'" not in detail
+
+    def test_the_discarded_fragments_are_still_declared(self):
+        """Dropped input is disclosed, never silently swallowed."""
+        detail = detail_of(
+            evaluate(
+                make_extraction(visible_panels=["box_back"], visible_spelling_errors=["b,", "Apnie"])
+            ),
+            "Typography & Print Quality",
+        )
+        assert "too short to be a word" in detail
+
+    def test_a_short_but_real_word_is_not_a_fragment(self):
+        report = evaluate(
+            make_extraction(visible_panels=["box_back"], visible_spelling_errors=["Aple"])
+        )
+        assert status_of(report, "Typography & Print Quality") is EvidenceStatus.FAIL
