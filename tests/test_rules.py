@@ -471,7 +471,10 @@ class TestTypographyRule:
 
     def test_kerning_is_still_noted_alongside_a_real_misspelling(self):
         report = evaluate(
-            make_extraction(font_kerning_irregularities=True, visible_spelling_errors=["Appie"])
+            make_extraction(
+                font_kerning_irregularities=True,
+                visible_spelling_errors=["Appie", "swalliwed"],
+            )
         )
         assert status_of(report, "Typography & Print Quality") is EvidenceStatus.FAIL
         assert "kerning" in detail_of(report, "Typography & Print Quality")
@@ -708,13 +711,29 @@ class TestAccentLossFilter:
     @pytest.mark.parametrize(
         "word", ["MagSate", "Appie", "Bums", "swalliwed", "inalimbricos", "Designd"]
     )
-    def test_letter_substitutions_still_fail(self, word):
-        # Post 4's real counterfeit errors must survive the filter untouched.
-        report = evaluate(make_extraction(visible_spelling_errors=[word]))
-        assert status_of(report, "Typography & Print Quality") is EvidenceStatus.FAIL
+    def test_letter_substitutions_are_counted_as_real_errors(self, word):
+        """Post 4's real counterfeit errors must survive the accent filter.
 
-    def test_a_real_error_alongside_accent_loss_still_fails(self):
-        report = evaluate(make_extraction(visible_spelling_errors=["Audifonos", "MagSate"]))
+        Paired with a second error because one alone is now an observation -
+        reflective print manufactures single substitutions. What is under test
+        here is the accent filter, not the count, so the pairing keeps the
+        question the same.
+        """
+        report = evaluate(make_extraction(visible_spelling_errors=[word, "cargaoores"]))
+        detail = detail_of(report, "Typography & Print Quality")
+        assert status_of(report, "Typography & Print Quality") is EvidenceStatus.FAIL
+        assert word in detail
+
+    @pytest.mark.parametrize("word", ["MagSate", "Appie", "Califomia"])
+    def test_one_letter_substitution_alone_is_not_charged(self, word):
+        """The reflective-print lesson: a lone substitution is a reading risk."""
+        report = evaluate(make_extraction(visible_spelling_errors=[word]))
+        assert status_of(report, "Typography & Print Quality") is EvidenceStatus.UNKNOWN
+
+    def test_real_errors_alongside_accent_loss_still_fail(self):
+        report = evaluate(
+            make_extraction(visible_spelling_errors=["Audifonos", "MagSate", "swalliwed"])
+        )
         detail = detail_of(report, "Typography & Print Quality")
         assert status_of(report, "Typography & Print Quality") is EvidenceStatus.FAIL
         assert "MagSate" in detail
@@ -1260,7 +1279,8 @@ class TestVerdictScenarioMatrix:
         assert score >= 0.85, name
 
     def test_a_soft_signal_flags_at_lower_confidence(self):
-        verdict, score = self._verdict(visible_spelling_errors=["MagSate"])
+        # Two misspellings: one alone is a reading artefact on reflective print.
+        verdict, score = self._verdict(visible_spelling_errors=["MagSate", "swalliwed"])
         assert verdict is Verdict.HIGH_RISK_SUSPECTED
         assert score < 0.85
 
@@ -1392,7 +1412,7 @@ class TestProductScopedRules:
         report = evaluate(make_extraction(
             extracted_model_number=self.OTHER_PRODUCT,
             serial_left_earbud="H4XQ7K2LMN9P",
-            visible_spelling_errors=["MagSate"],
+            visible_spelling_errors=["MagSate", "swalliwed"],
         ))
         assert status_of(report, "Serial Cross-Match") is EvidenceStatus.FAIL
         assert status_of(report, "Typography & Print Quality") is EvidenceStatus.FAIL
@@ -1521,7 +1541,8 @@ class TestCleanCopyNobodyPhotographedIsNotAPass:
         guard is only ever about absence."""
         report = evaluate(
             make_extraction(
-                visible_panels=self.HARDWARE_ONLY, visible_spelling_errors=["Apnie"]
+                visible_panels=self.HARDWARE_ONLY,
+                visible_spelling_errors=["Apnie", "swalliwed"],
             )
         )
         assert status_of(report, "Typography & Print Quality") is EvidenceStatus.FAIL
@@ -1537,9 +1558,12 @@ class TestOcrFragmentsAreNotMisspellings:
         )
         assert status_of(report, "Typography & Print Quality") is not EvidenceStatus.FAIL
 
-    def test_a_real_misspelling_beside_a_fragment_still_convicts(self):
+    def test_real_misspellings_beside_a_fragment_still_convict(self):
         report = evaluate(
-            make_extraction(visible_panels=["box_back"], visible_spelling_errors=["b,", "Apnie"])
+            make_extraction(
+                visible_panels=["box_back"],
+                visible_spelling_errors=["b,", "Apnie", "swalliwed"],
+            )
         )
         assert status_of(report, "Typography & Print Quality") is EvidenceStatus.FAIL
         detail = detail_of(report, "Typography & Print Quality")
@@ -1557,6 +1581,107 @@ class TestOcrFragmentsAreNotMisspellings:
 
     def test_a_short_but_real_word_is_not_a_fragment(self):
         report = evaluate(
-            make_extraction(visible_panels=["box_back"], visible_spelling_errors=["Aple"])
+            make_extraction(
+                visible_panels=["box_back"], visible_spelling_errors=["Aple", "swalliwed"]
+            )
         )
         assert status_of(report, "Typography & Print Quality") is EvidenceStatus.FAIL
+        assert "Aple" in detail_of(report, "Typography & Print Quality")
+
+
+class TestReflectivePrintMustNotConvict:
+    """Newer AirPods packaging throws highlights, and a washed-out stroke turns
+    "Apple" into "Appie" - one l-to-i substitution.
+
+    Corpus post 21, a genuine retail box with the price sticker still on it, was
+    called HIGH RISK on exactly that. The pattern cannot save us: a real
+    counterfeit in the corpus reads "Califomia" (rn-to-m), the same shape of
+    single substitution. Sharpness cannot either - the reflective genuine box
+    scores 220 against 182 and 492 for two fakes. Only the count separates them:
+    across the labelled corpus no genuine item reported any misspelling, and the
+    counterfeits that reported them reported 4, 2, 1 and 1.
+    """
+
+    def test_one_misspelling_is_reported_not_charged(self):
+        report = evaluate(
+            make_extraction(visible_panels=["box_back"], visible_spelling_errors=["Appie"])
+        )
+        assert status_of(report, "Typography & Print Quality") is EvidenceStatus.UNKNOWN
+        assert report.summary_verdict is not Verdict.HIGH_RISK_SUSPECTED
+
+    def test_it_says_why_and_what_would_settle_it(self):
+        detail = detail_of(
+            evaluate(make_extraction(visible_panels=["box_back"], visible_spelling_errors=["Appie"])),
+            "Typography & Print Quality",
+        )
+        assert "Appie" in detail
+        assert "reflective" in detail.lower()
+        assert "without glare" in detail
+
+    def test_two_misspellings_still_convict(self):
+        report = evaluate(
+            make_extraction(
+                visible_panels=["box_back"],
+                visible_spelling_errors=["Appie", "cargaoores"],
+            )
+        )
+        assert status_of(report, "Typography & Print Quality") is EvidenceStatus.FAIL
+
+    def test_a_fragment_does_not_count_toward_the_second(self):
+        """'b,' beside one real misspelling is still one misspelling."""
+        report = evaluate(
+            make_extraction(visible_panels=["box_back"], visible_spelling_errors=["b,", "Appie"])
+        )
+        assert status_of(report, "Typography & Print Quality") is EvidenceStatus.UNKNOWN
+
+
+class TestSerialGlyphConfusion:
+    """A genuine label reading D0QMG74KXN came back as DOQMG74KXN off a
+    reflective panel - letter O for digit zero. Folding those together for
+    COMPARISON keeps a highlight from manufacturing a mismatch; the buyer is
+    still shown exactly what was read."""
+
+    def test_a_zero_read_as_an_o_does_not_break_the_match(self):
+        report = evaluate(
+            make_extraction(
+                extracted_serial_number="D0QMG74KXN",
+                serial_case_lid="DOQMG74KXN",
+                serial_label_literal="(S) Serial No. D0QMG74KXN",
+                visible_panels=["box_bottom_label", "case_lid_underside"],
+            )
+        )
+        assert status_of(report, "Serial Cross-Match") is not EvidenceStatus.FAIL
+
+    def test_a_genuinely_different_serial_still_fails(self):
+        report = evaluate(
+            make_extraction(
+                extracted_serial_number="H4XQ7K2LMN",
+                serial_case_lid="P9WT3B8RTY",
+                serial_label_literal="(S) Serial No. H4XQ7K2LMN",
+                visible_panels=["box_bottom_label", "case_lid_underside"],
+            )
+        )
+        assert status_of(report, "Serial Cross-Match") is EvidenceStatus.FAIL
+
+    def test_one_real_character_apart_still_fails(self):
+        """Folding must not swallow a difference a reader would never make."""
+        from rules_engine import _same_serial
+
+        assert not _same_serial("MF4TFMQ2VQ", "MF4TFMQ2VR")
+        assert not _same_serial("D0QMG74KXN", "D0QMG74KX")
+        assert _same_serial("D0QMG74KXN", "DOQMG74KXN")
+
+    def test_the_buyer_is_shown_what_was_actually_read(self):
+        """Folding is for comparison only; it must never rewrite the evidence."""
+        detail = detail_of(
+            evaluate(
+                make_extraction(
+                    extracted_serial_number="D0QMG74KXN",
+                    serial_case_lid="P9WT3B8RTY",
+                    serial_label_literal="(S) Serial No. D0QMG74KXN",
+                    visible_panels=["box_bottom_label", "case_lid_underside"],
+                )
+            ),
+            "Serial Cross-Match",
+        )
+        assert "D0QMG74KXN" in detail and "P9WT3B8RTY" in detail

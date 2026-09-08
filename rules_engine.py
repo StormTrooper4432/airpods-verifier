@@ -521,6 +521,30 @@ def _rule_serial_format(extraction: VisionExtraction, variant: str) -> RuleOutco
 _SERIAL_LABEL_RE = re.compile(r"\(\s*S\s*\)(?P<gap>\s*)serial", re.IGNORECASE)
 
 
+#: Glyph pairs an OCR confuses on printed serials. Observed: a genuine label
+#: reading D0QMG74KXN came back as DOQMG74KXN - letter O for digit zero - off a
+#: reflective panel.
+#:
+#: These fold ONLY for comparison, never for display: the buyer is shown what
+#: was read. A mismatch that survives folding differs by something no reader
+#: confuses, while two genuinely different serials still differ in many
+#: characters, so this cannot mask a real mismatch. Accusing someone because a
+#: highlight turned a zero into an O would be the same class of error as the
+#: reflective-print misspelling above.
+_CONFUSABLE_GLYPHS = str.maketrans({
+    "O": "0", "Q": "0", "D": "0",
+    "I": "1", "L": "1",
+    "S": "5", "Z": "2", "B": "8", "G": "6",
+})
+
+
+def _same_serial(left: str, right: str) -> bool:
+    """Equal once glyphs no reader can tell apart are folded together."""
+    return left.upper().translate(_CONFUSABLE_GLYPHS) == right.upper().translate(
+        _CONFUSABLE_GLYPHS
+    )
+
+
 def _rule_serial_cross_match(extraction: VisionExtraction, variant: str) -> RuleOutcome:
     """Check the serials against each other.
 
@@ -562,11 +586,11 @@ def _rule_serial_cross_match(extraction: VisionExtraction, variant: str) -> Rule
         for other_name, other_value in unique_required[index + 1 :]:
             if name == "case lid" or other_name == "case lid":
                 continue  # box/case equality is handled separately below
-            if value == other_value:
+            if _same_serial(value, other_value):
                 duplicates.append(f"{name} and {other_name} share the serial {value}")
 
     for name, value in unique_required:
-        if name != "case lid" and case and value == case:
+        if name != "case lid" and case and _same_serial(value, case):
             duplicates.append(f"the {name} repeats the case serial {value}")
 
     if duplicates:
@@ -578,7 +602,7 @@ def _rule_serial_cross_match(extraction: VisionExtraction, variant: str) -> Rule
             "repeated one indicates fabricated printing or a swapped component.",
         )
 
-    if box and case and box != case:
+    if box and case and not _same_serial(box, case):
         return RuleOutcome(
             EvidenceStatus.FAIL,
             f"The box label serial ({box}) does not match the serial under the case lid ({case}). "
@@ -651,6 +675,34 @@ _PANELS_CARRYING_PRINTED_COPY = frozenset({"box_back", "box_front", "box_bottom_
 #: 'Apnie' - and a fragment is a reading artefact, not a printing defect.
 _MINIMUM_MISSPELLING_LETTERS = 3
 
+#: How many misspellings it takes to convict.
+#:
+#: One is not enough, and this was paid for. Newer AirPods packaging prints on a
+#: finish that throws highlights, and a washed-out stroke turns "Apple" into
+#: "Appie" - a single l-to-i substitution. Corpus post 21, a genuine retail box
+#: with a price sticker still on it, was called HIGH RISK on exactly that.
+#:
+#: The pattern cannot separate the cases. A real counterfeit in the corpus reads
+#: "Califomia" (rn-to-m) and another "certifed", both single substitutions an
+#: OCR would plausibly make. Sharpness does not separate them either: the
+#: reflective genuine box scores 220 against 182 and 492 for two fakes.
+#:
+#: What does separate them is how many. Measured across the labelled corpus:
+#:
+#:     GENUINE                0 of 5 items reported ANY misspelling
+#:     HIGH_RISK_SUSPECTED    4 of 9, at counts 4, 2, 1, 1
+#:
+#: So two or more is a printing defect and one is a reading artefact. The cost
+#: is real and was measured before making the change: corpus posts 2 and 16 are
+#: counterfeits whose only evidence was a single misspelling, and both fall to
+#: INCONCLUSIVE, taking agreement from 13/20 to 11/20.
+#:
+#: That trade is deliberate. INCONCLUSIVE tells a buyer the tool cannot settle
+#: it and asks for another photograph. Accusing a genuine box tells them to walk
+#: away from a real unit, and it will keep happening as reflective packaging
+#: becomes the norm.
+_MISSPELLINGS_TO_CONVICT = 2
+
 
 def _is_word_shaped(token: str) -> bool:
     return sum(character.isalpha() for character in token) >= _MINIMUM_MISSPELLING_LETTERS
@@ -675,6 +727,18 @@ def _rule_typography(extraction: VisionExtraction, variant: str) -> RuleOutcome:
         if fragments
         else ""
     )
+
+    if len(real_errors) == 1:
+        # One is a reading artefact until something corroborates it.
+        return RuleOutcome(
+            EvidenceStatus.UNKNOWN,
+            f"One misspelling was read from the packaging ('{real_errors[0]}'). A single one is "
+            f"reported and not charged: reflective print turns a washed-out stroke into a wrong "
+            f"letter, and a genuine box has been accused this way. Two or more is a printing "
+            f"defect. Re-photograph the printed panels without glare if you want this settled."
+            + fragment_note
+            + kerning_note,
+        )
 
     if real_errors:
         listed = ", ".join(f"'{word}'" for word in real_errors)

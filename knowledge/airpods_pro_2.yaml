@@ -520,6 +520,36 @@ serial_format:
 # number for an assumed one. Revisit if a future measurement shows drift.
 # source: measurement (this repository), 2026-09-08
 
+# REFLECTIVE PRINT, observed 2026-09-08 on a genuine AirPods Pro 3 retail box
+# (corpus post 21, price sticker still attached).
+#
+# Newer packaging uses a finish that throws highlights, and a washed-out stroke
+# is read as a different letter. "Apple" came back as "Appie" - one l-to-i
+# substitution - and the box was called HIGH RISK on it. The same panel gave
+# serial D0QMG74KXN as DOQMG74KXN, letter O for digit zero.
+#
+# Neither the pattern nor the image quality separates this from a real defect:
+#
+#   a genuine reflective box   "Appie"     (l->i)   sharpness 220
+#   a counterfeit              "Califomia" (rn->m)  sharpness  40
+#   a counterfeit              "certifed"           sharpness 492
+#
+# The count does. Across the labelled corpus:
+#
+#   GENUINE               0 of 5 items reported ANY misspelling
+#   HIGH_RISK_SUSPECTED   4 of 9, at counts 4, 2, 1, 1
+#
+# So two or more misspellings is a printing defect and one is a reading
+# artefact. Measured cost: corpus posts 2 and 16 are counterfeits whose only
+# evidence was a single misspelling and both fall to INCONCLUSIVE; post 15,
+# where the pipeline had out-claimed the expert, is corrected. Agreement 13/20
+# to 12/20, and both properties that matter hold - no counterfeit passed as
+# genuine, no genuine unit accused.
+#
+# Confusable glyphs are folded when serials are COMPARED, never when they are
+# shown, so a highlight cannot manufacture a cross-match failure.
+# source: measurement against the expert-labelled corpus, 2026-09-08
+
 packaging:
   shrinkwrap:
     # Contradicts the common "wrapped = fake" claim, and contradicts the

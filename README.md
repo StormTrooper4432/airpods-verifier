@@ -239,7 +239,7 @@ WHAT TO ASK FOR NEXT
 seeing any pipeline output:
 
 ```
-agreement          13/20
+agreement          12/20
 counterfeits passed as genuine      0
 genuine units accused               0
 ```
@@ -255,7 +255,7 @@ check was already unknown. Sampling is not pinned, so this is measured rather
 than structural, and the likely reason is the schema-constrained extraction
 leaving little room to vary.
 
-Every rule change in this project came from that corpus. Three checks were **demoted
+Every rule change in this project came from that corpus. Four checks were **demoted
 after measurement contradicted them**:
 
 - **Kerning irregularity** — scored 0-for-2, firing only on genuine units. Blur,
