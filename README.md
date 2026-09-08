@@ -109,6 +109,13 @@ on the same filesystem.
 | `VERIFIER_ROOT` | found by walking up from cwd | where `main.py` lives |
 | `SF_FONT_PATH` | macOS system path | Apple's typeface. Not in the image — its licence does not allow redistribution — so letterform checks report unavailable in a container |
 
+**A caveat on all three limits.** The queue, the per-address window and the
+daily budget all live in the server's memory, so a host that sleeps an idle
+instance resets them on wake. The per-address window still works within a busy
+period, but the daily budget is only a real cap while the instance stays up.
+On a scale-to-zero plan it is a speed bump, not a ceiling — worth knowing before
+pointing anyone at the URL.
+
 **Two constraints any host must satisfy**, both because examinations are
 serialised in-process:
 
@@ -119,8 +126,10 @@ serialised in-process:
   immediately and the pipeline keeps running after the response is sent. A host
   that throttles CPU between requests will stall it.
 
-On Google Cloud Run — whose always-free tier covers this comfortably, and which
-is the same account the Gemini key comes from — that is:
+**Cloud Run needs a payment card.** It refuses to enable its own API without a
+billing account (`UREQ_PROJECT_BILLING_NOT_FOUND`) even though this workload
+sits inside the always-free tier, so the charge is $0 but the card is not
+optional. With billing attached:
 
 ```bash
 gcloud run deploy airpods-verifier --source . \
@@ -131,6 +140,12 @@ gcloud run deploy airpods-verifier --source . \
 Scale-to-zero is fine: a job id that outlives its instance returns "that
 examination is no longer on the server", which the sheet renders as a notice
 rather than a hang.
+
+**Render needs no card.** `render.yaml` in this repository is a ready blueprint
+— connect the repo and set `GEMINI_API_KEY` in the dashboard. The trade is 0.1
+CPU and 512 MB, and the instance sleeps after 15 minutes idle, so a visitor
+after a quiet spell waits about a minute for the cold start on top of the
+vision call.
 
 ---
 

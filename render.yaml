@@ -1,0 +1,34 @@
+# Deploy blueprint. Render is here because it needs no payment card, which
+# Cloud Run does — Cloud Run refuses to enable its API without a billing
+# account even though this workload sits inside the always-free tier.
+#
+# The trade is real: 0.1 CPU and 512 MB against Cloud Run's allowance, and the
+# instance sleeps after 15 minutes idle, so the first visitor after a quiet
+# spell waits about a minute for a cold start on top of the vision call.
+services:
+  - type: web
+    name: airpods-verifier
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: oregon
+    healthCheckPath: /api/examine
+    envVars:
+      # Set this in the dashboard, not here. It is a secret.
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: PORT
+        value: 8080
+      # One vision call at a time. The free tier is the constraint, not the CPU.
+      - key: EXAMINE_CONCURRENCY
+        value: 1
+      - key: EXAMINE_MAX_QUEUE
+        value: 12
+      - key: EXAMINE_PER_IP_HOURLY
+        value: 6
+      - key: EXAMINE_PER_IP_DAILY
+        value: 20
+      # Deliberately below the provider's daily allowance. Note that this
+      # counter lives in the process, so it resets whenever the instance sleeps.
+      - key: EXAMINE_DAILY_BUDGET
+        value: 300
