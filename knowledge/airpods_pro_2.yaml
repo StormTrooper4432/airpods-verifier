@@ -520,6 +520,40 @@ serial_format:
 # number for an assumed one. Revisit if a future measurement shows drift.
 # source: measurement (this repository), 2026-09-08
 
+# SERIAL LEGIBILITY, measured 2026-09-08 across the 20-post labelled corpus.
+#
+# Apple prints a serial in four places: the box label, under the case lid, and
+# on each earbud stem. Serial Cross-Match asks whether they agree, and it is the
+# strongest check available - it needs no reference data, works on any
+# generation, and is the only one a cloned serial cannot defeat, because a clone
+# still has to agree with three other printings.
+#
+# It has never once run. Across 20 posts:
+#
+#   box label serial      legible in  7 of 20
+#   case lid serial       legible in  0 of 20
+#   left earbud serial    legible in  0 of 20
+#   right earbud serial   legible in  0 of 20
+#   posts with the 2 serials the rule needs:  0 of 20
+#
+# Ledger status over the whole corpus: 0 PASS, 0 FAIL, 20 UNKNOWN. The case lid
+# was IDENTIFIED as photographed in 7 of those posts, so this is not a framing
+# problem - the surface was in shot and the characters still could not be read.
+# Apple prints them at around a millimetre, and a phone at arm's length does not
+# resolve that.
+#
+# CONSEQUENCE FOR COVERAGE, and it is not small. The rule carries 4.0 of the
+# 19.5 total, so the practical ceiling is 15.5 of 19.5 = 79.5%, not 100%. The
+# 60% floor for a verdict is therefore 75% of what is actually obtainable.
+#
+# DECISION: nothing is reweighted. A floor that demands more of the evidence
+# than intended errs toward INCONCLUSIVE, which is the safe direction and the
+# one this project has repeatedly chosen. Lowering the denominator to match what
+# is reachable would loosen the bar for GENUINE on exactly the checks that
+# remain - and 0 fakes passed is the property every change here has had to keep.
+# Revisit only with a measurement showing the case lid serial can be captured.
+# source: measurement (this repository), 2026-09-08
+
 # PHOTOGRAPH ORIENTATION, found 2026-09-08 in the same corpus post 21.
 #
 # A phone stores the sensor's pixels plus an EXIF tag saying which way up they

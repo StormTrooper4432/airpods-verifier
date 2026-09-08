@@ -449,3 +449,25 @@ def test_the_sheet_prints_the_numbers_it_computes(sheet_source: str) -> None:
     empty_state = index[at : at + 600]
     assert "reachableWeight(['box_bottom_label'])" in empty_state
     assert "reachableWeight(['box_front', 'box_back', 'box_top'])" in empty_state
+
+
+def test_the_masthead_does_not_promise_a_check_that_has_never_run() -> None:
+    """Serial Cross-Match is 0 PASS, 0 FAIL, 20 UNKNOWN over the whole corpus.
+
+    Apple prints those serials at around a millimetre; the case lid was in shot
+    in 7 posts and legible in none. The masthead used to say the record "reads
+    the printed box against Apple's published hardware matrix, and the four
+    serials against each other", stating as routine a comparison that has never
+    once happened. It is conditional now, and this fails if the flat claim
+    returns. See the serial-legibility note in knowledge/airpods_pro_2.yaml.
+    """
+    index = (WEB / "src" / "pages" / "index.astro").read_text(encoding="utf-8")
+    stand = index[index.index("masthead-stand") : index.index("masthead-stand") + 700]
+
+    assert "whenever more than one can be" in stand, (
+        "the masthead no longer qualifies the serial cross-check"
+    )
+    assert "and the four serials against each other" not in stand, (
+        "the masthead states the four-serial comparison as something the record does; "
+        "it has never resolved on any corpus post"
+    )
