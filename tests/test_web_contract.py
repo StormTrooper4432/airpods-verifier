@@ -471,3 +471,27 @@ def test_the_masthead_does_not_promise_a_check_that_has_never_run() -> None:
         "the masthead states the four-serial comparison as something the record does; "
         "it has never resolved on any corpus post"
     )
+
+
+def test_the_browser_and_the_engine_give_the_same_capture_instruction(sheet_source: str) -> None:
+    """Both layers tell people how to shoot the fine-print surfaces. They must agree.
+
+    The case lid serial is 0 of 20 on the corpus and the measured cause is
+    framing distance: a lid filling the frame reads correctly at the shipped
+    downscale ceiling, the same lid at arm's length does not read at all. The
+    engine says so in its next steps, and the browser says so in the forecast
+    before the photograph is taken. Two copies of one instruction is exactly the
+    thing that rots, so this pins them together.
+    """
+    import rules_engine
+
+    for panel in ("case_lid_underside", "earbud"):
+        block = re.search(rf"id: '{panel}',(.*?)\n  \}}", sheet_source, re.S)
+        assert block, f"{panel} is no longer in the web panel table"
+        hint = re.search(r"capture: '([^']+)'", block.group(1))
+        assert hint, f"{panel} lost its capture hint in the browser"
+
+        web = hint.group(1).lower()
+        engine = rules_engine.PANEL_REQUESTS[panel].lower()
+        assert "close" in web or "frame" in web, f"{panel} web hint says nothing about framing"
+        assert "close" in engine or "frame" in engine, f"{panel} engine step says nothing about framing"

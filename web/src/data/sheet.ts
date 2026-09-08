@@ -43,6 +43,8 @@ export interface Panel {
   group: 'carton' | 'hardware';
   /** What is printed there. Only stated where the knowledge base sources it. */
   carries?: string;
+  /** How to shoot it, when shooting it wrong is why a check never runs. */
+  capture?: string;
   /** The same fact at plot scale. */
   short?: string;
   carriesSource?: string;
@@ -120,6 +122,11 @@ export const PANELS: Panel[] = [
     figure: 'lid',
     boxes: [{ x: 296, y: 568, w: 172, h: 156 }],
     carries: 'The serial, printed on the underside of the lid.',
+    /* Measured: a lid filling the frame reads correctly at the shipped
+       downscale ceiling; the same lid at arm's length does not read at all.
+       That is why the case lid serial is 0 of 20 on the corpus. See the
+       case-lid note in knowledge/airpods_pro_2.yaml. */
+    capture: 'fill the frame with it — the serial is about a millimetre',
     short: 'serial',
     carriesSource: "Apple, 'Identify your AirPods'",
   },
@@ -132,6 +139,8 @@ export const PANELS: Panel[] = [
     figure: 'bud',
     boxes: [{ x: 492, y: 568, w: 172, h: 156 }],
     carries: 'Each earbud carries its own serial, different from the case serial.',
+    /* Smaller print than the lid's, so the framing rule applies harder still. */
+    capture: 'as close as the camera will focus — this print is smaller still',
     short: 'serial',
     carriesSource: 'r/AreMyAirpodsAuthentic community guide',
   },
