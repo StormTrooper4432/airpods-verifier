@@ -7,7 +7,6 @@
  * percentage on this sheet, because the pipeline does not produce one.
  */
 import GraderMark from './GraderMark.astro';
-import { rosette } from '../lib/guilloche';
 import {
   RULE_BY_PARAMETER,
   RULES,
@@ -62,8 +61,6 @@ const scoreLabel =
 const showFinding = verdict !== null && verdict !== 'INCONCLUSIVE' && score !== null;
 const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 
-/* The lathe again, this time as a ground beneath the grade rather than trim. */
-const underprint = rosette(300);
 ---
 
 <header class:list={['grade', `grade-${kind}`, striking && 'is-striking']}>
@@ -112,7 +109,7 @@ const underprint = rosette(300);
   </div>
 </header>
 
-<style define:vars={{ underprint }}>
+<style>
   .grade {
     margin: 0 0 calc(var(--u) * 4);
     position: relative;

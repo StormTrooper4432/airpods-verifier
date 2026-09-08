@@ -30,7 +30,12 @@ function trace(
   r: number,
   d: number,
   phase = 0,
-  samples = 2400,
+  /**
+   * Compared at the size these actually render: 2400 and 1000 are
+   * indistinguishable, 700 is very slightly faceted, and at 500 the lobes go
+   * visibly polygonal. 1000 costs 21 KB against 58 KB for the same picture.
+   */
+  samples = 1000,
 ) {
   const turns = r / gcd(R, r);
   const k = (R - r) / r;
@@ -39,7 +44,8 @@ function trace(
     const t = (2 * Math.PI * turns * i) / samples + phase;
     const x = cx + scale * ((R - r) * Math.cos(t) + d * Math.cos(k * t));
     const y = cy + scale * ((R - r) * Math.sin(t) - d * Math.sin(k * t));
-    points.push(`${i === 0 ? 'M' : 'L'}${x.toFixed(2)} ${y.toFixed(2)}`);
+    // One decimal is under a tenth of a pixel at these sizes and saves ~15%.
+    points.push(`${i === 0 ? 'M' : 'L'}${x.toFixed(1)} ${y.toFixed(1)}`);
   }
   return `<path d="${points.join(' ')}"/>`;
 }

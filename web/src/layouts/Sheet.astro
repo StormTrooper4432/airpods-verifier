@@ -1,6 +1,19 @@
 ---
 import Guilloche from '../components/Guilloche.astro';
+import { rosette, sealRing, strip } from '../lib/guilloche';
 import '../styles/sheet.css';
+
+/**
+ * The lathe work, emitted once for the whole page.
+ *
+ * These are constant, and a page can hold four graded records. Left to the
+ * components, each instance carried its own copy of the same 31 KB rosette.
+ */
+const ornament = [
+  `.guilloche{--horizontal:${strip(false)};--vertical:${strip(true)};--depth:22px}`,
+  `.grade-ground{--underprint:${rosette(300)}}`,
+  `.seal-ring{--ring:${sealRing(132)}}`,
+].join('');
 
 interface Props {
   title: string;
@@ -23,6 +36,7 @@ const { title, description } = Astro.props;
     <link rel="preload" as="font" type="font/woff2" crossorigin
           href="/fonts/ArchivoNarrow-latin.woff2" />
     <link rel="icon" href="/mark.svg" type="image/svg+xml" />
+    <style is:inline set:html={ornament}></style>
   </head>
   <body>
     <a class="skip" href="#examination">Skip to the examination</a>

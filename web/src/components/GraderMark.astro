@@ -4,14 +4,12 @@
  * on this sheet the grader is a rules engine — so the mark says exactly that,
  * and says what it is not.
  */
-import { sealRing } from '../lib/guilloche';
 
 interface Props {
   checks: number;
   weight: string;
 }
 const { checks, weight } = Astro.props;
-const ring = sealRing(132);
 ---
 
 <figure class="seal" role="img"
@@ -24,7 +22,7 @@ const ring = sealRing(132);
   </figcaption>
 </figure>
 
-<style define:vars={{ ring }}>
+<style>
   .seal {
     position: relative;
     width: 132px;
