@@ -102,16 +102,28 @@ def process(folder: Path, *, provider, model, effort, cap, allow_lite=False, lit
             "output_tokens": result.output_tokens,
             "estimated_cost_usd": result.estimated_cost_usd,
             "extraction": result.extraction.model_dump(mode="json"),
-            "verdict": report.summary_verdict.value,
-            "confidence": report.confidence_score,
-            "ledger": report.to_dict()["evidence_ledger"],
+            # Named for what they are: the verdict THIS extraction produced under
+            # the rules in force when it was run. Rules change; extractions do
+            # not. Anything reading these as current is reading history — which
+            # has happened, twice in one sitting, and silently: the stored
+            # verdict disagreed with the live rules on 5 of 20 posts and every
+            # analysis built on it was wrong in the same direction. Call
+            # rescore() and read `verdict`, which only ever exists in memory.
+            "verdict_when_extracted": report.summary_verdict.value,
+            "confidence_when_extracted": report.confidence_score,
+            "ledger_when_extracted": report.to_dict()["evidence_ledger"],
         }
     )
     return record
 
 
 def rescore(record: dict) -> dict:
-    """Recompute verdict, ledger and next steps from a stored extraction."""
+    """Recompute verdict, ledger and next steps from a stored extraction.
+
+    This is the ONLY way to get a current verdict out of a stored result. The
+    file on disk carries `*_when_extracted` fields, which are history and are
+    named so that reading them by accident is impossible.
+    """
     extraction = record.get("extraction")
     if not extraction:
         return record

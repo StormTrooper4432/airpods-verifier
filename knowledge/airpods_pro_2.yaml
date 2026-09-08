@@ -520,6 +520,54 @@ serial_format:
 # number for an assumed one. Revisit if a future measurement shows drift.
 # source: measurement (this repository), 2026-09-08
 
+# WHY THE CASE LID SERIAL IS NEVER READ, measured 2026-09-08.
+#
+# The legibility note below records that it is 0 of 20. This is the mechanism,
+# measured on a synthetic lid rendered the way the real thing looks: laser
+# etching, grey on white plastic, a specular sheen, handheld softness, sensor
+# noise, and the serial at Apple's roughly 1mm on a ~60mm lid.
+#
+# The pipeline downscales every photograph to 1568px on the long edge before
+# the model sees it. What that does to a 1mm serial depends entirely on how
+# much of the frame the lid fills:
+#
+#   lid fills ~85% of the frame   read CORRECTLY at the shipped 1568px
+#   lid fills ~35% of the frame   not read at all at 1568px
+#
+# So this is a photographing distance problem, not a resolution ceiling that
+# needs raising. Standing back far enough to get the whole case in shot is what
+# destroys it, and that is exactly what people do - the case lid was in frame in
+# 7 of 20 corpus posts and legible in none of them.
+#
+# Raising the ceiling on the far shot walks it through a DANGEROUS band before
+# it becomes correct:
+#
+#   1568px   serial  ~9px   not read
+#   1960px   serial ~11px   LOYT6B4RKN   letter O for digit zero
+#   2352px   serial ~13px   LDYT6B4RKN   letter D for digit zero
+#   2744px   serial ~16px   LOYT684RKN   O for zero AND 8 for B
+#   3136px   serial ~18px   correct
+#
+# (Serial invented; see the note on never writing a real one down.)
+#
+# Every error in that band is a confusable-glyph substitution, and _same_serial
+# already folds exactly those (O/Q/D->0, B->8, I/L->1, S->5, Z->2, G->6) for
+# COMPARISON while displaying what was read. Checked against all three
+# misreadings: each folds equal to the truth, and a genuinely different serial
+# still differs. The safeguard covers the precise failure mode this produces.
+#
+# DECISION: the ceiling is not raised. A misread serial cross-checked against a
+# correctly read one is a mismatch, and a mismatch accuses a genuine unit - the
+# thing this project has never once done. The fix is free and photographic:
+# tell people to fill the frame with the lid, which reads correctly at the
+# ceiling already shipping. If the ceiling is ever revisited, 3136px is the
+# first value measured to be correct rather than merely legible.
+#
+# CAVEAT: the stimulus is synthetic. It establishes that framing distance is
+# sufficient to cause this, not that it is the only cause in the corpus - a real
+# photograph can also be out of focus or angled into a reflection.
+# source: measurement (this repository), 2026-09-08
+
 # SERIAL LEGIBILITY, measured 2026-09-08 across the 20-post labelled corpus.
 #
 # Apple prints a serial in four places: the box label, under the case lid, and

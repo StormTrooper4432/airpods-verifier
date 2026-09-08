@@ -876,12 +876,16 @@ PANEL_REQUESTS: dict[str, str] = {
         "Photograph the back of the box - it carries the copyright line and the regulatory marks."
     ),
     "case_lid_underside": (
-        "Open the case and photograph the underside of the lid - the serial is printed there, and "
-        "it should match the serial on the box."
+        "Open the case and fill the frame with the underside of the lid - get as close as your "
+        "camera will focus. The serial is etched there at about a millimetre, and it should match "
+        "the one on the box. Standing back far enough to get the whole case in shot is what makes "
+        "it unreadable: measured, a lid filling the frame reads correctly and the same lid at "
+        "arm's length does not read at all."
     ),
     "earbud": (
-        "Photograph the stem of each earbud - each carries its own serial, different from the "
-        "case and from each other."
+        "Photograph the stem of each earbud as close as your camera will focus - each carries its "
+        "own serial, different from the case and from each other. This print is smaller than the "
+        "lid's, so a whole-earbud shot will not resolve it."
     ),
     "box_front": "Photograph the front of the box.",
     "box_side": "Photograph the sides of the box, including any seals or pull tabs.",
