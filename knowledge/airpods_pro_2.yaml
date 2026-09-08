@@ -485,6 +485,41 @@ serial_format:
 # edge view before the absence counts moved corpus agreement from 12/20 to
 # 13/20 with no other verdict changing.
 # source: measurement against the expert-labelled corpus, 2026-09-08
+# RUN-TO-RUN STABILITY, measured 2026-09-08.
+#
+# A buyer acts on this once, on a phone, with money at stake. If the same
+# photographs produced a different verdict on a second run, that would be a
+# serious flaw and nobody had checked. Sampling is NOT pinned - no temperature,
+# no seed - so variation was the thing to expect.
+#
+# Fifteen runs of `main.py --lite-only`, three photo sets, five runs each:
+#
+#   post 18, 4 photos (produces a finding)   verdict, score, failing rule,
+#                                            model number, serial length, the
+#                                            (S)Serial spacing and the panel
+#                                            list: identical 5/5
+#   post  2, 3 photos (marginal legibility)  identical 5/5, including the
+#                                            fields that stayed unread
+#   post 18, 2 photos (nothing legible)      verdict and score identical 5/5;
+#                                            one panel label alternated between
+#                                            case_exterior and other, changing
+#                                            no rule and no verdict
+#
+# The one observed variation was a panel name on a set where every check was
+# already UNKNOWN. Nothing decision-bearing moved.
+#
+# The likely reason is architectural rather than lucky: the extraction is
+# schema-constrained server-side (response_format with additionalProperties
+# false), so the sampling space is narrow and the fields are mostly copied text
+# rather than generated prose.
+#
+# DECISION: sampling is deliberately left unpinned. Setting temperature to 0
+# would make stability structural rather than observed, but it changes model
+# behaviour, and the corpus agreement figure was measured under current
+# settings - re-pinning without re-scoring all twenty would trade a measured
+# number for an assumed one. Revisit if a future measurement shows drift.
+# source: measurement (this repository), 2026-09-08
+
 packaging:
   shrinkwrap:
     # Contradicts the common "wrapped = fake" claim, and contradicts the

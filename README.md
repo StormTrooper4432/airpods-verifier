@@ -201,6 +201,13 @@ Almost every disagreement is `INCONCLUSIVE` on an item the expert could judge �
 declining rather than being wrong. For a buyer-protection tool that's the correct
 direction to fail: a missed fake costs $200, an unnecessary re-photograph costs nothing.
 
+The same photographs give the same answer. Fifteen runs across three photo sets
+— one producing a finding, one marginal, one unreadable — returned identical
+verdicts and scores; the only variation was a panel label on a set where every
+check was already unknown. Sampling is not pinned, so this is measured rather
+than structural, and the likely reason is the schema-constrained extraction
+leaving little room to vary.
+
 Every rule change in this project came from that corpus. Three checks were **demoted
 after measurement contradicted them**:
 
