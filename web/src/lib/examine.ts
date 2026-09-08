@@ -9,15 +9,14 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { PanelId, Report } from '../data/sheet';
 import { redactReport } from './redact';
+import { ExamineError, extensionFor, validateShots, type Shot } from './upload';
 
-export class ExamineError extends Error {
-  constructor(
-    message: string,
-    readonly recovery: string,
-  ) {
-    super(message);
-  }
-}
+// Re-exported so callers and tests keep one import site for the upload gate.
+export {
+  ExamineError, MAX_FILES, MAX_BYTES, MAX_TOTAL_BYTES, extensionFor, validateShots,
+} from './upload';
+export type { Shot } from './upload';
+
 
 /**
  * Find the pipeline. `import.meta.url` is useless here: the bundler moves this
@@ -71,23 +70,7 @@ function python(): string {
   return existsSync(venv) ? venv : 'python3';
 }
 
-export const MAX_FILES = 10;
-export const MAX_BYTES = 8 * 1024 * 1024;
-/**
- * Measured on the free tier: 8s to 89s for four photographs, 53s for two, and
- * one run past 120s. The old two-minute ceiling cut off examinations that were
- * still working, and the number of photographs was never the cause — the wait
- * is the vision model's queue, not the upload.
- */
 const TIMEOUT_MS = 300_000;
-
-const EXT: Record<string, string> = {
-  'image/jpeg': '.jpg',
-  'image/png': '.png',
-  'image/webp': '.webp',
-  'image/heic': '.heic',
-  'image/heif': '.heic',
-};
 
 export interface Examination {
   report: Report;
@@ -130,47 +113,6 @@ function run(args: string[]): Promise<{ code: number; stdout: string; stderr: st
   });
 }
 
-/** Photographs the visitor supplied, in the order the plot lists them. */
-export interface Shot {
-  panel: PanelId;
-  file: File;
-}
-
-/**
- * Reject a bad set before it joins the queue. Learning that a file is the
- * wrong type after waiting behind three other examinations is a worse answer
- * than learning it immediately, and costs the queue nothing.
- */
-export function validateShots(shots: Shot[]): void {
-  if (shots.length === 0) {
-    throw new ExamineError(
-      'No photographs were supplied.',
-      'Tap a panel on the plot and add a photograph of that surface.',
-    );
-  }
-  if (shots.length > MAX_FILES) {
-    throw new ExamineError(
-      `More than ${MAX_FILES} photographs were supplied.`,
-      `Send at most ${MAX_FILES}: the panels on the plot are enough.`,
-    );
-  }
-  for (const { file } of shots) {
-    if (!EXT[file.type]) {
-      throw new ExamineError(
-        `${file.name || 'A file'} is not a photograph the verifier reads (${file.type || 'unknown type'}).`,
-        'Send JPEG, PNG, WebP or HEIC.',
-      );
-    }
-    if (file.size > MAX_BYTES) {
-      throw new ExamineError(
-        `${file.name || 'A file'} is larger than ${MAX_BYTES / 1024 / 1024} MB.`,
-        'Photographs straight from a phone camera are within the limit; reduce the file and try again.',
-      );
-    }
-  }
-
-}
-
 export async function examine(shots: Shot[]): Promise<Examination> {
   validateShots(shots);
 
@@ -178,7 +120,7 @@ export async function examine(shots: Shot[]): Promise<Examination> {
   try {
     const images: string[] = [];
     for (const [i, { panel, file }] of shots.entries()) {
-      const name = `${String(i).padStart(2, '0')}-${panel}${EXT[file.type]}`;
+      const name = `${String(i).padStart(2, '0')}-${panel}${extensionFor(file) ?? '.jpg'}`;
       const full = path.join(dir, name);
       await writeFile(full, Buffer.from(await file.arrayBuffer()));
       images.push(full);

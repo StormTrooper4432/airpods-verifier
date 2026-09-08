@@ -95,6 +95,7 @@ jobs:
           node tools/limits.test.mjs
           node tools/middleware.test.mjs
           node tools/record.test.mjs
+          node tools/upload.test.mjs
       - name: Check nothing published carries a serial
         run: |
           python3 - <<'PY'
