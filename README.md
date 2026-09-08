@@ -263,6 +263,26 @@ python tools/run_corpus.py corpus/ --out results/     # extract once
 python tools/run_corpus.py --score results/           # re-score after any rule change
 ```
 
+Corpus from eBay listings, through eBay's own API — not a scraper. eBay's
+robots.txt prohibits automated access and names LLM-driven bots specifically,
+directing integrations to the Browse API. Register once at
+[developer.ebay.com](https://developer.ebay.com/) (free, keys issued
+immediately), then:
+
+```bash
+export EBAY_CLIENT_ID=... EBAY_CLIENT_SECRET=...
+python tools/fetch_ebay.py --query "airpods pro 2nd generation" --limit 40 --out corpus/
+```
+
+Every image passes `tools/stock_photos` first. Sellers pad listings with
+Apple's own press photography, which is a picture of a genuine unit attached to
+a listing that may not be one — the fastest way to corrupt a corpus. Detection
+is by cross-listing reuse: a photograph of a specific box on a specific table
+cannot honestly appear in two unrelated listings, while a press shot appears in
+hundreds. No reference images and no judgement about Apple's photography
+required. Measured on the reference set plus synthetic press shots: 30 real
+photographs kept, 4 press shots dropped, no errors either way.
+
 Blind labelling is built in: `results/review.csv` ships with `expert_verdict` blank, and
 `--score` prints a confusion matrix that reports *"fake passed as genuine"* separately
 from *"genuine flagged"* rather than averaging them.
