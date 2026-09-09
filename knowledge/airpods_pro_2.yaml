@@ -216,6 +216,25 @@ case_serial_suffixes:
 # to hold forever.
 observed_on: 2026-09-08
 observed_on_source: owner (domain expert), asked directly and reaffirmed
+# Copyright ranges for products this tool does not fully verify but has
+# sourced facts about. Same principle as packaging.seal_sourced_for: a range
+# here is confirmed, not extrapolated from Pro 2 dates.
+#
+# AirPods Pro 3: floor 2025 from Apple's "Identify your AirPods" (introduced
+# 2025); ceiling 2025 from the owner, asked directly on 2026-09-09 and
+# answering that 2025 is the only year on a genuine Pro 3 box. The owner had
+# already stated separately that the only AirPods product carrying 2026 is
+# AirPods Max 2, and these agree.
+#
+# Lets a Pro 3 be CONDEMNED on its copyright. Still cannot clear it: Model
+# Number Compatibility is Tier 1 and stays UNKNOWN for a non-Pro-2 product,
+# which forces INCONCLUSIVE whatever the coverage reaches.
+other_generation_copyright:
+  AirPods Pro 3:
+    min: 2025
+    max: 2025
+    source: apple-identify (introduced 2025); owner (only year seen, 2026-09-09)
+
 copyright_years:
   Pro 2 USB-C:
     min: 2023

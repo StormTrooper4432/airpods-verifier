@@ -251,15 +251,20 @@ class TestModelNumberRule:
     def test_other_generations_are_named_not_accused(self, number, generation):
         # A3063 is a real Pro 3 number. It appeared in the corpus on one genuine
         # unit and one counterfeit; naming the product is the only honest answer.
-        report = evaluate(make_extraction(extracted_model_number=number))
+        # The year is set inside Pro 3's sourced range so this tests the
+        # model-number rule rather than tripping the copyright one.
+        report = evaluate(make_extraction(extracted_model_number=number, copyright_year=2025))
         detail = detail_of(report, "Model Number Compatibility")
         assert status_of(report, "Model Number Compatibility") is EvidenceStatus.UNKNOWN
         assert generation in detail
         assert report.summary_verdict is not Verdict.HIGH_RISK_SUSPECTED
 
     def test_out_of_scope_items_do_not_get_an_authenticity_finding(self):
-        # A counterfeit Pro 3 and a genuine one look identical to a Pro 2 tool.
-        report = evaluate(make_extraction(extracted_model_number="A3063"))
+        # A counterfeit AirPods 4 and a genuine one look identical to a Pro 2
+        # tool. Pro 3 is no longer the example here: its seal and copyright are
+        # owner-sourced now, so it can be condemned on facts confirmed FOR IT.
+        # The invariant is about products with no sourced facts at all.
+        report = evaluate(make_extraction(extracted_model_number="A3053"))
         assert report.summary_verdict is Verdict.INCONCLUSIVE
 
     def test_malformed_identifier_still_fails(self):
@@ -1359,7 +1364,8 @@ class TestVerdictScenarioMatrix:
         assert score < 0.85
 
     def test_an_out_of_scope_product_is_never_accused(self):
-        verdict, _ = self._verdict(extracted_model_number="A3063")
+        # AirPods 4, not Pro 3: Pro 3 now has a sourced seal and copyright.
+        verdict, _ = self._verdict(extracted_model_number="A3053")
         assert verdict is Verdict.INCONCLUSIVE
 
 
@@ -1367,7 +1373,7 @@ class TestInconclusiveIsNotConfidence:
     def test_an_inconclusive_verdict_reports_coverage_not_confidence(self):
         # 0.74 next to "Confidence" reads as "probably fine", which is the
         # opposite of what an inconclusive result means.
-        report = evaluate(make_extraction(extracted_model_number="A3063"), GOOD_FONT)
+        report = evaluate(make_extraction(extracted_model_number="A3053"), GOOD_FONT)
         text = cli.render_report(report, color=False)
         assert report.summary_verdict is Verdict.INCONCLUSIVE
         assert "Evidence coverage:" in text
@@ -1849,52 +1855,56 @@ class TestNoGenuineSerialIsWrittenDown:
 
 
 class TestCopyrightForOtherGenerations:
-    """An out-of-scope box gets the observation, never the accusation.
+    """Pro 3 has a sourced copyright range, so it is checked against its own.
 
-    A Pro 3 box printed before Pro 3 existed is a real anomaly and worth saying
-    out loud. It is still not a finding: "an out-of-scope product is never
-    accused" is a designed invariant here, and it is why this project has never
-    accused a genuine unit — a counterfeit AirPods 4 and a genuine one look
-    identical to Pro 2 packaging rules. Convicting on one arithmetic case would
-    open that door for a modest gain, since the item is already INCONCLUSIVE
-    and the ledger already explains why.
+    Floor 2025 from Apple's introduction year. Ceiling 2025 from the owner,
+    asked directly: 2025 is the only year on a genuine Pro 3 box. Not
+    extrapolated from Pro 2 dates, which is the move that once accused a
+    genuine AirPods 4 ANC.
 
-    The first version of this DID convict, and ten existing tests caught it.
+    Condemning is allowed. Clearing is not: Model Number Compatibility is
+    Tier 1 and stays UNKNOWN for a non-Pro-2 product, so INCONCLUSIVE holds
+    whatever the coverage reaches.
     """
 
-    PRO_3 = "A3063"  # Apple, "Identify your AirPods": AirPods Pro 3, introduced 2025
+    PRO_3 = "A3063"
+    AIRPODS_4 = "A3053"  # no sourced facts; the invariant still applies to it
 
-    def test_the_status_stays_unknown_whatever_the_year(self):
-        import datetime
-
-        for year in (2024, 2025, datetime.date.today().year, datetime.date.today().year + 1):
-            report = evaluate(
-                make_extraction(extracted_model_number=self.PRO_3, copyright_year=year)
-            )
-            assert status_of(report, "Copyright Year Constraint") is EvidenceStatus.UNKNOWN, year
-
-    def test_the_verdict_stays_inconclusive_whatever_the_year(self):
-        """The invariant the first version broke."""
+    def test_a_year_predating_the_product_fails(self):
         report = evaluate(make_extraction(extracted_model_number=self.PRO_3, copyright_year=2024))
-        assert report.summary_verdict is Verdict.INCONCLUSIVE
+        assert status_of(report, "Copyright Year Constraint") is EvidenceStatus.FAIL
 
-    def test_a_year_predating_the_product_is_said_out_loud(self):
-        report = evaluate(make_extraction(extracted_model_number=self.PRO_3, copyright_year=2024))
-        detail = detail_of(report, "Copyright Year Constraint")
-        assert "predates AirPods Pro 3" in detail
-        assert "2025" in detail
-        assert "observation, not a finding" in detail
-
-    def test_a_plausible_year_gets_no_anomaly_note(self):
+    def test_the_only_genuine_year_passes(self):
         report = evaluate(make_extraction(extracted_model_number=self.PRO_3, copyright_year=2025))
-        assert "Worth noting" not in detail_of(report, "Copyright Year Constraint")
+        assert status_of(report, "Copyright Year Constraint") is EvidenceStatus.PASS
 
-    def test_the_introduction_year_comes_from_the_knowledge_base(self):
-        """No hand-typed year: it must be Apple's, via other_generations."""
-        from rules_engine import OTHER_GENERATIONS
+    def test_a_later_year_fails_on_the_owners_statement(self):
+        report = evaluate(make_extraction(extracted_model_number=self.PRO_3, copyright_year=2026))
+        assert status_of(report, "Copyright Year Constraint") is EvidenceStatus.FAIL
 
-        assert OTHER_GENERATIONS[self.PRO_3]["introduced"] == 2025
-        assert OTHER_GENERATIONS[self.PRO_3]["name"] == "AirPods Pro 3"
+    def test_a_pro_3_still_cannot_be_cleared(self):
+        """The invariant that survived. Tier 1 unresolved beats any coverage."""
+        report = evaluate(
+            make_extraction(
+                extracted_model_number=self.PRO_3,
+                copyright_year=2025,
+                has_paper_pull_tabs=True,
+                has_plastic_shrinkwrap=False,
+            )
+        )
+        assert report.summary_verdict is Verdict.INCONCLUSIVE
+        assert status_of(report, "Model Number Compatibility") is EvidenceStatus.UNKNOWN
+
+    def test_a_product_with_no_sourced_range_is_still_withheld(self):
+        report = evaluate(make_extraction(extracted_model_number=self.AIRPODS_4, copyright_year=2024))
+        assert status_of(report, "Copyright Year Constraint") is EvidenceStatus.UNKNOWN
+
+    def test_the_range_comes_from_the_knowledge_base(self):
+        from rules_engine import _OTHER_GENERATION_COPYRIGHT
+
+        bounds = _OTHER_GENERATION_COPYRIGHT["AirPods Pro 3"]
+        assert bounds["min"] == 2025 and bounds["max"] == 2025
+        assert "owner" in bounds["source"]
 
 
 class TestTheCopyrightCeilingCannotSilentlyAge:
@@ -2009,6 +2019,7 @@ class TestSealForProductsWithASourcedSeal:
         report = evaluate(
             make_extraction(
                 extracted_model_number=self.PRO_3,
+                copyright_year=2025,
                 has_paper_pull_tabs=True,
                 has_plastic_shrinkwrap=False,
             )

@@ -485,8 +485,43 @@ def _this_year() -> int:
     return datetime.date.today().year
 
 
+#: Copyright ranges confirmed for products this tool does not fully verify.
+#: Same principle as _SEAL_SOURCED_FOR: sourced, not extrapolated from Pro 2
+#: dates. Being here lets a product be condemned on its copyright and never
+#: cleared, since Model Number Compatibility is Tier 1 and stays UNKNOWN.
+_OTHER_GENERATION_COPYRIGHT: dict[str, dict] = KNOWLEDGE.get("other_generation_copyright", {})
+
+
 def _rule_copyright_year(extraction: VisionExtraction, variant: str) -> RuleOutcome:
     other = identifies_another_product(extraction)
+    bounds = _OTHER_GENERATION_COPYRIGHT.get(other or "")
+    if other is not None and bounds is not None:
+        year = extraction.copyright_year
+        if year is None:
+            return RuleOutcome(
+                EvidenceStatus.UNKNOWN,
+                "No copyright year was legible. It is printed in the fine print block on "
+                "the underside of the box.",
+            )
+        if year < bounds["min"]:
+            return RuleOutcome(
+                EvidenceStatus.FAIL,
+                f"Copyright year {year} predates {other}, which Apple introduced in "
+                f"{bounds['min']}. A box is not printed before the product it holds exists.",
+            )
+        if year > bounds["max"]:
+            return RuleOutcome(
+                EvidenceStatus.FAIL,
+                f"Copyright year {year} is later than any year that appears on a genuine "
+                f"{other} box, which shows {bounds['max']} only. Check the digit against "
+                f"the box in good light: a misread produces exactly this finding.",
+            )
+        return RuleOutcome(
+            EvidenceStatus.PASS,
+            f"Copyright year {year} is consistent with {other} "
+            f"({bounds['min']}\u2013{bounds['max']}). The packaging checks sourced for "
+            f"AirPods Pro 2 remain withheld, so this unit still cannot be cleared here.",
+        )
     if other is not None:
         # The Pro 2 RANGE does not transfer. One half of it does: a box cannot
         # be printed before the product it holds existed, whatever generation
