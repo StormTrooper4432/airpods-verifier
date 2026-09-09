@@ -578,6 +578,41 @@ serial_format:
 # number for an assumed one. Revisit if a future measurement shows drift.
 # source: measurement (this repository), 2026-09-08
 
+# WHY THE FONT CHECK HAS NEVER RUN: NO PHOTOGRAPH CLEARS THE GATE.
+# Measured 2026-09-09 across every reference photograph held locally.
+#
+#   gate                                     45px median glyph height
+#   owner close-up of a Pro 2 label          43px   closest ever recorded
+#   genuine Pro 3 label (real_app3)          37px
+#   genuine Pro 2, 12MP whole box            24px
+#   genuine Pro 1, 12MP whole box            23px
+#
+# Not one clears it. The check is 0 PASS / 0 FAIL / 20 UNKNOWN on the corpus
+# because it has never been handed a photograph it can measure, and the 45px
+# floor has been the only thing standing between this rule and a false
+# accusation.
+#
+# FORCED TO RUN BELOW THE GATE IT ACCUSES A GENUINE BOX. On the owner's own
+# genuine Pro 2 label at 40px, pooling four lines, analyse_label_lines scored
+# 22 glyphs and 16 letters and returned scatter 7.51% against a 2.0% threshold,
+# differs_from_san_francisco = True. That is a false positive on a confirmed
+# genuine unit, produced by the exact rule a domain expert on
+# r/AreMyAirpodsAuthentic recommends as the most reliable tell there is.
+#
+# ABOVE THE GATE IT IS UNTESTED. Not "known to work" and not "known to fail" -
+# there has never been a photograph to try. The synthetic separation (SF 0.62%
+# against 5.1-7.1% pooled over four lines) says the descriptor CAN separate
+# typefaces; it says nothing about photographed print, and the corpus figures
+# quoted in the README came from a path scoring almost nothing.
+#
+# WHAT WOULD SETTLE IT: genuine label photographs above 45px median glyph
+# height - a macro shot of the printed block filling the frame, camera original
+# rather than a screenshot. The owner's 43px was a screenshot of a close-up, so
+# the original of that same shot may already clear it. Then measure genuine
+# against counterfeit at that resolution. Until that exists the demotion to
+# weight zero stands, and this note is why.
+# source: measurement (this repository), 2026-09-09
+
 # LABEL TYPOGRAPHY HAS ALSO NEVER FIRED, and not only for the reason recorded.
 # Investigated 2026-09-09 after a domain expert on r/AreMyAirpodsAuthentic
 # argued that font and weight are the most reliable tell there is - the same
