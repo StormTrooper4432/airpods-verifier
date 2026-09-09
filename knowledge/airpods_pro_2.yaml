@@ -534,6 +534,32 @@ serial_format:
 # number for an assumed one. Revisit if a future measurement shows drift.
 # source: measurement (this repository), 2026-09-08
 
+# REAL-PHOTOGRAPH CHECK ON THE FRAMING CONCLUSION, 2026-09-08.
+#
+# The measurement below is synthetic, and its stated caveat is that it shows
+# framing distance is SUFFICIENT to destroy the lid serial, not that it is the
+# only cause. An owner photograph arrived the same day that tests the other
+# half: a case lid shot close, filling the frame, of a unit whose box label is
+# also photographed.
+#
+#   image as supplied           1636 x 622 (a screenshot, already reduced from
+#                               whatever the camera produced)
+#   pipeline downscale          0.96 - barely any, the image is already small
+#   serial glyph height after   roughly 17 to 25 px
+#   measured threshold          ~18px read correctly, ~9px not read at all
+#
+# So a lid-filling shot clears the threshold even after passing through a
+# screenshot AND the downscale, which is the framing advice working end to end.
+# It is legible to a human reader at full size, and the characters match the
+# box label on the same unit - the comparison Serial Cross-Match exists to make
+# and has never once been able to attempt.
+#
+# NOT YET RUN THROUGH THE PIPELINE. The photographs carry a real serial, and
+# sending them to a free-tier vision API is the thing knowledge/real_* exists
+# to prevent; whether to spend that is the owner's decision, not an assumption
+# to make on their behalf. Held in tests/sample_data/22, which is ignored.
+# source: owner photograph + measurement (this repository), 2026-09-08
+
 # WHY THE CASE LID SERIAL IS NEVER READ, measured 2026-09-08.
 #
 # The legibility note below records that it is 0 of 20. This is the mechanism,
