@@ -10,6 +10,7 @@ import type { APIRoute } from 'astro';
 import { timingSafeEqual } from 'node:crypto';
 
 import { all, label, summary } from '../../lib/record';
+import { metrics } from '../../lib/metrics';
 
 function authorised(request: Request): boolean {
   const expected = process.env.RECORD_TOKEN;
@@ -34,7 +35,8 @@ export const GET: APIRoute = async ({ request }) => {
     );
   }
   const full = new URL(request.url).searchParams.has('full');
-  return new Response(JSON.stringify(full ? { ...summary(), records: all() } : summary(), null, 2), {
+  const body = { ...summary(), traffic: metrics() };
+  return new Response(JSON.stringify(full ? { ...body, records: all() } : body, null, 2), {
     headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
   });
 };

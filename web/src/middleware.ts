@@ -19,6 +19,8 @@
  */
 import type { MiddlewareHandler } from 'astro';
 
+import { countView } from './lib/metrics.ts';
+
 const UNSAFE = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 /** The host a browser thinks it is talking to, as the proxy reports it. */
@@ -32,7 +34,20 @@ function publicHost(request: Request, url: URL): string | null {
 
 export const onRequest: MiddlewareHandler = async (context, next) => {
   const { request } = context;
-  if (!UNSAFE.has(request.method)) return next();
+
+  // A safe method skips the origin check, but it is still the only place that
+  // sees every page request, so it is where a view gets counted. Counting
+  // after next() rather than before means a 404 is not recorded as a visit.
+  if (!UNSAFE.has(request.method)) {
+    const response = await next();
+    try {
+      countView(request.method, new URL(request.url).pathname, response.status);
+    } catch {
+      // Counting must never be able to fail a page. A visitor being served
+      // matters and a tally does not.
+    }
+    return response;
+  }
 
   const origin = request.headers.get('origin');
 

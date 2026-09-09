@@ -29,10 +29,36 @@ from typing import Any, Iterable
 
 EXAMINATION = "examination "
 LABEL = "examination-label "
+VIEW = "view "
 
 #: The verdicts the engine can reach. Anything else in a log is a format change.
 VERDICTS = ("GENUINE", "HIGH_RISK_SUSPECTED", "INCONCLUSIVE")
 TRUTHS = ("GENUINE", "COUNTERFEIT")
+
+
+def count_views(lines: Iterable[str]) -> dict[str, int]:
+    """Page views, per path, from an exported log.
+
+    The instance keeps these in memory and the free tier stops it after fifteen
+    minutes idle, so the in-process total is only "since it woke". The log is
+    the durable copy and this is what reads it back.
+    """
+    counts: dict[str, int] = {}
+    for line in lines:
+        at = line.find(VIEW)
+        if at == -1:
+            continue
+        # "examination " never contains "view ", but a path might; require the
+        # marker to start a token so a URL called /preview does not match.
+        if at > 0 and line[at - 1] not in " \t":
+            continue
+        try:
+            payload = json.loads(line[at + len(VIEW) :].strip())
+        except json.JSONDecodeError:
+            continue
+        if isinstance(payload, dict) and isinstance(payload.get("path"), str):
+            counts[payload["path"]] = counts.get(payload["path"], 0) + 1
+    return counts
 
 
 def parse(lines: Iterable[str]) -> tuple[dict[str, dict], int]:
@@ -92,8 +118,11 @@ def agreement(records: Iterable[dict]) -> dict[str, Any]:
     }
 
 
-def summarise(records: dict[str, dict], orphans: int) -> dict[str, Any]:
+def summarise(records: dict[str, dict], orphans: int,
+              views_by_path: dict[str, int] | None = None) -> dict[str, Any]:
     entries = list(records.values())
+    views_by_path = views_by_path or {}
+    views = sum(views_by_path.values())
     examined = [r for r in entries if r.get("outcome") == "examined"]
     reached = [r["reached"] for r in examined if isinstance(r.get("reached"), (int, float))]
     errors = [
@@ -105,6 +134,11 @@ def summarise(records: dict[str, dict], orphans: int) -> dict[str, Any]:
     return {
         "records": len(entries),
         "labelsWithNoExamination": orphans,
+        "views": views,
+        "viewsByPath": views_by_path,
+        # Of the people who looked, how many ran something. Null rather than 0
+        # when nobody looked, because 0/0 is not a rate.
+        "ranAfterViewing": round(len(entries) / views, 3) if views else None,
         "outcomes": dict(Counter(r.get("outcome", "?") for r in entries).most_common()),
         "verdicts": dict(Counter(r["verdict"] for r in entries if r.get("verdict")).most_common()),
         "panelsOffered": dict(
@@ -140,12 +174,14 @@ def main(argv: list[str] | None = None) -> int:
 
     stream = sys.stdin if args.log == "-" else open(args.log, encoding="utf-8", errors="replace")
     try:
-        records, orphans = parse(stream)
+        lines = stream.readlines()
     finally:
         if stream is not sys.stdin:
             stream.close()
+    records, orphans = parse(lines)
+    views_by_path = count_views(lines)
 
-    if not records:
+    if not records and not views_by_path:
         print(
             "No examination lines in that log. They look like:\n"
             '  examination {"id":"v8wxec",...}',
@@ -165,7 +201,7 @@ def main(argv: list[str] | None = None) -> int:
             print("Every examination with a verdict is labelled.", file=sys.stderr)
         return 0
 
-    print(json.dumps(summarise(records, orphans), indent=2))
+    print(json.dumps(summarise(records, orphans, views_by_path), indent=2))
     return 0
 
 

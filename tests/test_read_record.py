@@ -175,3 +175,56 @@ def test_it_reads_no_field_a_record_never_contains():
 
     for banned in ("serial", "filename", "address", "user_agent", "photo", "image"):
         assert banned not in code, f"{banned} is not something a record carries"
+
+
+class TestViewCounting:
+    """Page views, read back from an exported log.
+
+    The instance holds these in memory and the free tier stops it after fifteen
+    minutes idle, so the live total only ever means "since it woke". The log is
+    the durable copy.
+    """
+
+    VIEW = 'view {"path":"/","at":"2026-09-08T22:00:00Z"}'
+
+    def test_views_are_counted_per_path(self):
+        counts = read_record.count_views(
+            [self.VIEW, self.VIEW, 'view {"path":"/about","at":"2026-09-08T22:01:00Z"}']
+        )
+        assert counts == {"/": 2, "/about": 1}
+
+    def test_a_path_containing_the_word_view_is_not_a_marker(self):
+        """The marker has to start a token, or /preview would count as one."""
+        counts = read_record.count_views(['GET /preview 200', 'served overview 200'])
+        assert counts == {}
+
+    def test_examination_lines_are_not_views(self):
+        counts = read_record.count_views([EXAMINED, CLEARED])
+        assert counts == {}
+
+    def test_a_host_timestamp_prefix_does_not_hide_a_view(self):
+        assert read_record.count_views(["2026-09-08T22:00:00.123Z  " + self.VIEW]) == {"/": 1}
+
+    def test_malformed_view_lines_are_stepped_over(self):
+        counts = read_record.count_views(
+            ["view {not json}", 'view {"no":"path"}', "view []", self.VIEW]
+        )
+        assert counts == {"/": 1}
+
+    def test_the_summary_reports_the_rate_this_was_built_for(self):
+        records, orphans = read_record.parse([EXAMINED])
+        summary = read_record.summarise(records, orphans, {"/": 4})
+        assert summary["views"] == 4
+        assert summary["ranAfterViewing"] == 0.25
+
+    def test_no_visitors_yet_is_null_rather_than_zero(self):
+        """0/0 is not a rate, and printing 0 would state a finding from no data."""
+        records, orphans = read_record.parse([EXAMINED])
+        assert read_record.summarise(records, orphans, {})["ranAfterViewing"] is None
+
+    def test_a_log_of_only_views_still_reports(self, tmp_path, capsys):
+        """A round where everyone looked and nobody ran is the finding, not an error."""
+        log = tmp_path / "views.log"
+        log.write_text(self.VIEW + "\n" + self.VIEW + "\n")
+        assert read_record.main([str(log)]) == 0
+        assert json.loads(capsys.readouterr().out)["views"] == 2

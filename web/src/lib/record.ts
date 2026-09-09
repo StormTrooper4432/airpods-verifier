@@ -26,6 +26,7 @@
  */
 
 import type { PanelId, Verdict } from '../data/sheet';
+import { countExamination } from './metrics.ts';
 
 const ENABLED = process.env.RECORD_EXAMINATIONS !== 'off';
 const KEEP = Math.max(50, Number(process.env.RECORD_KEEP ?? 500));
@@ -94,6 +95,10 @@ export function nextAttempt(session: string): number {
 }
 
 export function record(entry: Omit<Record, 'at' | 'id'>) {
+  // Counted even when recording is switched off: the tally is anonymous in a
+  // way the record is not, and turning off the detail should not blind the
+  // count of how many people ran something.
+  countExamination(entry.outcome);
   if (!ENABLED) return;
   const full: Record = {
     id: Math.random().toString(36).slice(2, 8),
