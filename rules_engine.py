@@ -367,6 +367,20 @@ def _rule_model_number(extraction: VisionExtraction, variant: str) -> RuleOutcom
 _PANELS_SHOWING_AN_EDGE = frozenset({"box_side"})
 
 
+#: Products whose retail seal the owner has confirmed directly, so the seal
+#: check is not an extrapolation. Read from the knowledge base rather than
+#: written here, because a rule with its ground truth inlined is a rule with no
+#: source. AirPods Pro 3 was added on the owner's direct answer, 2026-09-08.
+#:
+#: Being on this list lets a product be CONDEMNED on its seal. It does not let
+#: it be cleared: Model Number Compatibility is Tier 1 and stays UNKNOWN for a
+#: non-Pro-2 product, and an unresolved Tier 1 forces INCONCLUSIVE whatever the
+#: coverage reaches.
+_SEAL_SOURCED_FOR: frozenset[str] = frozenset(
+    KNOWLEDGE.get("packaging", {}).get("seal_sourced_for", ())
+)
+
+
 def _rule_packaging_seal(extraction: VisionExtraction, variant: str) -> RuleOutcome:
     """Seal check.
 
@@ -376,7 +390,7 @@ def _rule_packaging_seal(extraction: VisionExtraction, variant: str) -> RuleOutc
     is common online and wrong, and coding it would accuse genuine sealed units.
     """
     other = identifies_another_product(extraction)
-    if other is not None:
+    if other is not None and other not in _SEAL_SOURCED_FOR:
         return RuleOutcome(
             EvidenceStatus.UNKNOWN,
             f"This item's model number identifies it as {other}, and the seal expectations here "

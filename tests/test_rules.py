@@ -1956,3 +1956,72 @@ class TestTheCopyrightCeilingCannotSilentlyAge:
             )
         )
         assert "misread" in detail_of(report, "Copyright Year Constraint")
+
+
+class TestSealForProductsWithASourcedSeal:
+    """Pro 3 can be condemned on its seal. It still cannot be cleared.
+
+    Owner, asked directly 2026-09-08: a sealed genuine AirPods Pro 3 box has
+    paper pull-tabs with green arrows, the same as Pro 2 USB-C. Apple publishes
+    nothing about packaging seals, so the owner is the highest source available.
+
+    Clearing stays impossible because Model Number Compatibility is Tier 1 and
+    stays UNKNOWN for a non-Pro-2 product, and an unresolved Tier 1 forces
+    INCONCLUSIVE whatever the coverage reaches. That is the designed position
+    for a product this tool does not fully characterise, and it is why enabling
+    the seal here did not break the three "never accused" invariants.
+    """
+
+    PRO_3 = "A3063"
+    AIRPODS_4 = "A3053"  # no sourced seal; must stay withheld
+
+    def test_the_list_comes_from_the_knowledge_base(self):
+        from rules_engine import KNOWLEDGE, _SEAL_SOURCED_FOR
+
+        assert set(_SEAL_SOURCED_FOR) == set(KNOWLEDGE["packaging"]["seal_sourced_for"])
+        assert "AirPods Pro 3" in _SEAL_SOURCED_FOR
+
+    def test_a_pro_3_with_paper_tabs_resolves_the_seal(self):
+        report = evaluate(
+            make_extraction(
+                extracted_model_number=self.PRO_3,
+                has_paper_pull_tabs=True,
+                has_plastic_shrinkwrap=False,
+            )
+        )
+        assert status_of(report, "Packaging Seal Type") is EvidenceStatus.PASS
+
+    def test_a_pro_3_can_be_condemned_on_its_seal(self):
+        report = evaluate(
+            make_extraction(
+                extracted_model_number=self.PRO_3,
+                has_plastic_shrinkwrap=True,
+                shrinkwrap_has_pull_tab=False,
+                has_paper_pull_tabs=False,
+                visible_panels=["box_side", "box_bottom_label"],
+            )
+        )
+        assert status_of(report, "Packaging Seal Type") is EvidenceStatus.FAIL
+        assert report.summary_verdict is Verdict.HIGH_RISK_SUSPECTED
+
+    def test_a_pro_3_still_cannot_be_cleared(self):
+        """The invariant. Tier 1 is unresolved, so no coverage clears it."""
+        report = evaluate(
+            make_extraction(
+                extracted_model_number=self.PRO_3,
+                has_paper_pull_tabs=True,
+                has_plastic_shrinkwrap=False,
+            )
+        )
+        assert report.summary_verdict is Verdict.INCONCLUSIVE
+        assert status_of(report, "Model Number Compatibility") is EvidenceStatus.UNKNOWN
+
+    def test_a_product_with_no_sourced_seal_is_still_withheld(self):
+        report = evaluate(
+            make_extraction(
+                extracted_model_number=self.AIRPODS_4,
+                has_paper_pull_tabs=True,
+                has_plastic_shrinkwrap=False,
+            )
+        )
+        assert status_of(report, "Packaging Seal Type") is EvidenceStatus.UNKNOWN

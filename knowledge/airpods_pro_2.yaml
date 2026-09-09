@@ -848,6 +848,26 @@ packaging:
     description: Paper pull-tabs with green arrows on the box seams.
     source: owner
 
+  # Products whose retail seal the owner has confirmed directly. The seal check
+  # is withheld for anything not on this list, because applying Pro 2 packaging
+  # expectations to another generation is the extrapolation that once accused a
+  # genuine AirPods 4 ANC.
+  #
+  # AirPods Pro 3 is here because the owner was asked directly on 2026-09-08
+  # what a sealed genuine Pro 3 box carries, and answered: paper pull-tabs with
+  # green arrows, the same as Pro 2 USB-C. Apple publishes nothing about
+  # packaging seals, so the owner is the highest available source.
+  #
+  # This lets a Pro 3 be CONDEMNED on its seal. It still cannot be CLEARED:
+  # Model Number Compatibility is Tier 1 and stays UNKNOWN for a non-Pro-2
+  # product, and an unresolved Tier 1 forces INCONCLUSIVE whatever the coverage
+  # reaches. Condemnable but never clearable is the designed position for a
+  # product this tool does not fully characterise.
+  seal_sourced_for:
+    - AirPods Pro 2
+    - AirPods Pro 3
+  seal_sourced_for_source: owner (asked directly, 2026-09-08)
+
 # Panel-indexed expectations. Consumed only as observation for now - panel
 # identification is not yet accurate enough to drive a FAIL. Promote entries to
 # rules once panel-ID accuracy is measured against a labelled corpus.
