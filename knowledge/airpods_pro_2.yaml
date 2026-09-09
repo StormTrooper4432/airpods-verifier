@@ -605,6 +605,54 @@ serial_format:
 # number for an assumed one. Revisit if a future measurement shows drift.
 # source: measurement (this repository), 2026-09-08
 
+# TWO MORE FONT APPROACHES, BOTH DEAD, 2026-09-09. Six now.
+#
+# WITHIN-LABEL CONSISTENCY. Not "which typeface" but "is this printing uniform"
+# - Apple's presses are machine-regular and a re-typeset fake might not be.
+# Coefficient of variation of glyph height and of stroke weight, compared at
+# matched resolution so the counterfeit screenshots are not handicapped:
+#
+#                        glyphs  height_cv  weight_cv
+#   genuine Pro 2 macro     454      0.431      0.323
+#   genuine Pro 3           130      0.251      0.267
+#   genuine Pro 3            196      0.512      0.324
+#   counterfeit Pro 3       150      0.352      0.295
+#   counterfeit Pro 3       104      0.975      0.323
+#
+# Genuine spans 0.251-0.512 and counterfeit 0.352-1.142. Overlapping, and the
+# genuine Pro 2 macro is LESS uniform than a counterfeit. Same shape as every
+# other result here: variation within genuine exceeds the gap to counterfeit.
+#
+# PHOTO-TO-PHOTO. The most promising idea, because it removes the
+# synthetic-to-real gap that DeepFont names as the central problem: compare a
+# label against a GENUINE PHOTOGRAPH of the same product rather than against a
+# rendered typeface, so both sides carry the same kind of noise. Genuine Pro 3
+# and counterfeit Pro 3 are the same product with the same label text, which is
+# exactly the pairing this needs. Median nearest-neighbour glyph-shape distance
+# into a genuine Pro 3 reference:
+#
+#   genuine Pro 3       0.1709   0.3333
+#   counterfeit Pro 3   0.1631   0.1686   0.4255   0.3427
+#
+# The counterfeit's closest match (0.1631) is NEARER the genuine reference than
+# a second genuine photograph is (0.1709). Complete overlap. Removing the
+# synthetic gap does not help, because the gap was never the binding problem -
+# between-photograph variation is.
+#
+# SIX APPROACHES, ONE ANSWER. Shape scatter, shape offset, absolute stroke
+# weight, within-label consistency, photo-to-photo matching, and MLLM prompting
+# (benchmarked across 15 models by arXiv 2603.08497) all fail the same way at
+# the resolutions a phone produces. A trained classifier is the only route the
+# literature supports and it needs a corpus this project does not have.
+#
+# THE TYPOGRAPHY THAT DOES WORK IS ALREADY SHIPPING. Typography & Print Quality
+# - misspellings in the printed copy - is the single biggest driver of
+# HIGH_RISK verdicts on the corpus and is what caught the confirmed counterfeit
+# Pro 3 (Audllonos, cargadares, Chemical Bums, swalliwed), together with the
+# (S)Serial spacing tell. When a domain expert says fakes cannot reproduce
+# Apple's typography, THAT is the part a photograph can measure.
+# source: measurement (this repository), 2026-09-09
+
 # WHAT THE PUBLISHED RESEARCH SAYS ABOUT DOING THIS WITH A MODEL, 2026-09-09.
 # Searched after the geometric approach was measured dead, to check whether an
 # MLLM or a trained network could do what the descriptor cannot.
