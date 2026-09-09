@@ -578,6 +578,45 @@ serial_format:
 # number for an assumed one. Revisit if a future measurement shows drift.
 # source: measurement (this repository), 2026-09-08
 
+# THE FONT CHECK RUN ABOVE THE GATE, FOR THE FIRST TIME, 2026-09-09.
+# The owner supplied a macro photograph of a genuine Pro 2 box back at
+# 3024x4032, median glyph height 70px - the first image in this project to
+# clear the 45px floor. Measured locally; knowledge/real_* never leaves the
+# machine. Thirteen expected lines supplied, pooled:
+#
+#   glyphs scored        50          letters measured   50
+#   median glyph height  70px        gate               45px
+#   offset               0.94%       scatter            6.71%
+#   threshold            2.00%       differs_from_SF    TRUE
+#
+# IT ACCUSES A CONFIRMED GENUINE BOX. Not marginally, and not for want of
+# sample: fifty glyphs, well resolved, on a unit the owner confirms is real.
+# The question that could not be answered before - does this work above the
+# gate - is answered, and the answer is no.
+#
+# WHERE IT FAILS IS INSTRUCTIVE. The offset is 0.94%, so the AVERAGE glyph sits
+# almost exactly on San Francisco. The scatter is 6.71%, so individual glyphs
+# disagree wildly around that average. That is the signature of per-glyph
+# measurement noise, not of a different typeface: a substitute face would shift
+# the mean, and this does not.
+#
+# The 2.00% scatter threshold was calibrated on synthetic renders, which carry
+# no photographic noise at all. Applying it to photographs compares a
+# noise-free population against a noisy one, so every real photograph fails it.
+# That is a calibration error, not necessarily a dead descriptor.
+#
+# WHAT WOULD SETTLE IT: a counterfeit label photographed above 45px so the two
+# can be compared at equal resolution. None exists - every counterfeit
+# reference here is a screenshot, best 29px. Until a counterfeit is measured
+# above the gate, there is no way to know whether 6.71% is high or simply what
+# a photograph scores, and the check must stay at weight zero.
+#
+# This is the strongest evidence yet for the demotion. A domain expert on
+# r/AreMyAirpodsAuthentic argues font and weight is the most reliable tell
+# there is, and he may well be right by eye. This implementation of it accuses
+# a genuine unit at full resolution with fifty glyphs.
+# source: measurement (this repository), 2026-09-09
+
 # WHY THE FONT CHECK HAS NEVER RUN: NO PHOTOGRAPH CLEARS THE GATE.
 # Measured 2026-09-09 across every reference photograph held locally.
 #
