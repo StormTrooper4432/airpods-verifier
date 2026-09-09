@@ -578,6 +578,45 @@ serial_format:
 # number for an assumed one. Revisit if a future measurement shows drift.
 # source: measurement (this repository), 2026-09-08
 
+# WHAT THE PUBLISHED RESEARCH SAYS ABOUT DOING THIS WITH A MODEL, 2026-09-09.
+# Searched after the geometric approach was measured dead, to check whether an
+# MLLM or a trained network could do what the descriptor cannot.
+#
+# VISION-LANGUAGE MODELS ARE TYPOGRAPHY-BLIND. "Reading != Seeing: Diagnosing
+# and Closing the Typography Gap in Vision-Language Models" (arXiv 2603.08497)
+# evaluates 15 state-of-the-art VLMs over 26 fonts, four scripts, three
+# difficulty levels. They read text near-perfectly and cannot see how it looks.
+# Colour recognition is near-perfect; FONT STYLE DETECTION IS UNIVERSALLY POOR.
+# Model scale does not predict performance and accuracy is flat across
+# difficulty, which the authors attribute to typographic properties never being
+# annotated in pretraining rather than to a capacity ceiling. Font style
+# specifically "resists fine-tuning across all model sizes" and they call for
+# architectural change.
+#
+# Direct consequence for this project: asking Gemini "is this San Francisco"
+# is not a shortcut around the descriptor. It is the same wall, and the
+# benchmark says so across every model tested.
+#
+# A DEDICATED NETWORK REACHES 80% TOP-5. DeepFont (arXiv 1507.03196, Adobe)
+# built the AdobeVFR dataset and a CNN specifically for visual font
+# recognition. Its central problem is named as the synthetic-to-real domain
+# gap - the exact failure measured above this note - and it is addressed with a
+# stacked convolutional autoencoder trained on a large corpus of UNLABELED
+# REAL-WORLD text images. The result is better than 80% top-5.
+#
+# Top-5 at 80% is a font-picker, not an authenticity check. A verdict here
+# needs the false-positive rate near zero, and the corpus that bought Adobe
+# that number is orders of magnitude beyond anything this project holds: one
+# genuine label above the resolution gate and zero counterfeits.
+#
+# CONCLUSION. Three routes are now closed with evidence rather than opinion:
+# geometric descriptors (measured here), MLLM prompting (benchmarked across 15
+# models), and a trained classifier (needs a corpus that does not exist here).
+# The blocker is data, not cleverness. If counterfeit labels above 45px ever
+# accumulate in numbers, DeepFont's domain-adaptation approach is the
+# documented way to spend them; until then the check stays at weight zero.
+# source: arXiv 2603.08497; arXiv 1507.03196; measurement (this repository)
+
 # WHY GEOMETRIC FONT DETECTION CANNOT WORK ON PHOTOGRAPHS, 2026-09-09.
 # Both channels a domain expert named - "the font and weight on the box" -
 # measured directly, after a genuine label above the gate scored as differing
