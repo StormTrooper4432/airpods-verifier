@@ -534,6 +534,39 @@ serial_format:
 # number for an assumed one. Revisit if a future measurement shows drift.
 # source: measurement (this repository), 2026-09-08
 
+# SERIAL CROSS-MATCH RESOLVED, 2026-09-08. First time in this project.
+#
+# Three owner photographs - box underside label, case lid filling the frame,
+# box back - run through the real pipeline with the owner's consent:
+#
+#   Model Number Compatibility   PASS        Serial Cross-Match     PASS
+#   Packaging Seal Type          PASS        Serial Label Format    PASS
+#   Copyright Year Constraint    PASS        Typography & Print     PASS
+#   Serial Number Format         PASS
+#   verdict GENUINE, coverage 0.95 (18.5 of 19.5, the confidence cap)
+#
+# The case lid serial was READ for the first time - 0 of 20 across the whole
+# labelled corpus before this - and it matched the box label serial, which is
+# the comparison the rule exists to make and had never been able to attempt.
+#
+# This is the chain closing: the check was measured never to fire, the cause
+# was measured to be framing distance against the 1568px downscale, the capture
+# guidance was rewritten to ask for a lid filling the frame, and a photograph
+# taken that way made it resolve. The guidance is not a guess any more.
+#
+# Also PASSED on this unit, and worth noting because both are Pro 2 specific:
+# paper pull-tab seals with green arrows and no plastic wrap, and copyright
+# 2024 against a 2023 minimum.
+#
+# CAVEAT ON WHAT THIS IS EVIDENCE OF. It is one unit and it is not a labelled
+# corpus item, so it moves no agreement figure. It demonstrates the rule CAN
+# resolve on an ordinary phone photograph, not that it resolves often. It is
+# also a Middle East box - TDRA ER23568/23, Arabic origin line, Apple
+# Distribution International Cork - and this knowledge base characterises North
+# American packaging only, so the content rules that passed here passed on a
+# region they were not sourced for.
+# source: owner photographs + pipeline run (this repository), 2026-09-08
+
 # REAL-PHOTOGRAPH CHECK ON THE FRAMING CONCLUSION, 2026-09-08.
 #
 # The measurement below is synthetic, and its stated caveat is that it shows
