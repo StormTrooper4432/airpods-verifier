@@ -578,6 +578,37 @@ serial_format:
 # number for an assumed one. Revisit if a future measurement shows drift.
 # source: measurement (this repository), 2026-09-08
 
+# LABEL TYPOGRAPHY HAS ALSO NEVER FIRED, and not only for the reason recorded.
+# Investigated 2026-09-09 after a domain expert on r/AreMyAirpodsAuthentic
+# argued that font and weight are the most reliable tell there is - the same
+# claim this project measured and demoted.
+#
+# Ledger status across the labelled corpus: 0 PASS, 0 FAIL, 20 UNKNOWN. The
+# same shape as Serial Cross-Match before the framing fix, so the obvious
+# hypothesis was the same cause: photographs too far back. The resolution gate
+# wants 45px median glyph height and whole-box photographs deliver 28-35px.
+#
+# That hypothesis is HALF right. Measured on an owner close-up of a Pro 2 label
+# filling the frame (tests/sample_data/22): the crop clears the gate
+# comfortably. But analyse_label still returns glyphs=0 and letters_measured=0
+# on it, with a nonsense median height equal to the whole crop, while
+# find_text_lines on the same crop reports 6 lines. So line detection works and
+# glyph segmentation does not.
+#
+# TWO BLOCKERS, NOT ONE. Framing is necessary and not sufficient. The second is
+# bug-shaped rather than physics-shaped - something between isolate_dominant_line
+# and the glyph pass fails on a photographed line, where it works on the
+# synthetic renders the thresholds were calibrated against. That is unfinished:
+# it was found, not fixed, and this note exists so the next attempt does not
+# start by re-testing the resolution theory alone.
+#
+# The demotion stands either way. Nothing here shows the font check separates
+# genuine from counterfeit; it shows the check has not been running at all, so
+# the 2.39-4.72% genuine against 6.78% counterfeit figures were produced by a
+# path that scores almost nothing. Re-measure before believing those numbers in
+# either direction.
+# source: measurement (this repository), 2026-09-09
+
 # SERIAL CROSS-MATCH RESOLVED, 2026-09-08. First time in this project.
 #
 # Three owner photographs - box underside label, case lid filling the frame,
