@@ -546,13 +546,13 @@ def _rule_copyright_year(extraction: VisionExtraction, variant: str) -> RuleOutc
     ceiling = COPYRIGHT_YEARS.get(variant, {}).get("max", MAXIMUM_COPYRIGHT_YEAR)
     if year > ceiling:
         return RuleOutcome(
-            EvidenceStatus.PASS,
-            f"Copyright year {year} is later than any year observed on genuine "
-            f"{variant} packaging (latest seen is {ceiling}). Recorded, not charged. "
-            f"The only AirPods product observed carrying a 2026 copyright is AirPods "
-            f"Max 2, introduced that year, so this is out of pattern and worth a second "
-            f"look - but Apple reprints boxes without announcing it, and not having seen "
-            f"a later one is not evidence against this box.",
+            EvidenceStatus.FAIL,
+            f"Copyright year {year} is later than any year that appears on genuine "
+            f"{variant} packaging, which stops at {ceiling}. The domain expert states "
+            f"categorically that no genuine AirPods Pro 2 box carries a 2026 copyright - "
+            f"the only AirPods product that does is AirPods Max 2, introduced that year. "
+            f"Check the year against the box in good light before acting on this: a "
+            f"misread digit produces exactly this finding.",
         )
 
     minimum = COPYRIGHT_YEARS.get(variant, {}).get('min', _PERMISSIVE_MINIMUM_YEAR)

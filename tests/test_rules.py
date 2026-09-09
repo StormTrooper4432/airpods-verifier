@@ -408,39 +408,53 @@ class TestCopyrightYearRule:
         )
         assert status_of(report, "Copyright Year Constraint") is EvidenceStatus.FAIL
 
-    def test_the_current_year_never_fails(self):
-        """The guard that would have caught this, and did not exist.
+    def test_the_ceiling_convicts_and_is_therefore_dated(self):
+        """This replaced "the current year never fails".
 
-        The ceiling is an OBSERVED one — four genuine units, seen by one person
-        — and it does not move when the calendar does. It stood at 2025 while
-        the date was 2026-09-08, so a genuine box reprinted this year was being
-        called HIGH RISK. Nothing failed; the tests asserted the stale ceiling
-        rather than the property that matters.
+        That test existed because the ceiling had aged: it sat at 2025 while the
+        date was 2026-09-08, so a box reprinted that year was called HIGH RISK
+        and nothing noticed. Asserting the current year can never fail was the
+        fix, and it was the wrong shape — the owner then stated categorically
+        that NO genuine Pro 2 box carries a 2026 copyright, which makes the
+        current year exactly the year that should fail.
+
+        Both cannot hold. The safety property is not "the calendar wins", it is
+        "a convicting ceiling must have been confirmed recently by a human", and
+        TestTheCopyrightCeilingCannotSilentlyAge enforces that instead. This
+        keeps the two tied together so the conviction cannot outlive its source.
         """
-        import datetime
+        from rules_engine import KNOWLEDGE
 
-        this_year = datetime.date.today().year
-        report = evaluate(make_extraction(copyright_year=this_year))
-        assert status_of(report, "Copyright Year Constraint") is not EvidenceStatus.FAIL, (
-            f"a box printed this year ({this_year}) is being convicted against an observed "
-            f"ceiling of {MAXIMUM_COPYRIGHT_YEAR}; the ceiling has aged"
+        report = evaluate(
+            make_extraction(
+                claimed_model_variant="Pro 2 USB-C",
+                extracted_model_number="A3047",
+                copyright_year=MAXIMUM_COPYRIGHT_YEAR + 1,
+            )
         )
+        if status_of(report, "Copyright Year Constraint") is EvidenceStatus.FAIL:
+            assert KNOWLEDGE.get("observed_on"), (
+                "the ceiling convicts, so it must carry the date it was last confirmed"
+            )
 
-    def test_a_year_above_the_observed_ceiling_is_recorded_not_charged(self):
-        """Apple reprints boxes. The ceiling is a handful of units, not a spec.
+    def test_a_year_above_the_ceiling_convicts_on_the_owners_statement(self):
+        """Owner, asked directly and reaffirmed: no genuine Pro 2 box shows 2026.
 
-        Measured before softening: the only corpus item this convicted is post
-        9, a confirmed counterfeit that fails Typography & Print Quality as
-        well, so agreement is unchanged at 12/20 with 0 fakes passed and 0
-        genuine units accused.
+        An absence claim, which rule 4 warns about. The objection was raised and
+        reaffirmed, so it stands on the source hierarchy where the owner
+        outranks everything but Apple's published pages — and Apple publishes
+        nothing about packaging copyright years. Corroborated but not proved by
+        corpus post 9, a confirmed counterfeit carrying 2026 on a Pro 2, which
+        already fails typography so no verdict moves.
         """
-        import datetime
-
-        above = MAXIMUM_COPYRIGHT_YEAR + 1
-        if above > datetime.date.today().year:
-            pytest.skip("the observed ceiling has caught up with the calendar")
-        report = evaluate(make_extraction(copyright_year=above))
-        assert status_of(report, "Copyright Year Constraint") is EvidenceStatus.PASS
+        report = evaluate(
+            make_extraction(
+                claimed_model_variant="Pro 2 USB-C",
+                extracted_model_number="A3047",
+                copyright_year=MAXIMUM_COPYRIGHT_YEAR + 1,
+            )
+        )
+        assert status_of(report, "Copyright Year Constraint") is EvidenceStatus.FAIL
 
     def test_a_future_year_fails(self):
         """The one ceiling that cannot age: no box is printed in the future."""
@@ -1881,3 +1895,64 @@ class TestCopyrightForOtherGenerations:
 
         assert OTHER_GENERATIONS[self.PRO_3]["introduced"] == 2025
         assert OTHER_GENERATIONS[self.PRO_3]["name"] == "AirPods Pro 3"
+
+
+class TestTheCopyrightCeilingCannotSilentlyAge:
+    """A frozen ceiling accused genuine boxes once. It must not do it twice.
+
+    The ceiling convicts again, on the owner's categorical statement that no
+    genuine AirPods Pro 2 box carries a 2026 copyright. That is an absence
+    claim; the objection was raised and the owner reaffirmed it, so it stands
+    on the source hierarchy — the same footing as the (S) Serial spacing rule.
+
+    What went wrong before was not the claim but the calendar. The ceiling sat
+    at 2025 while the date was 2026-09-08, so every box reprinted that year was
+    called HIGH RISK, and the tests asserted the stale number instead of the
+    property. These fail when the observation goes stale, forcing a re-check
+    rather than letting it rot into false accusations.
+    """
+
+    MAX_OBSERVATION_AGE_DAYS = 400  # a year, plus room to notice
+
+    def test_the_ceiling_observation_is_dated(self):
+        from rules_engine import KNOWLEDGE
+
+        assert KNOWLEDGE.get("observed_on"), (
+            "copyright ceilings convict; without a date nobody can tell when they went stale"
+        )
+
+    def test_the_observation_is_not_stale(self):
+        import datetime
+
+        from rules_engine import KNOWLEDGE
+
+        observed = KNOWLEDGE["observed_on"]
+        if isinstance(observed, str):
+            observed = datetime.date.fromisoformat(observed)
+        age = (datetime.date.today() - observed).days
+        assert age <= self.MAX_OBSERVATION_AGE_DAYS, (
+            f"the copyright ceiling was last confirmed {age} days ago and it CONVICTS. "
+            f"Ask the owner whether a genuine box has appeared carrying a later year, "
+            f"then update observed_on. Until then this rule may be accusing genuine units."
+        )
+
+    def test_a_year_above_the_ceiling_convicts(self):
+        report = evaluate(
+            make_extraction(
+                claimed_model_variant="Pro 2 USB-C",
+                extracted_model_number="A3047",
+                copyright_year=MAXIMUM_COPYRIGHT_YEAR + 1,
+            )
+        )
+        assert status_of(report, "Copyright Year Constraint") is EvidenceStatus.FAIL
+
+    def test_the_finding_warns_that_a_misread_digit_looks_identical(self):
+        """OCR turning 2025 into 2026 produces this finding and no other signal."""
+        report = evaluate(
+            make_extraction(
+                claimed_model_variant="Pro 2 USB-C",
+                extracted_model_number="A3047",
+                copyright_year=MAXIMUM_COPYRIGHT_YEAR + 1,
+            )
+        )
+        assert "misread" in detail_of(report, "Copyright Year Constraint")
