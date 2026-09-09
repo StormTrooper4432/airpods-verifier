@@ -7,7 +7,7 @@ Analyze the provided image(s) of an AirPods box or hardware.
 Extract the following key attributes with exact precision into JSON matching this exact structure:
 
 {
-  "claimed_model_variant": "Pro 2 USB-C | Pro 2 Lightning | Unknown",
+  "claimed_model_variant": "Pro 2 USB-C | Pro 2 Lightning | Pro 3 | Unknown",
   "extracted_model_number": "string or null",
   "extracted_serial_number": "string or null",
   "copyright_year": "integer or null",
@@ -29,7 +29,7 @@ Constraints:
 
 ### Field Guidance
 
-- `claimed_model_variant`: read the connector on the case (USB-C vs Lightning port) or the box text. Use "Unknown" unless one of these is unambiguous. Do not infer the variant from the model number.
+- `claimed_model_variant`: read the box text or the connector on the case (USB-C vs Lightning port). "Pro 3" when the box says AirPods Pro 3; Pro 3 ships with USB-C only, so the connector does not distinguish it from Pro 2 USB-C and the printed name does. Use "Unknown" unless one of these is unambiguous. Do not infer the variant from the model number.
 - `extracted_model_number`: the Apple A-number ("A" followed by four digits), printed in the fine-print block on the box underside or moulded inside the case lid. Return only that token, e.g. "A3047".
 - `part_number`: the Apple part number at the start of the label block, e.g. `MTJV3AM/A`. The two letters before `/A` encode the sales region. Null if not legible.
 - `origin_line`: the manufacturing-origin sentence **verbatim**, e.g. `Assembled in Vietnam` or `Made in China`. Copy the wording exactly — the phrasing itself is the data.

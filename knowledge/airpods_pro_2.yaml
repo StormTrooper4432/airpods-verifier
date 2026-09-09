@@ -21,6 +21,20 @@ variants:
   - id: Pro 2 Lightning
     introduced: 2022
     source: apple-identify
+  # AirPods Pro 3, promoted from other_generations on 2026-09-09 once every
+  # voting rule was either generation-independent or sourced FOR IT:
+  #   model numbers   apple-identify
+  #   charging case   apple-identify (A3122)
+  #   seal            owner, asked directly - paper pull-tabs with green arrows
+  #   copyright       apple-identify floor, owner ceiling (2025 only)
+  #   serial format / cross-match / label spacing / misspellings
+  #                   generation-independent; the (S) Serial spacing rule is
+  #                   confirmed BOTH ways on Pro 3 - a genuine box with the
+  #                   space and a confirmed counterfeit without it.
+  # One variant only: Apple ships Pro 3 with USB-C and no Lightning option.
+  - id: Pro 3
+    introduced: 2025
+    source: apple-identify
 
 # Apple lists the three set numbers together without saying which is the left
 # earbud, the right earbud, or the case. Where the component is genuinely
@@ -61,6 +75,23 @@ model_numbers:
     component: MagSafe Charging Case (Lightning)
     source: apple-identify   # Apple names this one explicitly as the case
 
+  - number: A3063
+    variant: Pro 3
+    component: null
+    source: apple-identify
+  - number: A3064
+    variant: Pro 3
+    component: null
+    source: apple-identify
+  - number: A3065
+    variant: Pro 3
+    component: null
+    source: apple-identify
+  - number: A3122
+    variant: Pro 3
+    component: MagSafe Charging Case for AirPods Pro 3
+    source: apple-identify   # Apple names this one explicitly as the case
+
 # Other AirPods Pro generations. These are recorded for IDENTIFICATION ONLY -
 # this tool verifies Pro 2 and nothing else. Without them, an A-number from
 # another generation is indistinguishable from a fabricated one, and the schema
@@ -79,10 +110,6 @@ model_numbers:
 # which put A3059 (a 2024 case) inside the AirPods 4 ANC earbud entry and dated
 # every AirPods Max to 2020.
 other_generations:
-  - name: AirPods Pro 3
-    introduced: 2025
-    numbers: [A3063, A3064, A3065]
-    source: apple-identify
   - name: AirPods Pro 1
     introduced: 2019
     numbers: [A2084, A2083]
@@ -129,10 +156,6 @@ charging_cases:
   - name: Charging Case for AirPods 4
     introduced: 2024
     numbers: [A3058]
-    source: apple-identify
-  - name: MagSafe Charging Case for AirPods Pro 3
-    introduced: 2025
-    numbers: [A3122]
     source: apple-identify
   - name: Lightning Charging Case for AirPods 3
     introduced: 2022
@@ -236,6 +259,10 @@ other_generation_copyright:
     source: apple-identify (introduced 2025); owner (only year seen, 2026-09-09)
 
 copyright_years:
+  Pro 3:
+    min: 2025
+    max: 2025
+    source: apple-identify (introduced 2025); owner (only year seen, 2026-09-09)
   Pro 2 USB-C:
     min: 2023
     max: 2025

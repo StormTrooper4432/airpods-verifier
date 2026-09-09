@@ -1,6 +1,6 @@
 # AirPods Authenticator
 
-Verify AirPods Pro 2 from photographs and get back an itemised **Evidence Ledger** —
+Verify AirPods Pro 2 and Pro 3 from photographs and get back an itemised **Evidence Ledger** —
 every finding cited to a source, every open question turned into a specific photograph
 to take.
 
@@ -247,13 +247,20 @@ The knowledge base covers **28 model numbers** across every AirPods product Appl
 for identification only. Without it, an A-number from another generation is
 indistinguishable from a fabricated one:
 
-> Extracted model A3063 is a genuine Apple model number, but it belongs to **AirPods Pro
-> 3** (introduced 2025), not AirPods Pro 2. This tool only verifies AirPods Pro 2, so no
-> authenticity finding can be made — a counterfeit Pro 3 and a genuine one would both
-> look like this here.
+> Extracted model A3055 is a genuine Apple model number, but it belongs to **AirPods 4
+> with Active Noise Cancellation** (introduced 2024), not AirPods Pro. This tool verifies
+> Pro 2 and Pro 3, so no authenticity finding can be made — a counterfeit AirPods 4 and a
+> genuine one would both look like this here.
 
-In the 20-post corpus, **3 items weren't Pro 2 at all** (two Pro 3, one AirPods 4 ANC).
-Two of those had previously been reported as suspicious.
+**Pro 3 was promoted from that refusal to a verified variant** once every voting rule was
+either generation-independent or sourced for it: model numbers and case from Apple, seal
+type and copyright ceiling from the domain expert asked directly. The serial checks and
+the misspelling check never depended on generation. It has one variant — Apple ships Pro 3
+with USB-C only.
+
+In the 20-post corpus, **3 items weren't Pro 2** (two Pro 3, one AirPods 4 ANC). Two had
+previously been reported as suspicious. The two Pro 3 items would now be graded rather
+than declined.
 
 ### What to photograph next
 

@@ -240,10 +240,9 @@ class TestModelNumberRule:
     @pytest.mark.parametrize(
         "number, generation",
         [
-            ("A3063", "AirPods Pro 3"),
-            ("A3064", "AirPods Pro 3"),
-            ("A3065", "AirPods Pro 3"),
-            ("A3122", "MagSafe Charging Case for AirPods Pro 3"),
+            # Pro 3 numbers are NOT here any more: it was promoted to a
+            # verified variant once its seal and copyright were sourced, so it
+            # is named AND graded rather than named and declined.
             ("A2084", "AirPods Pro 1"),
             ("A2083", "AirPods Pro 1"),
         ],
@@ -863,7 +862,6 @@ class TestGenerationIdentification:
         "number, generation",
         [
             ("A3055", "AirPods 4 with Active Noise Cancellation"),  # corpus post 5
-            ("A3063", "AirPods Pro 3"),                             # corpus posts 4 and 8
             ("A3053", "AirPods 4"),
             ("A2565", "AirPods 3"),
             ("A2032", "AirPods 2"),
@@ -1076,7 +1074,6 @@ class TestChargingCaseIdentification:
         [
             ("A3059", "AirPods 4", 2024),
             ("A3058", "AirPods 4", 2024),
-            ("A3122", "AirPods Pro 3", 2025),
             ("A2897", "AirPods 3", 2022),
             ("A2566", "AirPods 3", 2021),
             ("A1938", "AirPods 1 and 2", 2019),
@@ -1108,9 +1105,12 @@ class TestChargingCaseIdentification:
         assert "or" in entry["name"]
 
     def test_a_case_number_is_named_not_accused(self):
-        report = evaluate(make_extraction(extracted_model_number="A3122"))
+        # A3059 is the AirPods 4 ANC case. A3122 used to sit here; it is a Pro 3
+        # case and Pro 3 is a verified variant now, so it is graded rather than
+        # declined.
+        report = evaluate(make_extraction(extracted_model_number="A3059"))
         assert status_of(report, "Model Number Compatibility") is EvidenceStatus.UNKNOWN
-        assert "AirPods Pro 3" in detail_of(report, "Model Number Compatibility")
+        assert "AirPods 4" in detail_of(report, "Model Number Compatibility")
         assert report.summary_verdict is not Verdict.HIGH_RISK_SUSPECTED
 
 
@@ -1768,7 +1768,11 @@ class TestSerialGlyphConfusion:
 
 
 class TestOutOfScopeSaysWhatItCanStillDo:
-    """A Pro 3 cannot be cleared here, but it can still be condemned.
+    """An out-of-scope product cannot be cleared, but can still be condemned.
+
+    Was written about Pro 3, which is a verified variant now - its seal and
+    copyright were sourced and its numbers are in the matrix, so it is graded
+    like any Pro 2. AirPods 4 is the example that still fits.
 
     The Pro-2-sourced checks - seal type, copyright range, model compatibility -
     are withheld. The serial checks are not: Apple never repeats a serial and
@@ -1778,20 +1782,21 @@ class TestOutOfScopeSaysWhatItCanStillDo:
     stopped reading would miss a finding sitting three rows below.
     """
 
-    PRO_3 = "A3063"
+    OUT_OF_SCOPE = "A3053"  # AirPods 4
 
     def test_it_does_not_claim_nothing_can_be_found(self):
         detail = detail_of(
-            evaluate(make_extraction(extracted_model_number=self.PRO_3)),
+            evaluate(make_extraction(extracted_model_number=self.OUT_OF_SCOPE)),
             "Model Number Compatibility",
         )
         assert "cannot be cleared" in detail
         assert "can still catch a fake" in detail
 
-    def test_the_serial_label_tell_still_convicts_a_pro_3(self):
+    def test_the_serial_label_tell_still_convicts_out_of_scope(self):
+        """Generation-independent: Apple never prints "(S)Serial" unspaced."""
         report = evaluate(
             make_extraction(
-                extracted_model_number=self.PRO_3,
+                extracted_model_number=self.OUT_OF_SCOPE,
                 extracted_serial_number="HGHP9X4047",
                 serial_label_literal="(S)Serial No. HGHP9X4047",
             )
@@ -1799,10 +1804,11 @@ class TestOutOfScopeSaysWhatItCanStillDo:
         assert status_of(report, "Serial Label Format") is EvidenceStatus.FAIL
         assert report.summary_verdict is Verdict.HIGH_RISK_SUSPECTED
 
-    def test_a_serial_mismatch_still_convicts_a_pro_3(self):
+    def test_a_serial_mismatch_still_convicts_out_of_scope(self):
+        """Apple never ships a box whose label disagrees with the case inside."""
         report = evaluate(
             make_extraction(
-                extracted_model_number=self.PRO_3,
+                extracted_model_number=self.OUT_OF_SCOPE,
                 extracted_serial_number="H4XQ7K2LMN",
                 serial_case_lid="P9WT3B8RTY",
                 serial_label_literal="(S) Serial No. H4XQ7K2LMN",
@@ -1812,9 +1818,14 @@ class TestOutOfScopeSaysWhatItCanStillDo:
         assert status_of(report, "Serial Cross-Match") is EvidenceStatus.FAIL
         assert report.summary_verdict is Verdict.HIGH_RISK_SUSPECTED
 
-    def test_a_clean_pro_3_is_still_never_cleared(self):
-        """The asymmetry is the point: condemn yes, clear no."""
-        report = evaluate(make_extraction(extracted_model_number=self.PRO_3))
+    def test_a_clean_out_of_scope_item_is_still_never_cleared(self):
+        """The asymmetry is the point: condemn yes, clear no.
+
+        Pro 3 used to be the example here and is now a verified variant, so it
+        IS cleared. The asymmetry still holds for anything this tool has no
+        packaging ground truth for.
+        """
+        report = evaluate(make_extraction(extracted_model_number=self.OUT_OF_SCOPE))
         assert report.summary_verdict is not Verdict.GENUINE
 
 
@@ -1871,7 +1882,7 @@ class TestCopyrightForOtherGenerations:
     AIRPODS_4 = "A3053"  # no sourced facts; the invariant still applies to it
 
     def test_a_year_predating_the_product_fails(self):
-        report = evaluate(make_extraction(extracted_model_number=self.PRO_3, copyright_year=2024))
+        report = evaluate(make_extraction(claimed_model_variant="Pro 3", extracted_model_number=self.PRO_3, copyright_year=2024))
         assert status_of(report, "Copyright Year Constraint") is EvidenceStatus.FAIL
 
     def test_the_only_genuine_year_passes(self):
@@ -1882,18 +1893,19 @@ class TestCopyrightForOtherGenerations:
         report = evaluate(make_extraction(extracted_model_number=self.PRO_3, copyright_year=2026))
         assert status_of(report, "Copyright Year Constraint") is EvidenceStatus.FAIL
 
-    def test_a_pro_3_still_cannot_be_cleared(self):
-        """The invariant that survived. Tier 1 unresolved beats any coverage."""
+    def test_a_clean_pro_3_reaches_a_verdict(self):
+        """Was "still cannot be cleared". Promoting Pro 3 inverted it."""
         report = evaluate(
             make_extraction(
+                claimed_model_variant="Pro 3",
                 extracted_model_number=self.PRO_3,
                 copyright_year=2025,
                 has_paper_pull_tabs=True,
                 has_plastic_shrinkwrap=False,
             )
         )
-        assert report.summary_verdict is Verdict.INCONCLUSIVE
-        assert status_of(report, "Model Number Compatibility") is EvidenceStatus.UNKNOWN
+        assert report.summary_verdict is Verdict.GENUINE
+        assert status_of(report, "Model Number Compatibility") is EvidenceStatus.PASS
 
     def test_a_product_with_no_sourced_range_is_still_withheld(self):
         report = evaluate(make_extraction(extracted_model_number=self.AIRPODS_4, copyright_year=2024))
@@ -2018,14 +2030,15 @@ class TestSealForProductsWithASourcedSeal:
         """The invariant. Tier 1 is unresolved, so no coverage clears it."""
         report = evaluate(
             make_extraction(
+                claimed_model_variant="Pro 3",
                 extracted_model_number=self.PRO_3,
                 copyright_year=2025,
                 has_paper_pull_tabs=True,
                 has_plastic_shrinkwrap=False,
             )
         )
-        assert report.summary_verdict is Verdict.INCONCLUSIVE
-        assert status_of(report, "Model Number Compatibility") is EvidenceStatus.UNKNOWN
+        assert report.summary_verdict is Verdict.GENUINE
+        assert status_of(report, "Model Number Compatibility") is EvidenceStatus.PASS
 
     def test_a_product_with_no_sourced_seal_is_still_withheld(self):
         report = evaluate(
@@ -2036,3 +2049,71 @@ class TestSealForProductsWithASourcedSeal:
             )
         )
         assert status_of(report, "Packaging Seal Type") is EvidenceStatus.UNKNOWN
+
+
+class TestProThreeIsAVerifiedVariant:
+    """Pro 3 is graded, not declined, since 2026-09-09.
+
+    It was promoted out of other_generations once every voting rule was either
+    generation-independent or sourced FOR it: model numbers and the case from
+    Apple, seal type and copyright ceiling from the owner asked directly. The
+    serial checks and the misspelling check never depended on generation.
+
+    The promotion is the product decision the three "never accused" invariants
+    were protecting against being made by accident. It was made on answers to
+    two direct questions, and those invariants still hold for AirPods 4.
+    """
+
+    PRO_3 = "A3063"
+
+    def _pro3(self, **kw):
+        base = dict(
+            claimed_model_variant="Pro 3",
+            extracted_model_number=self.PRO_3,
+            copyright_year=2025,
+            has_paper_pull_tabs=True,
+            has_plastic_shrinkwrap=False,
+        )
+        base.update(kw)
+        return make_extraction(**base)
+
+    def test_a_clean_pro_3_is_cleared(self):
+        report = evaluate(self._pro3())
+        assert report.summary_verdict is Verdict.GENUINE
+
+    def test_the_model_number_resolves_instead_of_declining(self):
+        assert status_of(evaluate(self._pro3()), "Model Number Compatibility") is EvidenceStatus.PASS
+
+    def test_the_variant_resolves_from_the_number_without_a_claim(self):
+        """The schema gained "Pro 3", but a box that does not state it still works."""
+        from rules_engine import resolve_variant
+
+        assert resolve_variant(self._pro3(claimed_model_variant="Unknown")) == "Pro 3"
+
+    def test_a_copyright_before_the_product_existed_convicts(self):
+        report = evaluate(self._pro3(copyright_year=2024))
+        assert status_of(report, "Copyright Year Constraint") is EvidenceStatus.FAIL
+
+    def test_a_missing_pull_tab_convicts_on_an_edge_view(self):
+        report = evaluate(
+            self._pro3(
+                has_paper_pull_tabs=False,
+                has_plastic_shrinkwrap=True,
+                shrinkwrap_has_pull_tab=False,
+                visible_panels=["box_side", "box_bottom_label"],
+            )
+        )
+        assert status_of(report, "Packaging Seal Type") is EvidenceStatus.FAIL
+
+    def test_pro_3_numbers_are_not_in_two_tables(self):
+        """A3122 sat in model_numbers AND charging_cases when Pro 3 moved."""
+        from rules_engine import MODEL_NUMBERS, OTHER_GENERATIONS
+
+        assert not set(MODEL_NUMBERS) & set(OTHER_GENERATIONS)
+
+    def test_pro_3_has_exactly_one_variant(self):
+        """Apple ships Pro 3 with USB-C only, so there is no connector split."""
+        from rules_engine import KNOWLEDGE
+
+        pro3 = [v for v in KNOWLEDGE["variants"] if v["id"] == "Pro 3"]
+        assert len(pro3) == 1 and pro3[0]["introduced"] == 2025

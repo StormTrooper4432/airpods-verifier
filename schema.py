@@ -28,12 +28,13 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 VARIANT_USB_C = "Pro 2 USB-C"
 VARIANT_LIGHTNING = "Pro 2 Lightning"
+VARIANT_PRO_3 = "Pro 3"
 VARIANT_UNKNOWN = "Unknown"
 
 #: Literal (not Enum) so the generated JSON Schema inlines the enum values
 #: instead of emitting a ``$ref``/``$defs`` pair -- the flattest, most portable
 #: shape for the strict structured-outputs schema validator.
-ClaimedVariant = Literal["Pro 2 USB-C", "Pro 2 Lightning", "Unknown"]
+ClaimedVariant = Literal["Pro 2 USB-C", "Pro 2 Lightning", "Pro 3", "Unknown"]
 
 #: Surfaces a photograph can show. Panel identification is recorded as an
 #: observation only - it does not drive any rule until its accuracy has been
