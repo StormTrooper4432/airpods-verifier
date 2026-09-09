@@ -578,6 +578,58 @@ serial_format:
 # number for an assumed one. Revisit if a future measurement shows drift.
 # source: measurement (this repository), 2026-09-08
 
+# WHY GEOMETRIC FONT DETECTION CANNOT WORK ON PHOTOGRAPHS, 2026-09-09.
+# Both channels a domain expert named - "the font and weight on the box" -
+# measured directly, after a genuine label above the gate scored as differing
+# from San Francisco.
+#
+# SHAPE. The inversion recorded elsewhere in this file was attributed to
+# RESOLUTION. It is noise, and resolution does not fix noise. Rendering the same
+# lines in four faces and degrading until San Francisco scatters like the real
+# photograph:
+#
+#   blur 2.6   SF 5.87   Helvetica 6.65   Avenir  9.67   Geneva 6.77
+#   blur 3.2   SF 5.26   Helvetica 6.97   Avenir 11.11   Geneva 6.71
+#   blur 4.0   SF 6.20   Helvetica 5.83   Avenir  5.47   Geneva 9.24  <- inverted
+#
+# At blur 4.0 both Helvetica and Avenir score BETTER than San Francisco. The
+# genuine photograph scored 6.71%, which sits inside the substitute range at
+# every noise level tested. The typeface signal is below the photographic noise
+# floor, and a macro photograph at 70px does not lift it out.
+#
+# OFFSET IS NOT THE ANSWER EITHER. The genuine label split offset 0.94% against
+# scatter 6.71%, which suggested the mean was clean and only the variance was
+# noisy - so offset should discriminate. It does not: under noise Helvetica's
+# offset lands at 0.88% and San Francisco's at -2.29%, so the substitute is
+# CLOSER to zero than the real face. Offset carries no reliable sign.
+#
+# WEIGHT CARRIES LESS SIGNAL THAN SHAPE, not more. Median ink fraction inside
+# each glyph box:
+#
+#                    San Francisco  Helvetica   Avenir   Geneva
+#   clean                0.544        0.545      0.583    0.553
+#   photograph-like      0.452        0.457      0.469    0.470
+#
+# San Francisco and Helvetica differ by 0.001 with NO noise at all. Weight
+# cannot separate the two faces a counterfeiter is most likely to choose
+# between, before any photograph is involved.
+#
+# CONCLUSION. Global geometric descriptors - shape scatter, shape offset, or
+# stroke weight - cannot separate San Francisco from its substitutes on a
+# photograph. Not with a better threshold, not with more resolution, not with
+# a bigger glyph sample. The check stays at weight zero permanently unless the
+# METHOD changes.
+#
+# WHAT A DIFFERENT METHOD WOULD LOOK LIKE. A human expert does this reliably,
+# so the information is present - they read specific letterforms, not a pooled
+# average. San Francisco's 'a', 'g', 'R' and 't' differ from Helvetica's in
+# ways a per-glyph comparison on those characters alone might catch, where
+# averaging fifty glyphs washes it out. That is untested and needs counterfeit
+# labels above the gate to validate; none exist, and the owner has no access to
+# one. Do not ship a font rule on synthetic separation alone - that is exactly
+# what produced the false positive this note documents.
+# source: measurement (this repository), 2026-09-09
+
 # THE FONT CHECK RUN ABOVE THE GATE, FOR THE FIRST TIME, 2026-09-09.
 # The owner supplied a macro photograph of a genuine Pro 2 box back at
 # 3024x4032, median glyph height 70px - the first image in this project to
