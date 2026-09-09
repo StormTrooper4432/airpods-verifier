@@ -14,7 +14,18 @@ venv/
 *.jpeg
 *.png
 *.heic
-!tests/sample_data/*.png
+# NO exception for tests/sample_data/*.png. There used to be one, so that a
+# synthetic fixture could be committed, and it became a loaded gun: every
+# photograph dropped into that directory was tracked by default, and a `git
+# add -A` published a real box label carrying a legible serial number. Nothing
+# in tests/ tracks a .png today, so the exception was protecting nothing and
+# costing that.
+#
+# A genuinely synthetic fixture can still be committed with `git add -f`, which
+# is the point - putting an image into this repository should be a deliberate
+# act, not something a wildcard does on your behalf. Photographs of real units
+# belong in knowledge/real_* (blocked from every vision API) or in a numbered
+# corpus subfolder, both of which are ignored.
 extraction*.json
 
 # Scraped corpus: other people's photos. Evaluate against them, don't republish.
