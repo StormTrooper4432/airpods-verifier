@@ -191,6 +191,21 @@ case_serial_suffixes:
 # cost on the corpus: none. The only item the ceiling convicted is post 9, a
 # confirmed counterfeit that fails Typography & Print Quality as well.
 # The `min` values still convict: a box cannot predate its product.
+# OWNER, 2026-09-08: the only AirPods product observed carrying a 2026
+# copyright is AirPods Max 2, which Apple introduced in 2026. Everything else
+# still shows 2025 or earlier. So a 2026 copyright on a Pro 2 box is genuinely
+# out of pattern.
+#
+# It is REPORTED, not charged, and the reason is CLAUDE.md rule 4: absence of
+# evidence is never evidence of forgery either. "No 2026 Pro 2 box has been
+# seen" is an absence claim, and Apple reprints packaging over a product's
+# life without announcing it. Corpus post 9 does carry 2026 on a Pro 2 and IS a
+# confirmed counterfeit - but it already fails Typography & Print Quality, so
+# convicting here would buy nothing and would risk the first false accusation
+# this project has had.
+#
+# Promote it if a labelled corpus ever shows 2026-on-not-Max-2 tracking
+# counterfeits across several units. One post is not that.
 copyright_years:
   Pro 2 USB-C:
     min: 2023

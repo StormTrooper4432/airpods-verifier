@@ -451,6 +451,17 @@ def _rule_packaging_seal(extraction: VisionExtraction, variant: str) -> RuleOutc
     )
 
 
+def _introduction_year(extraction: VisionExtraction) -> int | None:
+    """The year Apple introduced whatever this model number belongs to.
+
+    Read straight off `other_generations`, which sources every entry to Apple's
+    "Identify your AirPods" page, so this adds no new ground truth.
+    """
+    entry = OTHER_GENERATIONS.get(extraction.extracted_model_number or "")
+    introduced = entry.get("introduced") if entry else None
+    return introduced if isinstance(introduced, int) else None
+
+
 def _this_year() -> int:
     """The current calendar year.
 
@@ -463,10 +474,49 @@ def _this_year() -> int:
 def _rule_copyright_year(extraction: VisionExtraction, variant: str) -> RuleOutcome:
     other = identifies_another_product(extraction)
     if other is not None:
+        # The Pro 2 RANGE does not transfer. One half of it does: a box cannot
+        # be printed before the product it holds existed, whatever generation
+        # that is, and other_generations already carries a sourced introduction
+        # year for each. So a Pro 3 gets the check it can actually have instead
+        # of a blanket refusal, using data already in the knowledge base rather
+        # than an extrapolation from Pro 2 dates.
+        #
+        # Only the minimum. The observed ceiling is Pro 2 specific and, as of
+        # 2026-09-08, ceilings do not convict at all - see the note on
+        # copyright_years in the knowledge base.
+        year = extraction.copyright_year
+        introduced = _introduction_year(extraction)
+        if year is None or introduced is None:
+            return RuleOutcome(
+                EvidenceStatus.UNKNOWN,
+                f"This item's model number identifies it as {other}. The copyright range here "
+                f"is derived from AirPods Pro 2 release dates and does not apply to another "
+                f"generation.",
+            )
+        # Reported, never charged. An out-of-scope product returning
+        # INCONCLUSIVE is a designed invariant here, and it is why this project
+        # has never accused a genuine unit: a counterfeit AirPods 4 and a
+        # genuine one look identical to Pro 2 packaging rules. Convicting on
+        # one arithmetic case would open that door for a modest gain, since the
+        # item is already INCONCLUSIVE and the ledger already explains why.
+        anomaly = ""
+        if year < introduced:
+            anomaly = (
+                f" Worth noting: {year} predates {other}, which Apple introduced in "
+                f"{introduced}, and a box is not printed before the product it holds "
+                f"exists. That is an observation, not a finding - this tool does not "
+                f"grade {other}."
+            )
+        elif year > _this_year():
+            anomaly = (
+                f" Worth noting: {year} is later than the current year "
+                f"({_this_year()}), and no box is printed with a future copyright."
+            )
         return RuleOutcome(
             EvidenceStatus.UNKNOWN,
-            f"This item's model number identifies it as {other}. The copyright range here is "
-            f"derived from AirPods Pro 2 release dates and does not apply to another generation.",
+            f"This item's model number identifies it as {other}. The copyright range here "
+            f"is derived from AirPods Pro 2 release dates and does not apply to another "
+            f"generation.{anomaly}",
         )
 
     year = extraction.copyright_year
@@ -498,9 +548,11 @@ def _rule_copyright_year(extraction: VisionExtraction, variant: str) -> RuleOutc
         return RuleOutcome(
             EvidenceStatus.PASS,
             f"Copyright year {year} is later than any year observed on genuine "
-            f"{variant} packaging (latest seen is {ceiling}), which is recorded but not "
-            f"charged: Apple reprints boxes, and the observed ceiling is a handful of "
-            f"units rather than a specification.",
+            f"{variant} packaging (latest seen is {ceiling}). Recorded, not charged. "
+            f"The only AirPods product observed carrying a 2026 copyright is AirPods "
+            f"Max 2, introduced that year, so this is out of pattern and worth a second "
+            f"look - but Apple reprints boxes without announcing it, and not having seen "
+            f"a later one is not evidence against this box.",
         )
 
     minimum = COPYRIGHT_YEARS.get(variant, {}).get('min', _PERMISSIVE_MINIMUM_YEAR)

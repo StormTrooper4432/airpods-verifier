@@ -1832,3 +1832,52 @@ class TestNoGenuineSerialIsWrittenDown:
                 if fragment in text and path.name != Path(__file__).name:
                     offenders.append(f"{path.relative_to(root)} contains {fragment}")
         assert not offenders, "a real serial is back in the repository: " + "; ".join(offenders)
+
+
+class TestCopyrightForOtherGenerations:
+    """An out-of-scope box gets the observation, never the accusation.
+
+    A Pro 3 box printed before Pro 3 existed is a real anomaly and worth saying
+    out loud. It is still not a finding: "an out-of-scope product is never
+    accused" is a designed invariant here, and it is why this project has never
+    accused a genuine unit — a counterfeit AirPods 4 and a genuine one look
+    identical to Pro 2 packaging rules. Convicting on one arithmetic case would
+    open that door for a modest gain, since the item is already INCONCLUSIVE
+    and the ledger already explains why.
+
+    The first version of this DID convict, and ten existing tests caught it.
+    """
+
+    PRO_3 = "A3063"  # Apple, "Identify your AirPods": AirPods Pro 3, introduced 2025
+
+    def test_the_status_stays_unknown_whatever_the_year(self):
+        import datetime
+
+        for year in (2024, 2025, datetime.date.today().year, datetime.date.today().year + 1):
+            report = evaluate(
+                make_extraction(extracted_model_number=self.PRO_3, copyright_year=year)
+            )
+            assert status_of(report, "Copyright Year Constraint") is EvidenceStatus.UNKNOWN, year
+
+    def test_the_verdict_stays_inconclusive_whatever_the_year(self):
+        """The invariant the first version broke."""
+        report = evaluate(make_extraction(extracted_model_number=self.PRO_3, copyright_year=2024))
+        assert report.summary_verdict is Verdict.INCONCLUSIVE
+
+    def test_a_year_predating_the_product_is_said_out_loud(self):
+        report = evaluate(make_extraction(extracted_model_number=self.PRO_3, copyright_year=2024))
+        detail = detail_of(report, "Copyright Year Constraint")
+        assert "predates AirPods Pro 3" in detail
+        assert "2025" in detail
+        assert "observation, not a finding" in detail
+
+    def test_a_plausible_year_gets_no_anomaly_note(self):
+        report = evaluate(make_extraction(extracted_model_number=self.PRO_3, copyright_year=2025))
+        assert "Worth noting" not in detail_of(report, "Copyright Year Constraint")
+
+    def test_the_introduction_year_comes_from_the_knowledge_base(self):
+        """No hand-typed year: it must be Apple's, via other_generations."""
+        from rules_engine import OTHER_GENERATIONS
+
+        assert OTHER_GENERATIONS[self.PRO_3]["introduced"] == 2025
+        assert OTHER_GENERATIONS[self.PRO_3]["name"] == "AirPods Pro 3"
